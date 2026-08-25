@@ -1,0 +1,3 @@
+# Store typed claims relationally and rules as validated JSON
+
+Procedure Versions own relational records for checklist items, steps, fees, warnings, dependencies, Evidence Links, and Service Point associations; the complete procedure is not an opaque JSON document. Each Applicability Rule is a versioned, schema-validated JSONB AST rather than normalized rule-node rows or executable text. Editors change a published version by cloning its coherent records into a draft and publishing the reviewed replacement atomically. This preserves identity, provenance, and admin usability without turning the small nested rules language into a large relational model.

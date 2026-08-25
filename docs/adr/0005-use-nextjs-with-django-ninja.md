@@ -1,0 +1,3 @@
+# Use Next.js with a Django Ninja application interface
+
+Django and PostgreSQL form a modular monolith for procedural knowledge, publication, and evaluation; Django Ninja exposes a small HTTP interface consumed by a Next.js web application. Next.js owns bilingual SEO pages and the interactive questionnaire. A future native mobile client may reuse the same application interface after product fit, but version 1 will not build mobile infrastructure or share UI through React Native Web; generated interface types may be shared instead. This accepts two applications and cross-tier testing in exchange for a deliberate client seam and future mobile reuse.

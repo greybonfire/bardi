@@ -4,6 +4,10 @@ Research snapshot: 2026-08-25
 
 This file preserves the research provenance used by the ordinary domestic passport-renewal evidence pack. The pack prefers current first-party Ministry of Interior material. Older government pages and low-context web reports are retained only to expose temporal conflicts or research leads.
 
+`Source`, `Evidence Link`, and lightweight `Evidence Discrepancy` are distinct persistence concepts for the eventual admin/research system. A Source preserves the publication or report once; an Evidence Link records how an evidence-bearing semantic claim uses that Source; an Evidence Discrepancy preserves a small internal editorial record when relevant evidence materially conflicts or has uncertain applicability. Their internal storage shape does not prescribe how citations appear in the public UI.
+
+Not every piece of product copy needs an Evidence Link. This file records provenance only for claims that materially assert an external administrative fact, such as requirements, quantities, procedure-selection conditions, fees, validity/turnaround, material process steps, dependencies, routing/jurisdiction, or Field Guidance. Goal/Procedure labels, Question wording, Derived Fact explanations, UI grouping, summaries that add no new administrative assertion, and product safety warnings do not need their own evidence records.
+
 ## Source records
 
 ### `SRC-MOI-PASSPORT-REQ`
@@ -69,7 +73,7 @@ The evidence pack intentionally does not create a comprehensive nationwide direc
 - **Publisher:** Egyptian Public Services / service directory
 - **Context:** service titled as obtaining a passport in place of an expired or page-full passport
 - **Retrieved:** 2026-08-25
-- **Use:** confirms that expired/page-full replacement is a distinct service boundary
+- **Use:** confirms that expired/page-full replacement is a distinct Procedure within the broader passport Goal
 - **Limit:** service-directory content contains older administrative details in places and must not outrank newer competent-authority material on changed thresholds or fees
 
 ### `SRC-HISTORIC-GOV-PASSPORT`
@@ -107,6 +111,8 @@ Current consular guidance requires the previous passport for renewal and describ
 The account described practical passport-renewal experience and a fee inconsistent with the current Ministry-published base fee. Because the account does not provide enough precise Service Point context and conflicts with current official material, the discrepancy is not promoted into public Field Guidance. It is evidence that fee claims deserve frequent re-verification.
 
 ## Evidence Links
+
+Evidence Links are stored for evidence-bearing semantic claims, not for each sentence that may later render those claims. A future UI may combine several claims under one visible source summary or expose the individual Evidence Links behind a “view sources” affordance; this file intentionally records the finer internal provenance.
 
 ### `EL-MOI-REQ-01` — adult National ID
 
@@ -160,7 +166,7 @@ The account described practical passport-renewal experience and a fee inconsiste
 ### `EL-PSM-SERVICE-01` — renewal service identity
 
 - Source: `SRC-PSM-RENEWAL-SERVICE`
-- Claim: expired/page-full replacement is exposed as a distinct passport service
+- Claim: expired/page-full replacement is exposed as a distinct passport Procedure within the broader passport Goal
 - Retrieval context: government public-service directory, retrieved 2026-08-25
 - Verification state: current enough for service identity; individual old requirements are not adopted without newer corroboration
 
@@ -254,10 +260,15 @@ The account described practical passport-renewal experience and a fee inconsiste
 - Original fragment: `سبع سنوات`
 - Verification state: current
 
-## Discrepancy records
+## Internal Evidence Discrepancy records
+
+These records are for research/admin use only. They are intentionally small and should remain closer to an editorial issue record than an evidence-graph model. The minimum useful shape is the affected claim/subject, the relevant Sources or Evidence Links, a small status vocabulary such as `open` / `resolved` / `needs_reverification`, a concise rationale, and an optional resolution.
+
+The public plan must never render these records or their editorial adjudication text directly. It may expose only the user-relevant consequence, such as a claim being unavailable as current guidance, needing re-verification, or having an unresolved value.
 
 ### `DISC-AGE-15-VS-16`
 
+- Status: `resolved`
 - Current authority: `SRC-MOI-PASSPORT-REQ` says 15
 - Stale authority: `SRC-HISTORIC-GOV-PASSPORT` says 16
 - Adjudication: use current competent-authority material for the 2026-08-25 research snapshot; retain old material as historical evidence that the threshold changed
@@ -265,6 +276,7 @@ The account described practical passport-renewal experience and a fee inconsiste
 
 ### `DISC-FEE-CURRENT-VS-HISTORIC-AND-FIELD`
 
+- Status: `resolved_for_snapshot`
 - Current authority: Ministry publishes 705 EGP base fee at retrieval
 - Historical government material: lower old amounts
 - Low-context 2026 web account: materially different reported amount
@@ -273,13 +285,15 @@ The account described practical passport-renewal experience and a fee inconsiste
 
 ### `DISC-PREVIOUS-PASSPORT-APPLICABILITY`
 
+- Status: `needs_reverification`
 - Historical domestic and current consular sources support bringing the previous passport
 - Current domestic exact-passage support was not recovered
-- Adjudication: `needs-reverification`; exclude from current authoritative checklist until domestic source confirmation
+- Adjudication: exclude from current authoritative checklist until domestic source confirmation
 - Consequence: evidence applicability is jurisdiction-specific and cannot be inherited merely because the Authority is Egyptian government
 
 ### `DISC-MINOR-SUBMISSION-AUTHORITY`
 
+- Status: `needs_reverification`
 - Current consular source describes parent/legal guardian behavior
 - older domestic material also addressed parents acting for minors
 - current domestic exact passage was not recovered
@@ -288,6 +302,7 @@ The account described practical passport-renewal experience and a fee inconsiste
 
 ### `DISC-STANDARD-TURNAROUND`
 
+- Status: `open`
 - current first-party source recovered here does not publish a standard turnaround time
 - older government and newer secondary reports vary
 - Adjudication: current standard time is unknown; only urgent/premium timing is rendered

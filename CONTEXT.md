@@ -1,6 +1,6 @@
 # Egypt Paperwork Guidance
 
-This context describes how the platform represents a person's intended administrative outcome and produces sourced, personalized guidance for Egyptian government paperwork.
+This context describes how the platform organizes Egyptian administrative Procedures and produces sourced, personalized guidance from a person's current circumstances.
 
 ## Language
 
@@ -29,12 +29,12 @@ The explanation of each predicate result and whether it affected the final resul
 _Avoid_: Application log, error stack
 
 **Goal**:
-A stored, bilingual concrete outcome a person wants to achieve, such as obtaining, renewing, or replacing a passport. It identifies curated candidate Procedures; broad labels such as “Passport services” are navigation, not Goals.
-_Avoid_: Topic, service category
+A stable, bilingual grouping of closely related Procedures around a broad administrative objective, such as getting a passport, obtaining a National ID, or handling military paperwork. A Goal is primarily an organizational and user-entry concept: it keeps a large Procedure catalog navigable and identifies the curated Procedures that may achieve the objective. It is not itself a government transaction and does not own procedure-specific requirements, fees, steps, routing rules, or evidence.
+_Avoid_: Procedure, government transaction, rule set
 
 **Procedure**:
-A distinct administrative transaction performed with an authority for a defined output. First passport issuance, passport renewal, lost-passport replacement, and damaged-passport replacement are separate Procedures.
-_Avoid_: Goal, topic, status, procedure variant
+A distinct administrative transaction performed with an authority for a defined output and one concrete way of reaching a Goal. First passport issuance, ordinary passport renewal, lost-passport replacement, and damaged-passport replacement are separate Procedures that may all belong to the same passport Goal.
+_Avoid_: Goal, broad paperwork category, status, procedure variant
 
 **Procedure Version**:
 A coherent, published snapshot of one Procedure's rules, bilingual guidance, and public provenance. Publication workflow is separate from calculated trust; one version is applicable per Procedure and date, and withdrawn versions remain available only for explicit historical evaluation.
@@ -65,23 +65,23 @@ Guidance assembled for a person's stated Goal and current circumstances, includi
 _Avoid_: Definitive ruling, generic guide, future-dated plan
 
 **Procedural Claim**:
-A reviewable assertion used in personalized guidance, such as a requirement, step, fee, warning, or routing condition. Each Procedural Claim carries its own provenance.
-_Avoid_: Page copy, unsourced content
+A reviewable administrative assertion used in personalized guidance, such as a requirement, material step, fee, warning, dependency, or routing condition. Claims that materially tell a person what the government requires, permits, charges, accepts, or where/when to act carry claim-level provenance. Derived explanations, Question wording, UI grouping, product warnings, and other presentation that introduce no new administrative assertion do not require a separate Evidence Link.
+_Avoid_: Page copy, one claim per rendered sentence, unsourced material administrative assertion
 
 **Source**:
-A preserved government publication or contextual Field Report that may support or challenge one or more Procedural Claims.
-_Avoid_: Claim, citation list
+A preserved government publication or contextual Field Report that may support or challenge one or more evidence-bearing Procedural Claims. A Source is stored independently from how or whether its citation is displayed to a user.
+_Avoid_: Claim, citation list, UI citation marker
 
 **Evidence Link**:
-The claim-specific citation connecting a Procedural Claim to a Source, including the exact relied-upon passage and retrieval context. Contradictory official evidence is resolved through recorded research rationale or leaves the claim inconclusive.
-_Avoid_: Procedure-level source list, automatic newest-source winner
+The internal claim-specific provenance record connecting an evidence-bearing Procedural Claim to a Source, including the exact relied-upon passage and retrieval/applicability context. Evidence attaches to the semantic claim rather than every sentence rendered from it. Public presentation may group or progressively disclose sources without changing the stored provenance.
+_Avoid_: Procedure-level source list, one citation per sentence, presentation component
 
 **Unverified Claim**:
 A previously supported Procedural Claim whose current truth can no longer be asserted, such as a fee beyond its review interval. A Personalized Plan may show it only as dated context, not as current guidance.
 _Avoid_: Current requirement, stale-but-valid
 
 **Document Type**:
-A stable identity for a requested document or item, such as an Egyptian passport, National ID, family registration, or photograph. It is reusable vocabulary only; each Procedure Version defines its own Checklist Item claim for quantity, necessity, applicability, wording, and evidence.
+A stable identity for a requested document or item, such as an Egyptian passport, National ID, family registration, or photograph. It is reusable vocabulary only; each Procedure Version defines its own Checklist Item claim for quantity, necessity, applicability, wording, and evidence when the item asserts a material administrative requirement.
 _Avoid_: Complete requirement, procedure-specific document claim
 
 **Checklist Item**:
@@ -89,7 +89,7 @@ An actionable item shown in the Personalized Plan. Each item is visibly classifi
 _Avoid_: Unlabeled requirement
 
 **Official Requirement**:
-A Checklist Item supported by a current authoritative government Source.
+A Checklist Item that asserts a government requirement and is supported by current authoritative evidence.
 _Avoid_: Tip, field report
 
 **Practical Preparation**:
@@ -109,8 +109,8 @@ Clearly labeled practical information supported by moderated, recent, contextual
 _Avoid_: Official requirement, guarantee
 
 **Evidence Discrepancy**:
-A visible conflict between an Official Requirement and credible Field Guidance. The official claim remains authoritative while the discrepancy is re-verified.
-_Avoid_: Override, silent correction
+A lightweight internal/admin record of a material conflict, applicability mismatch, or unresolved difference among Sources or Evidence Links relevant to a claim. It stores only the evidence involved, status, concise research rationale, and resolution when one exists. It is never a public-plan object; public guidance reflects its consequence through claim verification state, local inconclusiveness, or a simple user-appropriate explanation.
+_Avoid_: Public warning, confidence score, hidden source override, editorial essay
 
 **Anonymous Case**:
 A transient set of Facts evaluated to produce a Personalized Plan without becoming a User Profile or saved administrative record.

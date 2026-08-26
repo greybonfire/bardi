@@ -1,10 +1,30 @@
 # Passport renewal named scenarios
 
-These scenarios are authored evidence-pack expectations for later prototype tickets. They are not executable tests yet. They intentionally exercise positive, negative, UNKNOWN, contradictory, and supported-edge behavior at the scenario seam required by #1.
+These scenarios are authored evidence-pack expectations for later prototype tickets. They are not executable tests yet. They intentionally exercise Goal-to-Procedure organization, positive, negative, UNKNOWN, contradictory, supported-edge, evidence, and presentation behavior at the scenario seam required by #1.
 
 Evaluation date for current scenarios unless stated otherwise: `2026-08-25`.
 
-## Procedure-selection and boundary scenarios
+Unless a scenario says otherwise, the selected Goal is `get_egyptian_passport`. The Goal is an organizational set of related candidate Procedures and does not itself evaluate requirements, fees, steps, routing, or evidence.
+
+## Goal and Procedure-selection scenarios
+
+### `passport.goal.stable_across_related_procedures`
+
+Evaluate the same Goal with different passport-state Facts:
+
+```text
+Goal = get_egyptian_passport
+existing_passport_state = none | expired | pages_full | lost | damaged
+```
+
+**Expected**
+
+- Goal remains `get_egyptian_passport` for all cases.
+- The applicable Procedure may change as Facts change.
+- `expired` or `pages_full` can resolve to `ordinary_domestic_passport_renewal` when the other supported boundary Facts match.
+- `none`, `lost`, and `damaged` point toward distinct related Procedures and must not be collapsed into renewal.
+- The Goal itself contributes no checklist items, fees, steps, routing rules, or Evidence Links.
+- An unresearched related Procedure remains unsupported rather than causing the Goal identity to change.
 
 ### `passport.positive.adult_expired_standard`
 
@@ -25,6 +45,7 @@ residence_police_jurisdiction = giza
 
 **Expected**
 
+- Goal remains `get_egyptian_passport`.
 - Procedure resolves to `ordinary_domestic_passport_renewal`.
 - Adult National ID claim applies.
 - Birth-certificate claim does not apply.
@@ -54,6 +75,7 @@ minor_presenting_adult_role = unknown
 
 **Expected**
 
+- Goal remains `get_egyptian_passport`.
 - Procedure resolves to renewal.
 - Machine-readable birth-certificate claim applies.
 - National ID claim does not apply.
@@ -74,6 +96,7 @@ passport_class = ordinary
 
 **Expected**
 
+- Goal remains `get_egyptian_passport`.
 - This Procedure evaluates FALSE.
 - The result must not repurpose renewal as first issuance.
 - When cross-fixture Procedure selection is implemented, a curated first-issuance Procedure may be selected only if separately researched.
@@ -91,6 +114,7 @@ passport_class = ordinary
 
 **Expected**
 
+- Goal remains `get_egyptian_passport`.
 - Renewal evaluates FALSE / recognized unsupported for this fixture.
 - Lost-passport replacement must be named as a distinct Procedure rather than treated as a renewal branch.
 
@@ -107,6 +131,7 @@ passport_class = ordinary
 
 **Expected**
 
+- Goal remains `get_egyptian_passport`.
 - Renewal evaluates FALSE / recognized unsupported.
 - Damaged-passport replacement remains a distinct Procedure.
 
@@ -123,6 +148,7 @@ passport_class = ordinary
 
 **Expected**
 
+- Goal may still be `get_egyptian_passport`.
 - Domestic renewal fixture does not apply.
 - Current consular evidence may not be borrowed to fabricate a domestic/overseas universal route.
 
@@ -384,7 +410,7 @@ residence_police_jurisdiction = a_valid_but_not_fixture_encoded_district
 - Routing is locally inconclusive with official verification path.
 - Other reliable requirements remain available.
 
-## Evidence/trust scenarios
+## Evidence/trust and presentation scenarios
 
 ### `passport.evidence.previous_passport_not_publishable`
 
@@ -399,8 +425,9 @@ residence_police_jurisdiction = a_valid_but_not_fixture_encoded_district
 **Expected**
 
 - Current Ministry age-15 claim remains the current claim.
-- Stale age-16 government material is retained as discrepancy/history.
-- The fixture does not choose a source merely by a generic “newest URL” rule; the adjudication records competent authority, applicability and staleness.
+- Stale age-16 government material is retained as internal discrepancy/history.
+- The fixture does not choose a source merely by a generic “newest URL” rule; internal adjudication records competent authority, applicability and staleness.
+- The public plan does not expose the discrepancy record or editorial rationale verbatim.
 
 ### `passport.evidence.field_fee_report_not_guidance`
 
@@ -408,7 +435,7 @@ residence_police_jurisdiction = a_valid_but_not_fixture_encoded_district
 
 - Low-context 2026 field-style fee report is not public Field Guidance.
 - Current official base fee remains 705 EGP for the research snapshot.
-- The field report may trigger a re-verification task but cannot override the official claim.
+- The field report may trigger re-verification internally but cannot override the official claim.
 
 ### `passport.evidence.standard_turnaround_unknown`
 
@@ -417,6 +444,17 @@ residence_police_jurisdiction = a_valid_but_not_fixture_encoded_district
 - Standard turnaround is represented as unknown.
 - The plan never synthesizes a value from older or secondary reports.
 - Urgent/premium timings remain available because they have current first-party support.
+
+### `passport.evidence.storage_does_not_dictate_display`
+
+**Expected**
+
+- Evidence-bearing administrative claims retain their internal Evidence Links and Source provenance.
+- The public plan is not required to render one citation beside every checklist line or sentence.
+- The presentation layer may group sources, show compact verification metadata, or expose claim-specific evidence on demand without changing stored provenance.
+- Goal/Procedure labels, Question wording, Derived Fact explanations, UI grouping, and product safety warnings require no independent Evidence Link when they introduce no new administrative assertion.
+- Internal Evidence Discrepancy records and adjudication rationale are excluded from the public planning contract.
+- Any user-facing explanation of uncertainty is concise and derived from the claim state rather than exposing admin/editorial notes.
 
 ## Contradictory and invalid case scenarios
 
@@ -463,7 +501,7 @@ Run `passport.positive.adult_expired_standard` repeatedly with identical:
 
 - evidence-pack/Procedure Version;
 - Facts;
-- Goal;
+- Goal = `get_egyptian_passport`;
 - locale;
 - evaluation date;
 - rules-contract version.
@@ -471,9 +509,10 @@ Run `passport.positive.adult_expired_standard` repeatedly with identical:
 **Expected**
 
 - structurally identical planning result every run;
+- identical Goal and selected Procedure identities;
 - identical claim IDs and ordering;
 - identical selected Service Point identities for the same fixture data;
-- identical evidence-link IDs;
+- identical evidence-link IDs internally;
 - no persisted Anonymous Case required;
 - no raw Fact logging required.
 
@@ -485,6 +524,7 @@ Evaluate the same complete known case once with `locale = ar` and once with `loc
 
 **Expected**
 
+- same Goal identity;
 - same Procedure identity;
 - same rule results;
 - same claim IDs;
@@ -496,6 +536,7 @@ Evaluate the same complete known case once with `locale = ar` and once with `loc
 
 This fixture materially requires scenario coverage for:
 
+- a stable organizational Goal containing multiple related Procedures;
 - Procedure boundary and adjacent Procedures;
 - calendar-date age derivation;
 - a changed temporal threshold (15 vs stale 16);
@@ -504,6 +545,8 @@ This fixture materially requires scenario coverage for:
 - optional service-level fees/timing;
 - Procedure-specific territorial vs non-territorial Service Point routing;
 - stale/foreign-jurisdiction/low-context evidence exclusion;
+- granular internal provenance with independently designed public evidence presentation;
+- internal-only discrepancy handling;
 - locally inconclusive claims without global failure;
 - invalid typed Facts;
 - deterministic bilingual output and reproducibility.

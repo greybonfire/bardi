@@ -1,0 +1,236 @@
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+from datetime import date
+from typing import Literal, Mapping
+
+Locale = Literal["ar", "en"]
+VerificationState = Literal["current", "needs_reverification", "unknown"]
+
+
+@dataclass(frozen=True)
+class LocalizedText:
+    ar: str
+    en: str
+
+    def render(self, locale: Locale) -> str:
+        return self.ar if locale == "ar" else self.en
+
+
+@dataclass(frozen=True)
+class NamedDefinition:
+    id: str
+    text: LocalizedText
+
+
+@dataclass(frozen=True)
+class GoalDefinition(NamedDefinition):
+    procedure_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Source:
+    id: str
+    authority: str
+    title: str
+    retrieved_on: date
+
+
+@dataclass(frozen=True)
+class EvidenceLink:
+    id: str
+    source_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class Predicate:
+    op: str
+    fact: str | None = None
+    value: object | None = None
+    children: tuple["Predicate", ...] = ()
+
+
+@dataclass(frozen=True)
+class ProcedureVersionDefinition:
+    procedure_id: str
+    version_id: str
+    text: LocalizedText
+    applicability: Predicate
+    verified_on: date
+
+
+@dataclass(frozen=True)
+class ClaimDefinition:
+    id: str
+    text: LocalizedText
+    classification: str
+    applicability: Predicate | None
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+    display_order: int
+    quantity: int | None = None
+
+
+@dataclass(frozen=True)
+class StepDefinition:
+    id: str
+    text: LocalizedText
+    phase: str
+    slot: int
+    applicability: Predicate | None
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+
+
+@dataclass(frozen=True)
+class FeeDefinition:
+    id: str
+    text: LocalizedText
+    amount: int
+    currency: str
+    applicability: Predicate | None
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+
+
+@dataclass(frozen=True)
+class ServicePointDefinition:
+    id: str
+    text: LocalizedText
+    address: LocalizedText
+    applicability: Predicate
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+
+
+@dataclass(frozen=True)
+class WarningDefinition:
+    id: str
+    text: LocalizedText
+    severity: Literal["info", "important"]
+    evidence_link_ids: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class UnknownDefinition:
+    id: str
+    text: LocalizedText
+    applicability: Predicate | None = None
+
+
+@dataclass(frozen=True)
+class KnowledgeBundle:
+    id: str
+    goal: GoalDefinition
+    procedure: ProcedureVersionDefinition
+    sources: Mapping[str, Source]
+    evidence_links: Mapping[str, EvidenceLink]
+    claims: tuple[ClaimDefinition, ...]
+    steps: tuple[StepDefinition, ...]
+    fees: tuple[FeeDefinition, ...]
+    service_points: tuple[ServicePointDefinition, ...]
+    warnings: tuple[WarningDefinition, ...]
+    unknowns: tuple[UnknownDefinition, ...]
+
+
+@dataclass(frozen=True)
+class EvidenceSummary:
+    source_id: str
+    authority: str
+    title: str
+    verified_on: date
+
+
+@dataclass(frozen=True)
+class RenderedChecklistItem:
+    id: str
+    text: str
+    classification: str
+    quantity: int | None
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class RenderedStep:
+    id: str
+    text: str
+    phase: str
+    slot: int
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class RenderedFee:
+    id: str
+    text: str
+    amount: int
+    currency: str
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class RenderedServicePoint:
+    id: str
+    text: str
+    address: str
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class RenderedWarning:
+    id: str
+    text: str
+    severity: str
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class Freshness:
+    procedure_version_id: str
+    verified_on: date
+    evaluation_date: date
+    generated_on: date
+
+
+@dataclass(frozen=True)
+class PersonalizedPlan:
+    goal_id: str
+    goal: str
+    procedure_id: str
+    procedure: str
+    procedure_version_id: str
+    locale: Locale
+    checklist: tuple[RenderedChecklistItem, ...]
+    steps: tuple[RenderedStep, ...]
+    fees: tuple[RenderedFee, ...]
+    service_points: tuple[RenderedServicePoint, ...]
+    warnings: tuple[RenderedWarning, ...]
+    unknowns: tuple[str, ...]
+    freshness: Freshness
+
+
+@dataclass(frozen=True)
+class PlanResult:
+    plan: PersonalizedPlan
+    kind: Literal["plan"] = field(default="plan", init=False)
+
+
+@dataclass(frozen=True)
+class NextQuestionResult:
+    question_id: str
+    kind: Literal["next_question"] = field(default="next_question", init=False)
+
+
+@dataclass(frozen=True)
+class InconclusiveResult:
+    reason_code: str
+    kind: Literal["inconclusive"] = field(default="inconclusive", init=False)
+
+
+@dataclass(frozen=True)
+class InvalidResult:
+    diagnostic_code: str
+    kind: Literal["invalid"] = field(default="invalid", init=False)
+
+
+PlanningResult = PlanResult | NextQuestionResult | InconclusiveResult | InvalidResult

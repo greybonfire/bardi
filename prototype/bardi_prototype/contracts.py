@@ -1,32 +1,27 @@
 from __future__ import annotations
-
 from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal, Mapping
 
 Locale = Literal["ar", "en"]
 VerificationState = Literal["current", "needs_reverification", "unknown"]
-
+FactKind = Literal["enum", "integer", "boolean", "date", "string"]
 
 @dataclass(frozen=True)
 class LocalizedText:
     ar: str
     en: str
-
     def render(self, locale: Locale) -> str:
         return self.ar if locale == "ar" else self.en
-
 
 @dataclass(frozen=True)
 class NamedDefinition:
     id: str
     text: LocalizedText
 
-
 @dataclass(frozen=True)
 class GoalDefinition(NamedDefinition):
     procedure_ids: tuple[str, ...]
-
 
 @dataclass(frozen=True)
 class Source:
@@ -35,12 +30,10 @@ class Source:
     title: str
     retrieved_on: date
 
-
 @dataclass(frozen=True)
 class EvidenceLink:
     id: str
     source_ids: tuple[str, ...]
-
 
 @dataclass(frozen=True)
 class Predicate:
@@ -49,6 +42,13 @@ class Predicate:
     value: object | None = None
     children: tuple["Predicate", ...] = ()
 
+@dataclass(frozen=True)
+class FactDefinition:
+    key: str
+    kind: FactKind
+    enum_values: tuple[str, ...] = ()
+    minimum: int | None = None
+    derived: bool = False
 
 @dataclass(frozen=True)
 class ProcedureVersionDefinition:
@@ -57,7 +57,6 @@ class ProcedureVersionDefinition:
     text: LocalizedText
     applicability: Predicate
     verified_on: date
-
 
 @dataclass(frozen=True)
 class ClaimDefinition:
@@ -70,7 +69,6 @@ class ClaimDefinition:
     display_order: int
     quantity: int | None = None
 
-
 @dataclass(frozen=True)
 class StepDefinition:
     id: str
@@ -80,7 +78,6 @@ class StepDefinition:
     applicability: Predicate | None
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
-
 
 @dataclass(frozen=True)
 class FeeDefinition:
@@ -92,7 +89,6 @@ class FeeDefinition:
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
 
-
 @dataclass(frozen=True)
 class ServicePointDefinition:
     id: str
@@ -102,7 +98,6 @@ class ServicePointDefinition:
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
 
-
 @dataclass(frozen=True)
 class WarningDefinition:
     id: str
@@ -110,18 +105,14 @@ class WarningDefinition:
     severity: Literal["info", "important"]
     evidence_link_ids: tuple[str, ...] = ()
 
-
 @dataclass(frozen=True)
 class UnknownDefinition:
     id: str
     text: LocalizedText
     applicability: Predicate | None = None
 
-
 @dataclass(frozen=True)
 class KnowledgeBundle:
-    """One researched Procedure fixture and its owned guidance/provenance."""
-
     id: str
     goal: GoalDefinition
     procedure: ProcedureVersionDefinition
@@ -134,22 +125,17 @@ class KnowledgeBundle:
     warnings: tuple[WarningDefinition, ...]
     unknowns: tuple[UnknownDefinition, ...]
 
-
 @dataclass(frozen=True)
 class ProcedureCandidateDefinition:
-    """A Procedure that a Goal may resolve to, researched or not yet researched."""
-
     procedure_id: str
     text: LocalizedText
     applicability: Predicate
     fixture_id: str | None = None
 
-
 @dataclass(frozen=True)
 class GoalCatalogDefinition:
     goal: GoalDefinition
     candidates: tuple[ProcedureCandidateDefinition, ...]
-
 
 @dataclass(frozen=True)
 class QuestionDefinition:
@@ -159,21 +145,17 @@ class QuestionDefinition:
     text: LocalizedText
     priority: int
     resolves_fact_keys: tuple[str, ...] = ()
-
     @property
     def resolved_keys(self) -> tuple[str, ...]:
         return self.resolves_fact_keys or (self.fact_key,)
 
-
 @dataclass(frozen=True)
 class KnowledgeCatalog:
-    """Selection-level knowledge across Goals and researched Procedure fixtures."""
-
     id: str
     goals: Mapping[str, GoalCatalogDefinition]
     fixtures: Mapping[str, KnowledgeBundle]
     questions: tuple[QuestionDefinition, ...]
-
+    fact_definitions: Mapping[str, FactDefinition] = field(default_factory=dict)
 
 @dataclass(frozen=True)
 class EvidenceSummary:
@@ -181,7 +163,6 @@ class EvidenceSummary:
     authority: str
     title: str
     verified_on: date
-
 
 @dataclass(frozen=True)
 class RenderedChecklistItem:
@@ -191,7 +172,6 @@ class RenderedChecklistItem:
     quantity: int | None
     sources: tuple[EvidenceSummary, ...]
 
-
 @dataclass(frozen=True)
 class RenderedStep:
     id: str
@@ -199,7 +179,6 @@ class RenderedStep:
     phase: str
     slot: int
     sources: tuple[EvidenceSummary, ...]
-
 
 @dataclass(frozen=True)
 class RenderedFee:
@@ -209,14 +188,12 @@ class RenderedFee:
     currency: str
     sources: tuple[EvidenceSummary, ...]
 
-
 @dataclass(frozen=True)
 class RenderedServicePoint:
     id: str
     text: str
     address: str
     sources: tuple[EvidenceSummary, ...]
-
 
 @dataclass(frozen=True)
 class RenderedWarning:
@@ -225,14 +202,12 @@ class RenderedWarning:
     severity: str
     sources: tuple[EvidenceSummary, ...]
 
-
 @dataclass(frozen=True)
 class Freshness:
     procedure_version_id: str
     verified_on: date
     evaluation_date: date
     generated_on: date
-
 
 @dataclass(frozen=True)
 class PersonalizedPlan:
@@ -250,12 +225,10 @@ class PersonalizedPlan:
     unknowns: tuple[str, ...]
     freshness: Freshness
 
-
 @dataclass(frozen=True)
 class PlanResult:
     plan: PersonalizedPlan
     kind: Literal["plan"] = field(default="plan", init=False)
-
 
 @dataclass(frozen=True)
 class NextQuestionResult:
@@ -264,7 +237,6 @@ class NextQuestionResult:
     question: str = ""
     kind: Literal["next_question"] = field(default="next_question", init=False)
 
-
 @dataclass(frozen=True)
 class InconclusiveResult:
     reason_code: str
@@ -272,11 +244,10 @@ class InconclusiveResult:
     diagnostic_codes: tuple[str, ...] = ()
     kind: Literal["inconclusive"] = field(default="inconclusive", init=False)
 
-
 @dataclass(frozen=True)
 class InvalidResult:
     diagnostic_code: str
+    diagnostic_codes: tuple[str, ...] = ()
     kind: Literal["invalid"] = field(default="invalid", init=False)
-
 
 PlanningResult = PlanResult | NextQuestionResult | InconclusiveResult | InvalidResult

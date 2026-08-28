@@ -72,4 +72,23 @@ def validate_catalog(catalog: KnowledgeCatalog) -> tuple[str, ...]:
             if key not in definitions:
                 diagnostics.append(f"unsupported_question_resolved_fact:{key}")
 
+    contradiction_ids: set[str] = set()
+    for contradiction in catalog.contradictions:
+        if contradiction.id in contradiction_ids:
+            diagnostics.append(f"duplicate_contradiction_id:{contradiction.id}")
+        contradiction_ids.add(contradiction.id)
+        if contradiction.goal_id not in catalog.goals:
+            diagnostics.append(f"unsupported_contradiction_goal:{contradiction.goal_id}")
+        if len(contradiction.fact_keys) < 2:
+            diagnostics.append(f"contradiction_requires_multiple_facts:{contradiction.id}")
+        for key in contradiction.fact_keys:
+            definition = definitions.get(key)
+            if definition is None:
+                diagnostics.append(f"unsupported_contradiction_fact:{key}")
+            elif definition.derived:
+                diagnostics.append(f"contradiction_conflict_key_must_be_source_fact:{key}")
+        for diagnostic in validate_predicate(contradiction.condition, definitions):
+            if diagnostic not in diagnostics:
+                diagnostics.append(diagnostic)
+
     return tuple(dict.fromkeys(diagnostics))

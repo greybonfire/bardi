@@ -1,6 +1,7 @@
 from dataclasses import replace
 
-from ..contracts import LocalizedText, QuestionDefinition
+from ..contracts import ContradictionDefinition, LocalizedText, QuestionDefinition
+from ..evaluator import all_of, eq, exists
 from ..facts import FACT_DEFINITIONS
 from .catalog import load_researched_catalog as _load_researched_catalog
 from .national_id_renewal import load_national_id_renewal_fixture
@@ -13,7 +14,7 @@ def _t(ar: str, en: str) -> LocalizedText:
 
 
 def load_researched_catalog():
-    """Load the researched catalog enriched with the typed #7 Fact contract."""
+    """Load the researched catalog enriched with typed Facts and diagnostics."""
     catalog = _load_researched_catalog()
     additional_questions = (
         QuestionDefinition(
@@ -92,10 +93,49 @@ def load_researched_catalog():
             90,
         ),
     )
+    contradictions = (
+        ContradictionDefinition(
+            id="nid.no_current_card_with_expiry_date",
+            goal_id="get_egyptian_national_id",
+            fact_keys=("national_id_possession_state", "national_id_expiry_date"),
+            condition=all_of(
+                eq("national_id_possession_state", "none"),
+                exists("national_id_expiry_date"),
+            ),
+        ),
+        ContradictionDefinition(
+            id="mil.no_missing_relative_with_cause",
+            goal_id="handle_military_service_paperwork",
+            fact_keys=("missing_relative_category", "missing_relative_cause"),
+            condition=all_of(
+                eq("missing_relative_category", "none"),
+                exists("missing_relative_cause"),
+            ),
+        ),
+        ContradictionDefinition(
+            id="mil.no_missing_relative_with_alive_status",
+            goal_id="handle_military_service_paperwork",
+            fact_keys=("missing_relative_category", "missing_relative_alive_status"),
+            condition=all_of(
+                eq("missing_relative_category", "none"),
+                exists("missing_relative_alive_status"),
+            ),
+        ),
+        ContradictionDefinition(
+            id="mil.no_missing_relative_with_relative_order_status",
+            goal_id="handle_military_service_paperwork",
+            fact_keys=("missing_relative_category", "applicant_largest_eligible_relative_status"),
+            condition=all_of(
+                eq("missing_relative_category", "none"),
+                exists("applicant_largest_eligible_relative_status"),
+            ),
+        ),
+    )
     return replace(
         catalog,
         questions=catalog.questions + additional_questions,
         fact_definitions=FACT_DEFINITIONS,
+        contradictions=contradictions,
     )
 
 

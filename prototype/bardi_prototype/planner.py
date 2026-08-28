@@ -22,6 +22,7 @@ class SemanticPlan:
     knowledge: KnowledgeBundle
     facts: Mapping[str, object]
     evaluation_date: date
+    generated_on: date
     claims: tuple[ClaimDefinition, ...]
     steps: tuple[StepDefinition, ...]
     fees: tuple[FeeDefinition, ...]
@@ -42,47 +43,40 @@ class KnownCaseIncomplete(Exception):
 
 
 class ProcedureNotApplicable(Exception):
-    def __init__(
-        self,
-        procedure_id: str,
-        traces: tuple[RuleEvaluationRecord, ...] = (),
-    ) -> None:
+    def __init__(self, procedure_id: str, traces: tuple[RuleEvaluationRecord, ...] = ()) -> None:
         super().__init__(procedure_id)
         self.procedure_id = procedure_id
         self.traces = traces
 
 
 def _current_items(items):
-    return tuple(
-        item
-        for item in items
-        if getattr(item, "verification_state", "current") == "current"
-    )
+    return tuple(item for item in items if getattr(item, "verification_state", "current") == "current")
 
 
-def _select_items(
-    items,
-    facts: Mapping[str, object],
-    submitted_keys: frozenset[str],
-    *,
-    context_prefix: str,
-    consequential: bool,
-):
+def _select_items(items, facts: Mapping[str, object], submitted_keys: frozenset[str], *, context_prefix: str, consequential: bool):
     selected = []
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
     for item in _current_items(items):
         result = evaluate(item.applicability, facts, submitted_keys=submitted_keys)
-        traces.append(
-            record_evaluation(
-                f"{context_prefix}:{item.id}",
-                result,
-                consequential_to_planning=consequential,
-            )
-        )
+        traces.append(record_evaluation(f"{context_prefix}:{item.id}", result, consequential_to_planning=consequential))
         if result.value is TruthValue.TRUE:
             selected.append(item)
         elif result.value is TruthValue.UNKNOWN and consequential:
+            missing.update(result.missing_facts)
+    return tuple(selected), frozenset(missing), tuple(traces)
+
+
+def _select_fees(items, facts: Mapping[str, object], submitted_keys: frozenset[str]):
+    selected = []
+    missing: set[str] = set()
+    traces: list[RuleEvaluationRecord] = []
+    for item in items:
+        result = evaluate(item.applicability, facts, submitted_keys=submitted_keys)
+        traces.append(record_evaluation(f"fee:{item.id}", result, consequential_to_planning=True))
+        if result.value is TruthValue.TRUE:
+            selected.append(item)
+        elif result.value is TruthValue.UNKNOWN:
             missing.update(result.missing_facts)
     return tuple(selected), frozenset(missing), tuple(traces)
 
@@ -93,75 +87,33 @@ def assemble_plan(
     evaluation_date: date,
     *,
     submitted_keys: frozenset[str] | None = None,
+    generated_on: date | None = None,
 ) -> PlanAssembly:
-    """Assemble one Procedure plan, surfacing only consequential rule UNKNOWNs."""
     submitted = frozenset(facts) if submitted_keys is None else submitted_keys
+    generated = evaluation_date if generated_on is None else generated_on
     derived = derive_facts(dict(facts), evaluation_date)
     traces: list[RuleEvaluationRecord] = []
 
-    procedure_result = evaluate(
-        knowledge.procedure.applicability,
-        derived,
-        submitted_keys=submitted,
-    )
-    traces.append(
-        record_evaluation(
-            f"procedure_applicability:{knowledge.procedure.procedure_id}",
-            procedure_result,
-            consequential_to_planning=True,
-        )
-    )
+    procedure_result = evaluate(knowledge.procedure.applicability, derived, submitted_keys=submitted)
+    traces.append(record_evaluation(f"procedure_applicability:{knowledge.procedure.procedure_id}", procedure_result, consequential_to_planning=True))
     if procedure_result.value is TruthValue.FALSE:
         raise ProcedureNotApplicable(knowledge.procedure.procedure_id, tuple(traces))
     if procedure_result.value is TruthValue.UNKNOWN:
         return PlanAssembly(None, procedure_result.missing_facts, tuple(traces))
 
-    claims, claim_missing, claim_traces = _select_items(
-        knowledge.claims,
-        derived,
-        submitted,
-        context_prefix="claim",
-        consequential=True,
-    )
+    claims, claim_missing, claim_traces = _select_items(knowledge.claims, derived, submitted, context_prefix="claim", consequential=True)
     traces.extend(claim_traces)
-    steps, step_missing, step_traces = _select_items(
-        knowledge.steps,
-        derived,
-        submitted,
-        context_prefix="step",
-        consequential=True,
-    )
+    steps, step_missing, step_traces = _select_items(knowledge.steps, derived, submitted, context_prefix="step", consequential=True)
     traces.extend(step_traces)
-    fees, fee_missing, fee_traces = _select_items(
-        knowledge.fees,
-        derived,
-        submitted,
-        context_prefix="fee",
-        consequential=True,
-    )
+    fees, fee_missing, fee_traces = _select_fees(knowledge.fees, derived, submitted)
     traces.extend(fee_traces)
-
-    # Routing is deliberately local: unresolved Service Point applicability does
-    # not block otherwise-supported guidance, but the editor trace records it.
-    service_points, _, service_point_traces = _select_items(
-        knowledge.service_points,
-        derived,
-        submitted,
-        context_prefix="service_point",
-        consequential=False,
-    )
+    service_points, _, service_point_traces = _select_items(knowledge.service_points, derived, submitted, context_prefix="service_point", consequential=False)
     traces.extend(service_point_traces)
 
     unknowns: list[UnknownDefinition] = []
     for item in knowledge.unknowns:
         result = evaluate(item.applicability, derived, submitted_keys=submitted)
-        traces.append(
-            record_evaluation(
-                f"unknown:{item.id}",
-                result,
-                consequential_to_planning=False,
-            )
-        )
+        traces.append(record_evaluation(f"unknown:{item.id}", result, consequential_to_planning=False))
         if result.value is TruthValue.TRUE:
             unknowns.append(item)
 
@@ -173,8 +125,9 @@ def assemble_plan(
         knowledge=knowledge,
         facts=derived,
         evaluation_date=evaluation_date,
-        claims=tuple(sorted(claims, key=lambda item: item.display_order)),
-        steps=tuple(sorted(steps, key=lambda item: (item.slot, item.id))),
+        generated_on=generated,
+        claims=tuple(sorted(claims, key=lambda item: (item.display_order, item.id))),
+        steps=tuple(sorted(steps, key=lambda item: (item.phase_order, item.slot, item.id))),
         fees=tuple(sorted(fees, key=lambda item: item.id)),
         service_points=tuple(sorted(service_points, key=lambda item: item.id)),
         warnings=knowledge.warnings,
@@ -183,18 +136,8 @@ def assemble_plan(
     return PlanAssembly(semantic_plan, traces=tuple(traces))
 
 
-def assemble_known_case_plan(
-    knowledge: KnowledgeBundle,
-    facts: Mapping[str, object],
-    evaluation_date: date,
-) -> SemanticPlan:
-    """Compatibility wrapper for the complete-input issue #5 API."""
-    assembly = assemble_plan(
-        knowledge,
-        facts,
-        evaluation_date,
-        submitted_keys=frozenset(facts),
-    )
+def assemble_known_case_plan(knowledge: KnowledgeBundle, facts: Mapping[str, object], evaluation_date: date) -> SemanticPlan:
+    assembly = assemble_plan(knowledge, facts, evaluation_date, submitted_keys=frozenset(facts))
     if assembly.plan is None:
         raise KnownCaseIncomplete(",".join(sorted(assembly.missing_facts)))
     return assembly.plan

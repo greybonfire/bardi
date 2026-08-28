@@ -120,6 +120,8 @@ class UnknownDefinition:
 
 @dataclass(frozen=True)
 class KnowledgeBundle:
+    """One researched Procedure fixture and its owned guidance/provenance."""
+
     id: str
     goal: GoalDefinition
     procedure: ProcedureVersionDefinition
@@ -131,6 +133,46 @@ class KnowledgeBundle:
     service_points: tuple[ServicePointDefinition, ...]
     warnings: tuple[WarningDefinition, ...]
     unknowns: tuple[UnknownDefinition, ...]
+
+
+@dataclass(frozen=True)
+class ProcedureCandidateDefinition:
+    """A Procedure that a Goal may resolve to, researched or not yet researched."""
+
+    procedure_id: str
+    text: LocalizedText
+    applicability: Predicate
+    fixture_id: str | None = None
+
+
+@dataclass(frozen=True)
+class GoalCatalogDefinition:
+    goal: GoalDefinition
+    candidates: tuple[ProcedureCandidateDefinition, ...]
+
+
+@dataclass(frozen=True)
+class QuestionDefinition:
+    id: str
+    goal_id: str
+    fact_key: str
+    text: LocalizedText
+    priority: int
+    resolves_fact_keys: tuple[str, ...] = ()
+
+    @property
+    def resolved_keys(self) -> tuple[str, ...]:
+        return self.resolves_fact_keys or (self.fact_key,)
+
+
+@dataclass(frozen=True)
+class KnowledgeCatalog:
+    """Selection-level knowledge across Goals and researched Procedure fixtures."""
+
+    id: str
+    goals: Mapping[str, GoalCatalogDefinition]
+    fixtures: Mapping[str, KnowledgeBundle]
+    questions: tuple[QuestionDefinition, ...]
 
 
 @dataclass(frozen=True)
@@ -218,12 +260,16 @@ class PlanResult:
 @dataclass(frozen=True)
 class NextQuestionResult:
     question_id: str
+    fact_key: str = ""
+    question: str = ""
     kind: Literal["next_question"] = field(default="next_question", init=False)
 
 
 @dataclass(frozen=True)
 class InconclusiveResult:
     reason_code: str
+    procedure_id: str | None = None
+    diagnostic_codes: tuple[str, ...] = ()
     kind: Literal["inconclusive"] = field(default="inconclusive", init=False)
 
 

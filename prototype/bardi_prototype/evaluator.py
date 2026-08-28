@@ -10,12 +10,7 @@ class MissingFactError(KeyError):
 
 
 def evaluate(predicate: Predicate | None, facts: Mapping[str, object]) -> bool:
-    """Evaluate only the complete-input predicate subset needed by issue #5.
-
-    This intentionally is *not* the final three-valued rules engine. UNKNOWN,
-    typed validation, `exists`, and the Missing-Fact Picker belong to later
-    prototype issues.
-    """
+    """Evaluate only the complete-input predicate subset used before issue #7."""
     if predicate is None:
         return True
 
@@ -63,9 +58,21 @@ def lt(fact: str, value: object) -> Predicate:
     return Predicate("lt", fact=fact, value=value)
 
 
+def gt(fact: str, value: object) -> Predicate:
+    return Predicate("gt", fact=fact, value=value)
+
+
 def gte(fact: str, value: object) -> Predicate:
     return Predicate("gte", fact=fact, value=value)
 
 
 def all_of(*children: Predicate) -> Predicate:
     return Predicate("all", children=tuple(children))
+
+
+def any_of(*children: Predicate) -> Predicate:
+    return Predicate("any", children=tuple(children))
+
+
+def negate(child: Predicate) -> Predicate:
+    return Predicate("not", children=(child,))

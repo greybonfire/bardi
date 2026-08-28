@@ -1,49 +1,182 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
+from enum import Enum
 
-from .contracts import Predicate
+from .contracts import FactDefinition, Predicate
+from .facts import FACT_DEFINITIONS, value_matches_definition
+
+MAX_RULE_NODES = 128
+LEAF_OPERATORS = frozenset(("eq", "in", "lt", "lte", "gt", "gte", "exists"))
+BOOLEAN_OPERATORS = frozenset(("all", "any", "not"))
+SUPPORTED_OPERATORS = LEAF_OPERATORS | BOOLEAN_OPERATORS
 
 
-class MissingFactError(KeyError):
-    """Known-case evaluator cannot decide a predicate because a Fact is absent."""
+class TruthValue(str, Enum):
+    TRUE = "TRUE"
+    FALSE = "FALSE"
+    UNKNOWN = "UNKNOWN"
 
 
-def evaluate(predicate: Predicate | None, facts: Mapping[str, object]) -> bool:
-    """Evaluate only the complete-input predicate subset used before issue #7."""
+@dataclass(frozen=True)
+class Evaluation:
+    value: TruthValue
+    missing_facts: frozenset[str] = frozenset()
+
+
+def _literal_valid(definition: FactDefinition, value: object) -> bool:
+    return value_matches_definition(definition, value)
+
+
+def validate_predicate(
+    predicate: Predicate | None,
+    fact_definitions: Mapping[str, FactDefinition] = FACT_DEFINITIONS,
+    *,
+    max_nodes: int = MAX_RULE_NODES,
+) -> tuple[str, ...]:
+    """Validate the fixture-proven rule AST without executing it."""
     if predicate is None:
-        return True
+        return ()
 
+    diagnostics: list[str] = []
+    node_count = 0
+
+    def add(code: str) -> None:
+        if code not in diagnostics:
+            diagnostics.append(code)
+
+    def visit(node: Predicate) -> None:
+        nonlocal node_count
+        node_count += 1
+        if node_count > max_nodes:
+            add("rule_too_large")
+            return
+
+        op = node.op
+        if op not in SUPPORTED_OPERATORS:
+            add(f"unsupported_rule_operator:{op}")
+            return
+
+        if op in {"all", "any"}:
+            if node.fact is not None or node.value is not None:
+                add(f"malformed_rule:{op}")
+            if not node.children:
+                add(f"empty_boolean_composition:{op}")
+                return
+            for child in node.children:
+                visit(child)
+            return
+
+        if op == "not":
+            if node.fact is not None or node.value is not None or len(node.children) != 1:
+                add("malformed_rule:not")
+                return
+            visit(node.children[0])
+            return
+
+        if node.children:
+            add(f"malformed_rule:{op}")
+        if node.fact is None:
+            add(f"missing_rule_fact:{op}")
+            return
+
+        definition = fact_definitions.get(node.fact)
+        if definition is None:
+            add(f"unsupported_rule_fact:{node.fact}")
+            return
+
+        if op == "exists":
+            if node.value is not None:
+                add("malformed_rule:exists")
+            if definition.derived:
+                add(f"exists_requires_source_fact:{node.fact}")
+            return
+
+        if op in {"lt", "lte", "gt", "gte"} and definition.kind not in {"integer", "date"}:
+            add(f"ordering_not_supported_for_fact:{node.fact}")
+
+        if op == "in":
+            if not isinstance(node.value, (tuple, list)) or not node.value:
+                add(f"invalid_rule_operand:{node.fact}")
+                return
+            if any(not _literal_valid(definition, item) for item in node.value):
+                add(f"invalid_rule_operand:{node.fact}")
+            return
+
+        if not _literal_valid(definition, node.value):
+            add(f"invalid_rule_operand:{node.fact}")
+
+    visit(predicate)
+    return tuple(diagnostics)
+
+
+def evaluate(
+    predicate: Predicate | None,
+    facts: Mapping[str, object],
+    *,
+    submitted_keys: frozenset[str] | None = None,
+) -> Evaluation:
+    """Evaluate a validated predicate with strong-Kleene three-valued logic."""
+    if predicate is None:
+        return Evaluation(TruthValue.TRUE)
+
+    submitted = frozenset(facts) if submitted_keys is None else submitted_keys
     op = predicate.op
+
+    if op == "exists":
+        assert predicate.fact is not None
+        return Evaluation(TruthValue.TRUE if predicate.fact in submitted else TruthValue.FALSE)
+
     if op in {"eq", "in", "lt", "lte", "gt", "gte"}:
-        if predicate.fact is None:
-            raise ValueError(f"{op} predicate requires a fact")
+        assert predicate.fact is not None
         if predicate.fact not in facts:
-            raise MissingFactError(predicate.fact)
+            return Evaluation(TruthValue.UNKNOWN, frozenset((predicate.fact,)))
         actual = facts[predicate.fact]
         expected = predicate.value
         if op == "eq":
-            return actual == expected
-        if op == "in":
-            return actual in expected  # type: ignore[operator]
-        if op == "lt":
-            return actual < expected  # type: ignore[operator]
-        if op == "lte":
-            return actual <= expected  # type: ignore[operator]
-        if op == "gt":
-            return actual > expected  # type: ignore[operator]
-        return actual >= expected  # type: ignore[operator]
+            matched = actual == expected
+        elif op == "in":
+            matched = actual in expected  # type: ignore[operator]
+        elif op == "lt":
+            matched = actual < expected  # type: ignore[operator]
+        elif op == "lte":
+            matched = actual <= expected  # type: ignore[operator]
+        elif op == "gt":
+            matched = actual > expected  # type: ignore[operator]
+        else:
+            matched = actual >= expected  # type: ignore[operator]
+        return Evaluation(TruthValue.TRUE if matched else TruthValue.FALSE)
+
+    children = tuple(evaluate(child, facts, submitted_keys=submitted) for child in predicate.children)
 
     if op == "all":
-        return all(evaluate(child, facts) for child in predicate.children)
-    if op == "any":
-        return any(evaluate(child, facts) for child in predicate.children)
-    if op == "not":
-        if len(predicate.children) != 1:
-            raise ValueError("not predicate requires exactly one child")
-        return not evaluate(predicate.children[0], facts)
+        if any(child.value is TruthValue.FALSE for child in children):
+            return Evaluation(TruthValue.FALSE)
+        if all(child.value is TruthValue.TRUE for child in children):
+            return Evaluation(TruthValue.TRUE)
+        return Evaluation(
+            TruthValue.UNKNOWN,
+            frozenset().union(*(child.missing_facts for child in children if child.value is TruthValue.UNKNOWN)),
+        )
 
-    raise ValueError(f"unsupported known-case predicate operator: {op}")
+    if op == "any":
+        if any(child.value is TruthValue.TRUE for child in children):
+            return Evaluation(TruthValue.TRUE)
+        if all(child.value is TruthValue.FALSE for child in children):
+            return Evaluation(TruthValue.FALSE)
+        return Evaluation(
+            TruthValue.UNKNOWN,
+            frozenset().union(*(child.missing_facts for child in children if child.value is TruthValue.UNKNOWN)),
+        )
+
+    if op == "not":
+        child = children[0]
+        if child.value is TruthValue.UNKNOWN:
+            return child
+        return Evaluation(TruthValue.FALSE if child.value is TruthValue.TRUE else TruthValue.TRUE)
+
+    raise ValueError(f"predicate must be validated before evaluation: {op}")
 
 
 def eq(fact: str, value: object) -> Predicate:
@@ -58,12 +191,20 @@ def lt(fact: str, value: object) -> Predicate:
     return Predicate("lt", fact=fact, value=value)
 
 
+def lte(fact: str, value: object) -> Predicate:
+    return Predicate("lte", fact=fact, value=value)
+
+
 def gt(fact: str, value: object) -> Predicate:
     return Predicate("gt", fact=fact, value=value)
 
 
 def gte(fact: str, value: object) -> Predicate:
     return Predicate("gte", fact=fact, value=value)
+
+
+def exists(fact: str) -> Predicate:
+    return Predicate("exists", fact=fact)
 
 
 def all_of(*children: Predicate) -> Predicate:

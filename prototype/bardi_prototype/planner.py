@@ -14,7 +14,7 @@ from .contracts import (
     WarningDefinition,
 )
 from .derivations import derive_facts
-from .evaluator import TruthValue, evaluate
+from .evaluator import RuleEvaluationRecord, TruthValue, evaluate, record_evaluation
 
 
 @dataclass(frozen=True)
@@ -34,6 +34,7 @@ class SemanticPlan:
 class PlanAssembly:
     plan: SemanticPlan | None
     missing_facts: frozenset[str] = frozenset()
+    traces: tuple[RuleEvaluationRecord, ...] = ()
 
 
 class KnownCaseIncomplete(Exception):
@@ -41,7 +42,14 @@ class KnownCaseIncomplete(Exception):
 
 
 class ProcedureNotApplicable(Exception):
-    pass
+    def __init__(
+        self,
+        procedure_id: str,
+        traces: tuple[RuleEvaluationRecord, ...] = (),
+    ) -> None:
+        super().__init__(procedure_id)
+        self.procedure_id = procedure_id
+        self.traces = traces
 
 
 def _current_items(items):
@@ -57,17 +65,26 @@ def _select_items(
     facts: Mapping[str, object],
     submitted_keys: frozenset[str],
     *,
+    context_prefix: str,
     consequential: bool,
 ):
     selected = []
     missing: set[str] = set()
+    traces: list[RuleEvaluationRecord] = []
     for item in _current_items(items):
         result = evaluate(item.applicability, facts, submitted_keys=submitted_keys)
+        traces.append(
+            record_evaluation(
+                f"{context_prefix}:{item.id}",
+                result,
+                consequential_to_planning=consequential,
+            )
+        )
         if result.value is TruthValue.TRUE:
             selected.append(item)
         elif result.value is TruthValue.UNKNOWN and consequential:
             missing.update(result.missing_facts)
-    return tuple(selected), frozenset(missing)
+    return tuple(selected), frozenset(missing), tuple(traces)
 
 
 def assemble_plan(
@@ -80,43 +97,77 @@ def assemble_plan(
     """Assemble one Procedure plan, surfacing only consequential rule UNKNOWNs."""
     submitted = frozenset(facts) if submitted_keys is None else submitted_keys
     derived = derive_facts(dict(facts), evaluation_date)
+    traces: list[RuleEvaluationRecord] = []
 
     procedure_result = evaluate(
         knowledge.procedure.applicability,
         derived,
         submitted_keys=submitted,
     )
+    traces.append(
+        record_evaluation(
+            f"procedure_applicability:{knowledge.procedure.procedure_id}",
+            procedure_result,
+            consequential_to_planning=True,
+        )
+    )
     if procedure_result.value is TruthValue.FALSE:
-        raise ProcedureNotApplicable(knowledge.procedure.procedure_id)
+        raise ProcedureNotApplicable(knowledge.procedure.procedure_id, tuple(traces))
     if procedure_result.value is TruthValue.UNKNOWN:
-        return PlanAssembly(None, procedure_result.missing_facts)
+        return PlanAssembly(None, procedure_result.missing_facts, tuple(traces))
 
-    claims, claim_missing = _select_items(
-        knowledge.claims, derived, submitted, consequential=True
+    claims, claim_missing, claim_traces = _select_items(
+        knowledge.claims,
+        derived,
+        submitted,
+        context_prefix="claim",
+        consequential=True,
     )
-    steps, step_missing = _select_items(
-        knowledge.steps, derived, submitted, consequential=True
+    traces.extend(claim_traces)
+    steps, step_missing, step_traces = _select_items(
+        knowledge.steps,
+        derived,
+        submitted,
+        context_prefix="step",
+        consequential=True,
     )
-    fees, fee_missing = _select_items(
-        knowledge.fees, derived, submitted, consequential=True
+    traces.extend(step_traces)
+    fees, fee_missing, fee_traces = _select_items(
+        knowledge.fees,
+        derived,
+        submitted,
+        context_prefix="fee",
+        consequential=True,
     )
+    traces.extend(fee_traces)
 
     # Routing is deliberately local: unresolved Service Point applicability does
-    # not block otherwise-supported guidance.
-    service_points, _ = _select_items(
-        knowledge.service_points, derived, submitted, consequential=False
+    # not block otherwise-supported guidance, but the editor trace records it.
+    service_points, _, service_point_traces = _select_items(
+        knowledge.service_points,
+        derived,
+        submitted,
+        context_prefix="service_point",
+        consequential=False,
     )
+    traces.extend(service_point_traces)
 
-    unknowns = tuple(
-        item
-        for item in knowledge.unknowns
-        if evaluate(item.applicability, derived, submitted_keys=submitted).value
-        is TruthValue.TRUE
-    )
+    unknowns: list[UnknownDefinition] = []
+    for item in knowledge.unknowns:
+        result = evaluate(item.applicability, derived, submitted_keys=submitted)
+        traces.append(
+            record_evaluation(
+                f"unknown:{item.id}",
+                result,
+                consequential_to_planning=False,
+            )
+        )
+        if result.value is TruthValue.TRUE:
+            unknowns.append(item)
 
     missing = claim_missing | step_missing | fee_missing
     if missing:
-        return PlanAssembly(None, missing)
+        return PlanAssembly(None, missing, tuple(traces))
 
     semantic_plan = SemanticPlan(
         knowledge=knowledge,
@@ -129,7 +180,7 @@ def assemble_plan(
         warnings=knowledge.warnings,
         unknowns=tuple(sorted(unknowns, key=lambda item: item.id)),
     )
-    return PlanAssembly(semantic_plan)
+    return PlanAssembly(semantic_plan, traces=tuple(traces))
 
 
 def assemble_known_case_plan(

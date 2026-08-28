@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import Enum
 
 from .contracts import FactDefinition, Predicate
@@ -20,9 +20,41 @@ class TruthValue(str, Enum):
 
 
 @dataclass(frozen=True)
+class EvaluationTrace:
+    """Editor-facing trace for one predicate node.
+
+    Trace objects are ephemeral prototype diagnostics. Public planning results do
+    not contain them and the prototype does not persist them.
+    """
+
+    op: str
+    result: TruthValue
+    fact_key: str | None = None
+    fact_present: bool | None = None
+    submitted: bool | None = None
+    actual_value: object | None = None
+    expected_value: object | None = None
+    missing_facts: frozenset[str] = frozenset()
+    affected_result: bool = True
+    children: tuple["EvaluationTrace", ...] = ()
+
+
+@dataclass(frozen=True)
 class Evaluation:
     value: TruthValue
     missing_facts: frozenset[str] = frozenset()
+    trace: EvaluationTrace | None = None
+
+
+@dataclass(frozen=True)
+class RuleEvaluationRecord:
+    """One named rule evaluation captured by the scenario inspector."""
+
+    context: str
+    value: TruthValue
+    missing_facts: frozenset[str]
+    consequential_to_planning: bool
+    trace: EvaluationTrace
 
 
 def _literal_valid(definition: FactDefinition, value: object) -> bool:
@@ -111,27 +143,105 @@ def validate_predicate(
     return tuple(diagnostics)
 
 
+def _clear_effect(trace: EvaluationTrace) -> EvaluationTrace:
+    return replace(
+        trace,
+        affected_result=False,
+        children=tuple(_clear_effect(child) for child in trace.children),
+    )
+
+
+def _compose_trace(
+    *,
+    op: str,
+    value: TruthValue,
+    missing_facts: frozenset[str],
+    children: tuple[Evaluation, ...],
+) -> EvaluationTrace:
+    child_traces = tuple(child.trace for child in children)
+    assert all(trace is not None for trace in child_traces)
+
+    def affects(child: Evaluation) -> bool:
+        if op == "not":
+            return True
+        if op == "all":
+            if value is TruthValue.TRUE:
+                return True
+            if value is TruthValue.FALSE:
+                return child.value is TruthValue.FALSE
+            return child.value is TruthValue.UNKNOWN
+        if op == "any":
+            if value is TruthValue.FALSE:
+                return True
+            if value is TruthValue.TRUE:
+                return child.value is TruthValue.TRUE
+            return child.value is TruthValue.UNKNOWN
+        return True
+
+    traces = tuple(
+        trace if affects(child) else _clear_effect(trace)
+        for child, trace in zip(children, child_traces)
+        if trace is not None
+    )
+    return EvaluationTrace(
+        op=op,
+        result=value,
+        missing_facts=missing_facts,
+        children=traces,
+    )
+
+
 def evaluate(
     predicate: Predicate | None,
     facts: Mapping[str, object],
     *,
     submitted_keys: frozenset[str] | None = None,
 ) -> Evaluation:
-    """Evaluate a validated predicate with strong-Kleene three-valued logic."""
+    """Evaluate a validated predicate with strong-Kleene three-valued logic.
+
+    All pure child predicates are evaluated even when a sibling already
+    determines the parent result. The trace then marks dominated branches as
+    not affecting that result.
+    """
     if predicate is None:
-        return Evaluation(TruthValue.TRUE)
+        trace = EvaluationTrace(op="always", result=TruthValue.TRUE)
+        return Evaluation(TruthValue.TRUE, trace=trace)
 
     submitted = frozenset(facts) if submitted_keys is None else submitted_keys
     op = predicate.op
 
     if op == "exists":
         assert predicate.fact is not None
-        return Evaluation(TruthValue.TRUE if predicate.fact in submitted else TruthValue.FALSE)
+        fact_present = predicate.fact in facts
+        was_submitted = predicate.fact in submitted
+        value = TruthValue.TRUE if was_submitted else TruthValue.FALSE
+        trace = EvaluationTrace(
+            op=op,
+            result=value,
+            fact_key=predicate.fact,
+            fact_present=fact_present,
+            submitted=was_submitted,
+            actual_value=facts.get(predicate.fact) if fact_present else None,
+        )
+        return Evaluation(value, trace=trace)
 
     if op in {"eq", "in", "lt", "lte", "gt", "gte"}:
         assert predicate.fact is not None
-        if predicate.fact not in facts:
-            return Evaluation(TruthValue.UNKNOWN, frozenset((predicate.fact,)))
+        fact_present = predicate.fact in facts
+        was_submitted = predicate.fact in submitted
+        if not fact_present:
+            missing = frozenset((predicate.fact,))
+            trace = EvaluationTrace(
+                op=op,
+                result=TruthValue.UNKNOWN,
+                fact_key=predicate.fact,
+                fact_present=False,
+                submitted=was_submitted,
+                expected_value=predicate.value,
+                missing_facts=missing,
+            )
+            return Evaluation(TruthValue.UNKNOWN, missing, trace)
+
         actual = facts[predicate.fact]
         expected = predicate.value
         if op == "eq":
@@ -146,37 +256,78 @@ def evaluate(
             matched = actual > expected  # type: ignore[operator]
         else:
             matched = actual >= expected  # type: ignore[operator]
-        return Evaluation(TruthValue.TRUE if matched else TruthValue.FALSE)
+        value = TruthValue.TRUE if matched else TruthValue.FALSE
+        trace = EvaluationTrace(
+            op=op,
+            result=value,
+            fact_key=predicate.fact,
+            fact_present=True,
+            submitted=was_submitted,
+            actual_value=actual,
+            expected_value=expected,
+        )
+        return Evaluation(value, trace=trace)
 
-    children = tuple(evaluate(child, facts, submitted_keys=submitted) for child in predicate.children)
+    children = tuple(
+        evaluate(child, facts, submitted_keys=submitted)
+        for child in predicate.children
+    )
 
     if op == "all":
         if any(child.value is TruthValue.FALSE for child in children):
-            return Evaluation(TruthValue.FALSE)
-        if all(child.value is TruthValue.TRUE for child in children):
-            return Evaluation(TruthValue.TRUE)
-        return Evaluation(
-            TruthValue.UNKNOWN,
-            frozenset().union(*(child.missing_facts for child in children if child.value is TruthValue.UNKNOWN)),
-        )
+            value = TruthValue.FALSE
+            missing = frozenset()
+        elif all(child.value is TruthValue.TRUE for child in children):
+            value = TruthValue.TRUE
+            missing = frozenset()
+        else:
+            value = TruthValue.UNKNOWN
+            missing = frozenset().union(
+                *(child.missing_facts for child in children if child.value is TruthValue.UNKNOWN)
+            )
+        return Evaluation(value, missing, _compose_trace(op=op, value=value, missing_facts=missing, children=children))
 
     if op == "any":
         if any(child.value is TruthValue.TRUE for child in children):
-            return Evaluation(TruthValue.TRUE)
-        if all(child.value is TruthValue.FALSE for child in children):
-            return Evaluation(TruthValue.FALSE)
-        return Evaluation(
-            TruthValue.UNKNOWN,
-            frozenset().union(*(child.missing_facts for child in children if child.value is TruthValue.UNKNOWN)),
-        )
+            value = TruthValue.TRUE
+            missing = frozenset()
+        elif all(child.value is TruthValue.FALSE for child in children):
+            value = TruthValue.FALSE
+            missing = frozenset()
+        else:
+            value = TruthValue.UNKNOWN
+            missing = frozenset().union(
+                *(child.missing_facts for child in children if child.value is TruthValue.UNKNOWN)
+            )
+        return Evaluation(value, missing, _compose_trace(op=op, value=value, missing_facts=missing, children=children))
 
     if op == "not":
         child = children[0]
         if child.value is TruthValue.UNKNOWN:
-            return child
-        return Evaluation(TruthValue.FALSE if child.value is TruthValue.TRUE else TruthValue.TRUE)
+            value = TruthValue.UNKNOWN
+            missing = child.missing_facts
+        else:
+            value = TruthValue.FALSE if child.value is TruthValue.TRUE else TruthValue.TRUE
+            missing = frozenset()
+        return Evaluation(value, missing, _compose_trace(op=op, value=value, missing_facts=missing, children=children))
 
     raise ValueError(f"predicate must be validated before evaluation: {op}")
+
+
+def record_evaluation(
+    context: str,
+    evaluation: Evaluation,
+    *,
+    consequential_to_planning: bool,
+) -> RuleEvaluationRecord:
+    assert evaluation.trace is not None
+    return RuleEvaluationRecord(
+        context=context,
+        value=evaluation.value,
+        missing_facts=evaluation.missing_facts,
+        consequential_to_planning=consequential_to_planning,
+        trace=evaluation.trace,
+    )
 
 
 def eq(fact: str, value: object) -> Predicate:

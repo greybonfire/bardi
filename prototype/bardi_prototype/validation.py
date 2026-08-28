@@ -21,6 +21,15 @@ def _bundle_rules(bundle: KnowledgeBundle) -> Iterable[Predicate | None]:
         yield item.applicability
 
 
+def _predicate_fact_keys(predicate: Predicate) -> frozenset[str]:
+    keys: set[str] = set()
+    if predicate.fact is not None:
+        keys.add(predicate.fact)
+    for child in predicate.children:
+        keys.update(_predicate_fact_keys(child))
+    return frozenset(keys)
+
+
 def validate_bundle(
     bundle: KnowledgeBundle,
     fact_definitions: Mapping[str, FactDefinition],
@@ -71,5 +80,30 @@ def validate_catalog(catalog: KnowledgeCatalog) -> tuple[str, ...]:
         for key in question.resolved_keys:
             if key not in definitions:
                 diagnostics.append(f"unsupported_question_resolved_fact:{key}")
+
+    contradiction_ids: set[str] = set()
+    for contradiction in catalog.contradictions:
+        if contradiction.id in contradiction_ids:
+            diagnostics.append(f"duplicate_contradiction_id:{contradiction.id}")
+        contradiction_ids.add(contradiction.id)
+        if contradiction.goal_id not in catalog.goals:
+            diagnostics.append(f"unsupported_contradiction_goal:{contradiction.goal_id}")
+        if len(contradiction.fact_keys) < 2:
+            diagnostics.append(f"contradiction_requires_multiple_facts:{contradiction.id}")
+        if len(set(contradiction.fact_keys)) != len(contradiction.fact_keys):
+            diagnostics.append(f"duplicate_contradiction_fact_key:{contradiction.id}")
+        for key in contradiction.fact_keys:
+            definition = definitions.get(key)
+            if definition is None:
+                diagnostics.append(f"unsupported_contradiction_fact:{key}")
+            elif definition.derived:
+                diagnostics.append(f"contradiction_conflict_key_must_be_source_fact:{key}")
+        condition_keys = _predicate_fact_keys(contradiction.condition)
+        declared_keys = frozenset(contradiction.fact_keys)
+        if condition_keys != declared_keys:
+            diagnostics.append(f"contradiction_fact_keys_mismatch:{contradiction.id}")
+        for diagnostic in validate_predicate(contradiction.condition, definitions):
+            if diagnostic not in diagnostics:
+                diagnostics.append(diagnostic)
 
     return tuple(dict.fromkeys(diagnostics))

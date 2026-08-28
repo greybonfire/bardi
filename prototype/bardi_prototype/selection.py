@@ -6,18 +6,20 @@ from typing import Mapping
 
 from .contracts import KnowledgeCatalog, ProcedureCandidateDefinition, QuestionDefinition
 from .derivations import derive_facts
-from .evaluator import TruthValue, evaluate
+from .evaluator import RuleEvaluationRecord, TruthValue, evaluate, record_evaluation
 from .questions import pick_question
 
 
 @dataclass(frozen=True)
 class SelectedProcedure:
     candidate: ProcedureCandidateDefinition
+    traces: tuple[RuleEvaluationRecord, ...] = ()
 
 
 @dataclass(frozen=True)
 class SelectionQuestion:
     question: QuestionDefinition
+    traces: tuple[RuleEvaluationRecord, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,7 @@ class SelectionFailure:
     reason_code: str
     procedure_id: str | None = None
     diagnostic_codes: tuple[str, ...] = ()
+    traces: tuple[RuleEvaluationRecord, ...] = ()
 
 
 SelectionOutcome = SelectedProcedure | SelectionQuestion | SelectionFailure
@@ -54,6 +57,14 @@ def resolve_procedure(
         )
         for candidate in goal_entry.candidates
     )
+    traces = tuple(
+        record_evaluation(
+            f"procedure_selection:{candidate.procedure_id}",
+            result,
+            consequential_to_planning=True,
+        )
+        for candidate, result in evaluations
+    )
 
     matched = tuple(
         candidate
@@ -70,20 +81,21 @@ def resolve_procedure(
         return SelectionFailure(
             "procedure_selection_configuration_defect",
             diagnostic_codes=("multiple_matching_procedures",),
+            traces=traces,
         )
 
     if len(matched) == 1 and not unknown:
-        return SelectedProcedure(matched[0])
+        return SelectedProcedure(matched[0], traces)
 
     if not matched and not unknown:
-        return SelectionFailure("no_matching_researched_procedure")
+        return SelectionFailure("no_matching_researched_procedure", traces=traces)
 
     missing_facts = frozenset().union(
         *(result.missing_facts for _, result in unknown)
     )
     question = pick_question(catalog, goal_id, missing_facts)
     if question is not None:
-        return SelectionQuestion(question)
+        return SelectionQuestion(question, traces)
 
     diagnostics = tuple(
         f"missing_procedure_selection_question:{fact_key}"
@@ -93,4 +105,5 @@ def resolve_procedure(
         "procedure_selection_configuration_defect",
         procedure_id=matched[0].procedure_id if len(matched) == 1 else None,
         diagnostic_codes=diagnostics,
+        traces=traces,
     )

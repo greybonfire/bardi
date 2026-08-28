@@ -150,12 +150,22 @@ class QuestionDefinition:
         return self.resolves_fact_keys or (self.fact_key,)
 
 @dataclass(frozen=True)
+class ContradictionDefinition:
+    """A fixture-authored cross-Fact invariant whose TRUE condition is invalid."""
+
+    id: str
+    goal_id: str
+    fact_keys: tuple[str, ...]
+    condition: Predicate
+
+@dataclass(frozen=True)
 class KnowledgeCatalog:
     id: str
     goals: Mapping[str, GoalCatalogDefinition]
     fixtures: Mapping[str, KnowledgeBundle]
     questions: tuple[QuestionDefinition, ...]
     fact_definitions: Mapping[str, FactDefinition] = field(default_factory=dict)
+    contradictions: tuple[ContradictionDefinition, ...] = ()
 
 @dataclass(frozen=True)
 class EvidenceSummary:
@@ -248,6 +258,7 @@ class InconclusiveResult:
 class InvalidResult:
     diagnostic_code: str
     diagnostic_codes: tuple[str, ...] = ()
+    conflicting_fact_keys: tuple[str, ...] = ()
     kind: Literal["invalid"] = field(default="invalid", init=False)
 
 PlanningResult = PlanResult | NextQuestionResult | InconclusiveResult | InvalidResult

@@ -5,6 +5,7 @@ from datetime import date
 from typing import Mapping
 
 from .contracts import (
+    EvidenceSummary,
     InconclusiveResult,
     InvalidResult,
     KnowledgeBundle,
@@ -13,11 +14,13 @@ from .contracts import (
     NextQuestionResult,
     PlanResult,
     PlanningResult,
+    RenderedVerificationPath,
+    VerificationPathDefinition,
 )
 from .contradictions import check_contradictions
 from .evaluator import RuleEvaluationRecord
 from .facts import FACT_DEFINITIONS, validate_submitted_facts
-from .planner import ProcedureNotApplicable, assemble_plan
+from .planner import NoApplicableBasis, ProcedureNotApplicable, assemble_plan
 from .presentation import project_plan
 from .questions import pick_question
 from .selection import SelectedProcedure, SelectionFailure, SelectionQuestion, resolve_procedure
@@ -60,6 +63,32 @@ def _validate_facts(
     return tuple(dict.fromkeys(diagnostics))
 
 
+def _render_verification_path(
+    knowledge: KnowledgeBundle,
+    definition: VerificationPathDefinition,
+    locale: Locale,
+) -> RenderedVerificationPath:
+    source_ids: list[str] = []
+    for evidence_link_id in definition.evidence_link_ids:
+        link = knowledge.evidence_links[evidence_link_id]
+        for source_id in link.source_ids:
+            if source_id not in source_ids:
+                source_ids.append(source_id)
+    return RenderedVerificationPath(
+        id=definition.id,
+        text=definition.text.render(locale),
+        sources=tuple(
+            EvidenceSummary(
+                source_id=source_id,
+                authority=knowledge.sources[source_id].authority,
+                title=knowledge.sources[source_id].title,
+                verified_on=knowledge.sources[source_id].retrieved_on,
+            )
+            for source_id in source_ids
+        ),
+    )
+
+
 def _run_bundle(
     *,
     knowledge: KnowledgeBundle,
@@ -80,6 +109,21 @@ def _run_bundle(
             evaluation_date,
             submitted_keys=frozenset(facts),
             generated_on=generated_on,
+            catalog=catalog,
+        )
+    except NoApplicableBasis as exc:
+        return _ScenarioRun(
+            InconclusiveResult(
+                "no_applicable_basis",
+                procedure_id=exc.procedure_id,
+                message=exc.text.render(locale),
+                verification_path=_render_verification_path(
+                    knowledge,
+                    exc.verification_path,
+                    locale,
+                ),
+            ),
+            exc.traces,
         )
     except ProcedureNotApplicable as exc:
         return _ScenarioRun(

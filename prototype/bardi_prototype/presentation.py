@@ -7,12 +7,17 @@ from .contracts import (
     PersonalizedPlan,
     RenderedChecklistGroup,
     RenderedChecklistItem,
+    RenderedDependency,
+    RenderedEligibilityBasis,
     RenderedFee,
+    RenderedRouting,
     RenderedServicePoint,
     RenderedStep,
+    RenderedVerificationPath,
     RenderedWarning,
+    VerificationPathDefinition,
 )
-from .planner import SemanticPlan
+from .planner import SemanticPlan, SemanticServicePoint
 
 
 CLASSIFICATION_LABELS = {
@@ -21,7 +26,10 @@ CLASSIFICATION_LABELS = {
 }
 
 
-def _source_summaries(plan: SemanticPlan, evidence_link_ids: tuple[str, ...]) -> tuple[EvidenceSummary, ...]:
+def _source_summaries(
+    plan: SemanticPlan,
+    evidence_link_ids: tuple[str, ...],
+) -> tuple[EvidenceSummary, ...]:
     source_ids: list[str] = []
     for evidence_link_id in evidence_link_ids:
         link = plan.knowledge.evidence_links[evidence_link_id]
@@ -44,7 +52,9 @@ def _classification_label(classification: str, locale: Locale) -> str:
     return labels[locale] if labels else classification
 
 
-def _group_checklist(items: tuple[RenderedChecklistItem, ...]) -> tuple[RenderedChecklistGroup, ...]:
+def _group_checklist(
+    items: tuple[RenderedChecklistItem, ...],
+) -> tuple[RenderedChecklistGroup, ...]:
     order: list[str] = []
     grouped: dict[str, list[RenderedChecklistItem]] = {}
     document_ids: dict[str, str | None] = {}
@@ -62,6 +72,43 @@ def _group_checklist(items: tuple[RenderedChecklistItem, ...]) -> tuple[Rendered
             items=tuple(grouped[group_id]),
         )
         for group_id in order
+    )
+
+
+def _verification_path(
+    plan: SemanticPlan,
+    definition: VerificationPathDefinition | None,
+    locale: Locale,
+) -> RenderedVerificationPath | None:
+    if definition is None:
+        return None
+    return RenderedVerificationPath(
+        id=definition.id,
+        text=definition.text.render(locale),
+        sources=_source_summaries(plan, definition.evidence_link_ids),
+    )
+
+
+def _service_point(
+    plan: SemanticPlan,
+    item: SemanticServicePoint,
+    locale: Locale,
+) -> RenderedServicePoint:
+    evidence_ids = tuple(
+        dict.fromkeys(
+            item.version.evidence_link_ids + item.association.evidence_link_ids
+        )
+    )
+    return RenderedServicePoint(
+        id=item.point.id,
+        version_id=item.version.id,
+        association_id=item.association.id,
+        text=item.point.text.render(locale),
+        address=item.version.address.render(locale),
+        availability=item.version.availability,
+        effective_from=item.version.effective_from,
+        effective_to=item.version.effective_to,
+        sources=_source_summaries(plan, evidence_ids),
     )
 
 
@@ -90,6 +137,8 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
             phase=item.phase,
             phase_order=item.phase_order,
             slot=item.slot,
+            scope=item.scope,
+            eligibility_basis_id=item.eligibility_basis_id,
             sources=_source_summaries(plan, item.evidence_link_ids),
         )
         for item in plan.steps
@@ -110,12 +159,7 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
         for item in plan.fees
     )
     service_points = tuple(
-        RenderedServicePoint(
-            id=item.id,
-            text=item.text.render(locale),
-            address=item.address.render(locale),
-            sources=_source_summaries(plan, item.evidence_link_ids),
-        )
+        _service_point(plan, item, locale)
         for item in plan.service_points
     )
     warnings = tuple(
@@ -129,7 +173,73 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
         )
         for item in plan.warnings
     )
-    regeneration_warning = next(warning for warning in warnings if warning.role == "regeneration")
+    regeneration_warning = next(
+        warning for warning in warnings if warning.role == "regeneration"
+    )
+
+    eligibility_bases = tuple(
+        RenderedEligibilityBasis(
+            id=basis.id,
+            text=basis.text.render(locale),
+            verification_state=basis.verification_state,
+            checklist_item_ids=tuple(
+                item.id
+                for item in checklist
+                if item.eligibility_basis_id == basis.id
+            ),
+            step_ids=tuple(
+                item.id
+                for item in steps
+                if item.eligibility_basis_id == basis.id
+            ),
+            sources=_source_summaries(plan, basis.evidence_link_ids),
+        )
+        for basis in plan.eligibility_bases
+    )
+
+    dependencies = tuple(
+        RenderedDependency(
+            id=item.definition.id,
+            text=item.definition.text.render(locale),
+            relation=item.definition.relation,
+            status=item.status,
+            target_procedure_id=item.definition.target_procedure_id,
+            target_procedure=(
+                item.target_knowledge.procedure.text.render(locale)
+                if item.target_knowledge is not None
+                else item.definition.text.render(locale)
+            ),
+            target_procedure_version_id=(
+                item.target_knowledge.procedure.version_id
+                if item.target_knowledge is not None
+                else None
+            ),
+            sources=_source_summaries(
+                plan,
+                item.definition.evidence_link_ids,
+            ),
+            verification_path=_verification_path(
+                plan,
+                item.definition.verification_path,
+                locale,
+            ),
+        )
+        for item in plan.dependencies
+    )
+
+    routing_path = _verification_path(
+        plan,
+        plan.routing.verification_path,
+        locale,
+    )
+    routing = RenderedRouting(
+        status=plan.routing.status,
+        service_points=service_points,
+        unresolved_association_ids=plan.routing.unresolved_association_ids,
+        unresolved_fact_keys=plan.routing.unresolved_fact_keys,
+        verification_path=routing_path,
+    )
+
     return PersonalizedPlan(
         goal_id=knowledge.goal.id,
         goal=knowledge.goal.text.render(locale),
@@ -151,4 +261,12 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
             evaluation_date=plan.evaluation_date,
             generated_on=plan.generated_on,
         ),
+        eligibility_bases=eligibility_bases,
+        basis_verification_path=_verification_path(
+            plan,
+            knowledge.basis_verification_path,
+            locale,
+        ),
+        dependencies=dependencies,
+        routing=routing,
     )

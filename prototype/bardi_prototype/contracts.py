@@ -1,5 +1,5 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Literal, Mapping
 
@@ -181,13 +181,13 @@ class ServicePointVersionDefinition:
 @dataclass(frozen=True)
 class ProcedureServicePointAssociationDefinition:
     id: str
-    procedure_version_id: str
     service_point_version_id: str
     applicability: Predicate
     effective_from: date | None
     effective_to: date | None
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
+    procedure_version_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -227,6 +227,25 @@ class KnowledgeBundle:
     basis_verification_path: VerificationPathDefinition | None = None
     no_applicable_basis_text: LocalizedText | None = None
     routing_verification_path: VerificationPathDefinition | None = None
+
+    def __post_init__(self) -> None:
+        if any(
+            association.procedure_version_id is None
+            for association in self.service_point_associations
+        ):
+            object.__setattr__(
+                self,
+                "service_point_associations",
+                tuple(
+                    replace(
+                        association,
+                        procedure_version_id=self.procedure.version_id,
+                    )
+                    if association.procedure_version_id is None
+                    else association
+                    for association in self.service_point_associations
+                ),
+            )
 
 
 @dataclass(frozen=True)

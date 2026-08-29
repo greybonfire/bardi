@@ -19,49 +19,53 @@ run_scenario(
 
 `inspect_scenario()` runs the same pipeline and adds ephemeral editor/research Evaluation Traces. Raw Facts and trace trees remain outside the public `PlanningResult`.
 
-Issues #5–#8 established the first plan, cross-fixture Procedure selection, typed TRUE/FALSE/UNKNOWN rules, Missing-Fact selection, contradictions, and editor traces. Issue #9 makes the successful result a complete bilingual evidence-backed Personalized Plan while leaving Eligibility-Basis selection, dependencies, richer routing, and temporal trust/version selection to later tickets.
+Issues #5–#9 established Procedure selection, typed three-valued evaluation, deterministic missing-Fact questions, contradictions/traces, and bilingual evidence-backed Personalized Plans. Issue #10 completes the administrative route around a selected Procedure with Eligibility Basis alternatives, direct blocking dependencies, and Procedure-specific Service Point routing.
 
-## Personalized Plan contract
+## Eligibility Bases
 
-A `PersonalizedPlan` now carries:
+A Procedure may define zero or more `EligibilityBasisDefinition` records. When Bases exist, the planner evaluates every authored Basis so it can return all matching alternatives rather than stopping at the first TRUE rule. Consequential UNKNOWN Basis branches continue through the existing Missing-Fact Picker.
 
-- stable Goal, Procedure, and Procedure Version identities;
-- a flat checklist plus deterministic presentation groups;
-- claim classification labels for Official Requirement vs Practical Preparation;
-- per-item quantity, original quantity, copy quantity, Document Type grouping identity, shared/Basis scope, and optional Eligibility Basis ID;
-- compact claim-derived Source summaries without exposing internal Evidence Link records;
-- deterministically ordered steps using explicit `phase_order`, `slot`, and stable ID;
-- structured fee states (`known`, `range`, `unknown`, `unverified`) without synthesized values;
-- Service Points, warnings, and unresolved non-fee information;
-- evaluation date, explicit generation date, Procedure Version verification date, and a dedicated regeneration warning.
+Matched Bases are ordered only for deterministic presentation; the planner does not recommend or rank one legal ground over another. Shared claims remain shared, while Basis-scoped claims and steps are added only for matched Basis IDs and retain their own semantic identities.
 
-Checklist grouping is presentation-only. Items are never unioned into a new semantic claim: grouped entries retain their own IDs, classifications, quantities, Basis scope, and evidence-derived sources.
+If all authored Bases are FALSE, the top-level result is `no_applicable_basis` with bilingual explanation and an evidence-backed official verification path. The planner does not substitute a closest-match Basis.
 
-## Evidence and publication safety
+The military fixture encodes the six researched family-exemption candidate Bases from its evidence pack. Their `needs_reverification` state remains visible and the product warning still states that a planner match is not an exemption decision. Basis-specific candidate legal claims are not promoted to current authoritative checklist guidance before specialist review.
 
-Fixture validation now rejects a current evidence-bearing checklist claim, material step, or current Service Point when its claim-specific Evidence Link is absent or broken. Known/range fees require evidence; unknown fees carry no invented amount. Unverified fees may preserve an evidenced historical/provisional value only when explicitly marked `needs_reverification`.
+## Direct Procedure Dependencies
 
-Administrative warnings require evidence. Product warnings—such as “regenerate before acting” and “this is guidance, not an authority decision”—do not require government evidence and never control plan flow.
+`ProcedureDependencyDefinition` currently supports only the researched contract shape `blocking_prerequisite`. A dependency has its own applicability rule, a `satisfied_when` rule, claim-specific evidence, and a safe verification path.
 
-Every fixture must provide complete Arabic and English text for public content. Both locales are part of one fixture/version structure and must preserve the same claim IDs, rule outcomes, quantities, fee states, ordering, and provenance identities. This structural check does not replace the independent human bilingual-review gate recorded in the evidence packs.
+The planner evaluates only the direct dependency edge. If the target Procedure exists in the current research catalog, the plan can identify its Procedure Version without recursively planning the target. If the target is unresearched, the dependency is returned as `unsupported_target` with its stable target ID, user-facing name, and verification path rather than inventing a plan.
 
-## Fixture-specific behavior
+Current researched fixtures assert no real direct blocking dependency, matching the evidence packs. Synthetic tests exercise supported and unsupported targets and verify that blocking dependency cycles are invalid catalog configuration.
 
-The passport fixture has current official checklist evidence, structured photo quantity, and the official “originals plus a copy” instruction represented as separate original/copy quantities. `passport.requirement.previous_passport` remains `needs_reverification` and is excluded from current guidance. The standard turnaround remains unknown.
+## Procedure-specific Service Point routing
 
-The National ID fixture now represents the unresolved ordinary fee as a structured `unknown` fee rather than burying it in generic prose. The previous-card requirement, turnaround, and exact routing remain unresolved where the evidence pack did not establish them.
+A Service Point is now a stable identity. Material details such as address and availability live on `ServicePointVersionDefinition`, while case-dependent routing lives on sourced `ProcedureServicePointAssociationDefinition` records owned by the Procedure Version.
 
-The military fixture likewise exposes its unresolved certificate fee as `unknown`. The shared supporting-document claim is current; the only-son legal Basis candidate is tagged as Basis-scoped metadata but remains `needs_reverification`, so it is still excluded from current authoritative checklist output pending specialist review.
+Associations and material detail versions can carry applicability intervals. Fixture validation rejects invalid intervals, overlapping current detail versions for the same Service Point, missing evidence, broken references, or association ownership that does not match the containing Procedure Version.
 
-No researched fixture currently has publishable Practical Preparation. Tests use synthetic fixture variants only to prove that Practical Preparation and shared/Basis-specific claims can be grouped without losing semantic identity or evidence; those test variants are not fixture guidance.
+Routing evaluates all applicable associations and returns all matches; there is no nearest-office or hidden recommendation. The routing section is explicitly local:
 
-## Typed evaluation and diagnostics
+- `resolved`: one or more points resolved and no current association remains UNKNOWN;
+- `partially_resolved`: points resolved while another current association remains locally UNKNOWN;
+- `unresolved`: no point resolves.
 
-Source Facts remain strictly typed; omission is UNKNOWN and null is invalid. Strong-Kleene rules, deterministic Missing-Fact selection, fixture-authored contradictions, and complete editor-facing Evaluation Traces remain unchanged from issues #7–#8. Local Service Point UNKNOWNs remain non-blocking.
+An unresolved route does not remove reliable checklist items, fees, warnings, or steps. It carries the unresolved association IDs/Facts and an evidence-backed verification path. The legacy flat `plan.service_points` projection remains for compatibility and mirrors the resolved points in `plan.routing`.
+
+The passport fixture moves its Giza jurisdiction rule from the Service Point itself onto a sourced passport-renewal association. The National ID fixture keeps exact routing unresolved and supplies a Civil Status directory verification path. The military fixture models researched Giza, Mansoura, and Zagazig recruitment-region associations from the official region directory.
+
+## Personalized Plan and evidence contract
+
+The issue #9 plan behavior remains intact: checklist grouping never merges semantic claims; Official Requirements and Practical Preparation remain visibly distinct; fee values use explicit known/range/unknown/unverified states; steps use deterministic phase/slot order; and public provenance is compact Source metadata derived from internal claim-specific Evidence Links.
+
+Source Facts remain strictly typed; omission is UNKNOWN and null is invalid. Strong-Kleene rules, deterministic Missing-Fact selection, fixture-authored contradictions, and complete editor-facing Evaluation Traces remain unchanged. Routing UNKNOWNs are deliberately non-consequential while Basis and dependency UNKNOWNs can still drive Questions.
 
 ## Prototype boundary
 
-There is no Django, PostgreSQL, ORM, HTTP server, Next.js client, persistence layer, network access, implicit system clock, random identifier generation, or raw-Fact logging. Issue #9 does not implement Eligibility-Basis matching, Procedure Dependencies, version-selection history, or a production provenance/publication workflow.
+There is no Django, PostgreSQL, ORM, HTTP server, Next.js client, persistence layer, network access, implicit system clock, random identifier generation, or raw-Fact logging.
+
+Issue #10 does not implement the generalized Procedure-Version freshness/trust behavior in #11. Service Point detail/association dates exist only because routing itself requires date-applicable material details. Future/withdrawn Procedure Versions, stale/disputed claims, and publication-state versus calculated-trust behavior remain deferred.
 
 ## Run the tests
 
@@ -71,4 +75,4 @@ From the repository root:
 python -m unittest discover -s prototype/tests -v
 ```
 
-The suite includes the earlier #5–#8 behavior plus issue #9 coverage for evidence gates, checklist grouping and quantities, fee states, deterministic phase/slot ordering, bilingual semantic parity, explicit generation/verification dates, and the required regeneration warning.
+The suite includes the earlier #5–#9 behavior plus issue #10 scenarios for exhaustive Basis alternatives, no-applicable-basis handling, additive Basis claims, one-level dependency resolution, unsupported dependency targets, blocking-cycle rejection, multiple Service Point matches, local routing uncertainty, and date-specific Service Point details.

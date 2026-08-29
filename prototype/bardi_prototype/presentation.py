@@ -89,6 +89,16 @@ def _verification_path(
     )
 
 
+def _required_verification_path(
+    plan: SemanticPlan,
+    definition: VerificationPathDefinition,
+    locale: Locale,
+) -> RenderedVerificationPath:
+    rendered = _verification_path(plan, definition, locale)
+    assert rendered is not None
+    return rendered
+
+
 def _service_point(
     plan: SemanticPlan,
     item: SemanticServicePoint,
@@ -218,7 +228,7 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
                 plan,
                 item.definition.evidence_link_ids,
             ),
-            verification_path=_verification_path(
+            verification_path=_required_verification_path(
                 plan,
                 item.definition.verification_path,
                 locale,

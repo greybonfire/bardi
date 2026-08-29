@@ -401,6 +401,34 @@ class BasisDependencyRoutingTests(unittest.TestCase):
         self.assertIsNotNone(plan.routing.verification_path)
         self.assertTrue(plan.routing.verification_path.sources)
 
+    def test_routing_association_owner_is_explicit_and_mismatch_is_invalid(self) -> None:
+        passport = load_passport_renewal_fixture()
+        association = passport.service_point_associations[0]
+        self.assertEqual(
+            association.procedure_version_id,
+            passport.procedure.version_id,
+        )
+        bad_association = replace(
+            association,
+            procedure_version_id="wrong.procedure.version",
+        )
+        bad_passport = replace(
+            passport,
+            service_point_associations=(bad_association,),
+        )
+        catalog = replace(
+            self.catalog,
+            fixtures={
+                **self.catalog.fixtures,
+                passport.procedure.procedure_id: bad_passport,
+            },
+        )
+        diagnostics = validate_catalog(catalog)
+        self.assertIn(
+            "association_procedure_version_mismatch:spa.passport_renewal.giza_standard:wrong.procedure.version",
+            diagnostics,
+        )
+
     def test_service_point_material_details_respect_evaluation_date(self) -> None:
         passport = load_passport_renewal_fixture()
         old_version = replace(
@@ -414,7 +442,7 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                 ar="عنوان اختباري جديد من 2027",
                 en="Synthetic new address from 2027",
             ),
-            availability="available",
+            availability="unknown",
             effective_from=date(2027, 1, 1),
             effective_to=None,
             evidence_link_ids=old_version.evidence_link_ids,
@@ -427,7 +455,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
         new_association = ProcedureServicePointAssociationDefinition(
             id="spa.passport_renewal.giza_standard.synthetic-2027",
             service_point_version_id=new_version.id,
-            applicability=old_association.applicability,
+            applicability=eq(
+                "residence_police_jurisdiction",
+                "boulak_el_dakrour",
+            ),
             effective_from=date(2027, 1, 1),
             effective_to=None,
             evidence_link_ids=old_association.evidence_link_ids,
@@ -446,21 +477,35 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             locale="en",
             evaluation_date=date(2026, 8, 25),
         )
-        new_result = run_scenario(
+        stale_jurisdiction = run_scenario(
             knowledge=variant,
             goal_id=variant.goal.id,
             facts=self.passport_facts(),
             locale="en",
             evaluation_date=date(2027, 1, 2),
         )
+        new_result = run_scenario(
+            knowledge=variant,
+            goal_id=variant.goal.id,
+            facts=self.passport_facts(
+                residence_police_jurisdiction="boulak_el_dakrour",
+            ),
+            locale="en",
+            evaluation_date=date(2027, 1, 2),
+        )
         self.assertIsInstance(old_result, PlanResult)
+        self.assertIsInstance(stale_jurisdiction, PlanResult)
         self.assertIsInstance(new_result, PlanResult)
         old_point = old_result.plan.service_points[0]  # type: ignore[union-attr]
+        self.assertEqual(stale_jurisdiction.plan.service_points, ())  # type: ignore[union-attr]
+        self.assertEqual(stale_jurisdiction.plan.routing.status, "unresolved")  # type: ignore[union-attr]
         new_point = new_result.plan.service_points[0]  # type: ignore[union-attr]
         self.assertEqual(old_point.id, new_point.id)
         self.assertNotEqual(old_point.version_id, new_point.version_id)
         self.assertNotEqual(old_point.address, new_point.address)
         self.assertEqual(new_point.address, "Synthetic new address from 2027")
+        self.assertEqual(old_point.availability, "available")
+        self.assertEqual(new_point.availability, "unknown")
 
 
 if __name__ == "__main__":

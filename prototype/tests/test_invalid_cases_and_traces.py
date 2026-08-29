@@ -203,10 +203,16 @@ class InvalidCasesAndTraceTests(unittest.TestCase):
         )
         self.assertIsInstance(inspection.result, PlanResult)
         self.assertEqual(inspection.result.plan.service_points, ())
+        self.assertEqual(inspection.result.plan.routing.status, "unresolved")
+        self.assertEqual(
+            inspection.result.plan.routing.unresolved_fact_keys,
+            ("residence_police_jurisdiction",),
+        )
+        self.assertIsNotNone(inspection.result.plan.routing.verification_path)
         routing = next(
             trace
             for trace in inspection.evaluation_traces
-            if trace.context == "service_point:sp.giza_passport_office"
+            if trace.context == "service_point_association:spa.passport_renewal.giza_standard"
         )
         self.assertFalse(routing.consequential_to_planning)
         self.assertEqual(routing.value, TruthValue.UNKNOWN)

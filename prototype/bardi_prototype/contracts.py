@@ -181,6 +181,7 @@ class ServicePointVersionDefinition:
 @dataclass(frozen=True)
 class ProcedureServicePointAssociationDefinition:
     id: str
+    procedure_version_id: str
     service_point_version_id: str
     applicability: Predicate
     effective_from: date | None

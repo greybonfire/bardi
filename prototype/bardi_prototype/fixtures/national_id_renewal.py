@@ -13,6 +13,7 @@ from ..contracts import (
     Source,
     StepDefinition,
     UnknownDefinition,
+    VerificationPathDefinition,
     WarningDefinition,
 )
 from ..evaluator import all_of, eq
@@ -191,4 +192,12 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
         service_points=(),
         warnings=warnings,
         unknowns=unknowns,
+        routing_verification_path=VerificationPathDefinition(
+            id="nid.routing.verify",
+            text=t(
+                "تحقق من منفذ الخدمة المختص من دليل خدمات الأحوال المدنية قبل التوجه.",
+                "Verify the competent service location in the Civil Status services directory before acting.",
+            ),
+            evidence_link_ids=("EL-PSM-NID-SERVICE",),
+        ),
     )

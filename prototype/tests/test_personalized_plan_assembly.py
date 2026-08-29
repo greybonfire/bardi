@@ -160,7 +160,7 @@ class PersonalizedPlanAssemblyTests(unittest.TestCase):
             document_type_id="military_supporting_documents",
             copy_quantity=1,
             scope="eligibility_basis",
-            eligibility_basis_id="family.test_basis",
+            eligibility_basis_id="family.only_son_living_father",
         )
         variant = replace(fixture, claims=(shared, basis, *fixture.claims[1:]))
         result = run_scenario(
@@ -170,6 +170,11 @@ class PersonalizedPlanAssemblyTests(unittest.TestCase):
                 "application_location": "inside_egypt",
                 "father_alive": True,
                 "other_living_sons_of_father_count": 0,
+                "father_unable_to_earn_status": "not_documented_unable",
+                "mother_family_status": "other",
+                "unmarried_sisters_requiring_support_count": 0,
+                "missing_relative_category": "none",
+                "sibling_service_status": "none",
             },
             locale="en",
             evaluation_date=date(2026, 8, 26),
@@ -179,7 +184,7 @@ class PersonalizedPlanAssemblyTests(unittest.TestCase):
         self.assertEqual(tuple(item.id for item in group.items), ("mil.shared.supporting_documents", "test.basis.supporting_documents"))
         self.assertEqual(group.items[1].classification_label, "Practical preparation")
         self.assertEqual(group.items[1].scope, "eligibility_basis")
-        self.assertEqual(group.items[1].eligibility_basis_id, "family.test_basis")
+        self.assertEqual(group.items[1].eligibility_basis_id, "family.only_son_living_father")
         self.assertEqual(group.items[1].copy_quantity, 1)
         self.assertTrue(group.items[0].sources)
         self.assertTrue(group.items[1].sources)

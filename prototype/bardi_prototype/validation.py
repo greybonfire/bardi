@@ -403,6 +403,10 @@ def validate_bundle(
         if association.id in association_ids:
             diagnostics.append(f"duplicate_service_point_association_id:{association.id}")
         association_ids.add(association.id)
+        if association.procedure_version_id != bundle.procedure.version_id:
+            diagnostics.append(
+                f"association_procedure_version_mismatch:{association.id}:{association.procedure_version_id}"
+            )
         if association.service_point_version_id not in version_ids:
             diagnostics.append(
                 f"association_unknown_service_point_version:{association.id}:{association.service_point_version_id}"

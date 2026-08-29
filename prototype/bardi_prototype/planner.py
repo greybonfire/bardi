@@ -22,6 +22,7 @@ class SemanticPlan:
     knowledge: KnowledgeBundle
     facts: Mapping[str, object]
     evaluation_date: date
+    generated_on: date
     claims: tuple[ClaimDefinition, ...]
     steps: tuple[StepDefinition, ...]
     fees: tuple[FeeDefinition, ...]
@@ -72,7 +73,11 @@ def _select_items(
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
     for item in _current_items(items):
-        result = evaluate(item.applicability, facts, submitted_keys=submitted_keys)
+        result = evaluate(
+            item.applicability,
+            facts,
+            submitted_keys=submitted_keys,
+        )
         traces.append(
             record_evaluation(
                 f"{context_prefix}:{item.id}",
@@ -87,15 +92,46 @@ def _select_items(
     return tuple(selected), frozenset(missing), tuple(traces)
 
 
+def _select_fees(
+    items,
+    facts: Mapping[str, object],
+    submitted_keys: frozenset[str],
+):
+    """Select all explicit fee states, including unknown/unverified values."""
+    selected = []
+    missing: set[str] = set()
+    traces: list[RuleEvaluationRecord] = []
+    for item in items:
+        result = evaluate(
+            item.applicability,
+            facts,
+            submitted_keys=submitted_keys,
+        )
+        traces.append(
+            record_evaluation(
+                f"fee:{item.id}",
+                result,
+                consequential_to_planning=True,
+            )
+        )
+        if result.value is TruthValue.TRUE:
+            selected.append(item)
+        elif result.value is TruthValue.UNKNOWN:
+            missing.update(result.missing_facts)
+    return tuple(selected), frozenset(missing), tuple(traces)
+
+
 def assemble_plan(
     knowledge: KnowledgeBundle,
     facts: Mapping[str, object],
     evaluation_date: date,
     *,
     submitted_keys: frozenset[str] | None = None,
+    generated_on: date | None = None,
 ) -> PlanAssembly:
-    """Assemble one Procedure plan, surfacing only consequential rule UNKNOWNs."""
+    """Assemble one Procedure plan, surfacing consequential rule UNKNOWNs."""
     submitted = frozenset(facts) if submitted_keys is None else submitted_keys
+    generated = evaluation_date if generated_on is None else generated_on
     derived = derive_facts(dict(facts), evaluation_date)
     traces: list[RuleEvaluationRecord] = []
 
@@ -112,9 +148,16 @@ def assemble_plan(
         )
     )
     if procedure_result.value is TruthValue.FALSE:
-        raise ProcedureNotApplicable(knowledge.procedure.procedure_id, tuple(traces))
+        raise ProcedureNotApplicable(
+            knowledge.procedure.procedure_id,
+            tuple(traces),
+        )
     if procedure_result.value is TruthValue.UNKNOWN:
-        return PlanAssembly(None, procedure_result.missing_facts, tuple(traces))
+        return PlanAssembly(
+            None,
+            procedure_result.missing_facts,
+            tuple(traces),
+        )
 
     claims, claim_missing, claim_traces = _select_items(
         knowledge.claims,
@@ -124,6 +167,7 @@ def assemble_plan(
         consequential=True,
     )
     traces.extend(claim_traces)
+
     steps, step_missing, step_traces = _select_items(
         knowledge.steps,
         derived,
@@ -132,17 +176,16 @@ def assemble_plan(
         consequential=True,
     )
     traces.extend(step_traces)
-    fees, fee_missing, fee_traces = _select_items(
+
+    fees, fee_missing, fee_traces = _select_fees(
         knowledge.fees,
         derived,
         submitted,
-        context_prefix="fee",
-        consequential=True,
     )
     traces.extend(fee_traces)
 
-    # Routing is deliberately local: unresolved Service Point applicability does
-    # not block otherwise-supported guidance, but the editor trace records it.
+    # Routing remains deliberately local: unresolved Service Point applicability
+    # does not block otherwise-supported guidance.
     service_points, _, service_point_traces = _select_items(
         knowledge.service_points,
         derived,
@@ -154,7 +197,11 @@ def assemble_plan(
 
     unknowns: list[UnknownDefinition] = []
     for item in knowledge.unknowns:
-        result = evaluate(item.applicability, derived, submitted_keys=submitted)
+        result = evaluate(
+            item.applicability,
+            derived,
+            submitted_keys=submitted,
+        )
         traces.append(
             record_evaluation(
                 f"unknown:{item.id}",
@@ -173,8 +220,16 @@ def assemble_plan(
         knowledge=knowledge,
         facts=derived,
         evaluation_date=evaluation_date,
-        claims=tuple(sorted(claims, key=lambda item: item.display_order)),
-        steps=tuple(sorted(steps, key=lambda item: (item.slot, item.id))),
+        generated_on=generated,
+        claims=tuple(
+            sorted(claims, key=lambda item: (item.display_order, item.id))
+        ),
+        steps=tuple(
+            sorted(
+                steps,
+                key=lambda item: (item.phase_order, item.slot, item.id),
+            )
+        ),
         fees=tuple(sorted(fees, key=lambda item: item.id)),
         service_points=tuple(sorted(service_points, key=lambda item: item.id)),
         warnings=knowledge.warnings,

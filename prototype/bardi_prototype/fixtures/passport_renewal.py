@@ -71,7 +71,8 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
         ),
         "EL-MOI-GIZA-01": EvidenceLink("EL-MOI-GIZA-01", ("SRC-MOI-OFFICE-DIRECTORY",)),
         "EL-MOI-PASSPORT-NATURE-01": EvidenceLink(
-            "EL-MOI-PASSPORT-NATURE-01", ("SRC-MOI-PASSPORT-REQ",)
+            "EL-MOI-PASSPORT-NATURE-01",
+            ("SRC-MOI-PASSPORT-REQ",),
         ),
         "EL-MOI-VALIDITY-01": EvidenceLink("EL-MOI-VALIDITY-01", ("SRC-MOI-PASSPORT-REQ",)),
     }
@@ -109,6 +110,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-MOI-REQ-01",),
             verification_state="current",
             display_order=10,
+            document_type_id="national_id",
         ),
         ClaimDefinition(
             id="passport.requirement.birth_certificate",
@@ -121,6 +123,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-MOI-REQ-02",),
             verification_state="current",
             display_order=20,
+            document_type_id="birth_certificate",
         ),
         ClaimDefinition(
             id="passport.requirement.student_enrollment",
@@ -133,6 +136,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-MOI-REQ-03",),
             verification_state="current",
             display_order=30,
+            document_type_id="student_enrollment_certificate",
         ),
         ClaimDefinition(
             id="passport.requirement.military_status",
@@ -146,6 +150,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-MOI-REQ-04",),
             verification_state="current",
             display_order=40,
+            document_type_id="military_status_document",
         ),
         ClaimDefinition(
             id="passport.requirement.photos",
@@ -159,6 +164,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             verification_state="current",
             display_order=50,
             quantity=3,
+            document_type_id="passport_photo",
         ),
         ClaimDefinition(
             id="passport.requirement.originals_and_copy",
@@ -171,6 +177,9 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-MOI-REQ-06",),
             verification_state="current",
             display_order=60,
+            document_type_id="supporting_documents",
+            original_quantity=1,
+            copy_quantity=1,
         ),
         ClaimDefinition(
             id="passport.requirement.previous_passport",
@@ -183,6 +192,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-PSM-SERVICE-01",),
             verification_state="needs_reverification",
             display_order=70,
+            document_type_id="previous_passport",
         ),
     )
 
@@ -198,6 +208,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-MOI-PROCESS-01",),
             verification_state="current",
+            phase_order=10,
         ),
         StepDefinition(
             id="passport.step.complete_form",
@@ -210,6 +221,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-MOI-PROCESS-02",),
             verification_state="current",
+            phase_order=10,
         ),
         StepDefinition(
             id="passport.step.submit_and_pay",
@@ -222,6 +234,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-MOI-ROUTING-01", "EL-MOI-FEE-01"),
             verification_state="current",
+            phase_order=20,
         ),
     )
 
@@ -234,6 +247,8 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-MOI-FEE-01",),
             verification_state="current",
+            value_state="known",
+            fee_type="base",
         ),
         FeeDefinition(
             id="passport.fee.urgent_service",
@@ -243,6 +258,8 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             applicability=eq("service_level", "urgent"),
             evidence_link_ids=("EL-MOI-URGENT-01",),
             verification_state="current",
+            value_state="known",
+            fee_type="additional_service",
         ),
         FeeDefinition(
             id="passport.fee.premium_service",
@@ -252,6 +269,8 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             applicability=eq("service_level", "premium"),
             evidence_link_ids=("EL-MOI-PREMIUM-01",),
             verification_state="current",
+            value_state="known",
+            fee_type="additional_service",
         ),
     )
 
@@ -291,6 +310,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             ),
             severity="info",
             evidence_link_ids=("EL-MOI-PASSPORT-NATURE-01",),
+            kind="administrative",
         ),
         WarningDefinition(
             id="passport.warning.validity",
@@ -300,6 +320,7 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             ),
             severity="info",
             evidence_link_ids=("EL-MOI-VALIDITY-01",),
+            kind="administrative",
         ),
         WarningDefinition(
             id="passport.warning.regenerate",
@@ -308,6 +329,8 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
                 "Re-check the plan immediately before acting because fees, Service Points and instructions can change.",
             ),
             severity="important",
+            kind="product",
+            role="regeneration",
         ),
         WarningDefinition(
             id="passport.warning.guidance_not_decision",
@@ -316,6 +339,8 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
                 "This is source-backed guidance, not a binding decision by the government authority.",
             ),
             severity="important",
+            kind="product",
+            role="limitation",
         ),
     )
 

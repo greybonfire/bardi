@@ -5,6 +5,7 @@ from datetime import date
 from ..contracts import (
     ClaimDefinition,
     EvidenceLink,
+    FeeDefinition,
     GoalDefinition,
     KnowledgeBundle,
     LocalizedText,
@@ -91,8 +92,10 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             evidence_link_ids=(),
             verification_state="needs_reverification",
             display_order=20,
+            document_type_id="national_id",
         ),
     )
+
     steps = (
         StepDefinition(
             id="nid.step.apply_for_renewal",
@@ -105,6 +108,7 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-CIVIL-LAW-52",),
             verification_state="current",
+            phase_order=10,
         ),
         StepDefinition(
             id="nid.step.resolve_service_location",
@@ -117,8 +121,24 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-PSM-NID-SERVICE",),
             verification_state="current",
+            phase_order=20,
         ),
     )
+
+    fees = (
+        FeeDefinition(
+            id="nid.fee.ordinary",
+            text=t("رسم التجديد العادي", "Ordinary renewal fee"),
+            amount=None,
+            currency="EGP",
+            applicability=None,
+            evidence_link_ids=(),
+            verification_state="unknown",
+            value_state="unknown",
+            fee_type="base",
+        ),
+    )
+
     warnings = (
         WarningDefinition(
             id="nid.warning.deadline",
@@ -128,6 +148,7 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             ),
             severity="important",
             evidence_link_ids=("EL-CIVIL-LAW-52",),
+            kind="administrative",
         ),
         WarningDefinition(
             id="nid.warning.recheck",
@@ -136,16 +157,12 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
                 "Re-check the plan before acting because fees, service channels and operational instructions can change.",
             ),
             severity="important",
+            kind="product",
+            role="regeneration",
         ),
     )
+
     unknowns = (
-        UnknownDefinition(
-            id="nid.fee.ordinary",
-            text=t(
-                "الرسم الحالي للتجديد العادي غير مثبت في هذه الحزمة.",
-                "The current ordinary-renewal fee is not established by this research fixture.",
-            ),
-        ),
         UnknownDefinition(
             id="nid.turnaround.ordinary",
             text=t(
@@ -170,7 +187,7 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
         evidence_links=evidence_links,
         claims=claims,
         steps=steps,
-        fees=(),
+        fees=fees,
         service_points=(),
         warnings=warnings,
         unknowns=unknowns,

@@ -26,13 +26,6 @@ from .validation import validate_bundle, validate_catalog
 
 @dataclass(frozen=True)
 class ScenarioInspection:
-    """Editor-facing result containing ephemeral rule traces.
-
-    `result` is exactly the safe public planning result returned by
-    `run_scenario()`. `evaluation_traces` are for fixture review/debugging and
-    are not part of that public result.
-    """
-
     result: PlanningResult
     evaluation_traces: tuple[RuleEvaluationRecord, ...] = ()
 
@@ -74,6 +67,7 @@ def _run_bundle(
     facts: Mapping[str, object],
     locale: Locale,
     evaluation_date: date,
+    generated_on: date,
     catalog: KnowledgeCatalog | None = None,
 ) -> _ScenarioRun:
     if goal_id != knowledge.goal.id:
@@ -85,6 +79,7 @@ def _run_bundle(
             facts,
             evaluation_date,
             submitted_keys=frozenset(facts),
+            generated_on=generated_on,
         )
     except ProcedureNotApplicable as exc:
         return _ScenarioRun(
@@ -92,7 +87,9 @@ def _run_bundle(
             exc.traces,
         )
     except (ValueError, TypeError):
-        return _ScenarioRun(_invalid("invalid_facts", ("fact_derivation_failed",)))
+        return _ScenarioRun(
+            _invalid("invalid_facts", ("fact_derivation_failed",))
+        )
 
     if assembly.plan is None:
         if catalog is None:
@@ -100,7 +97,8 @@ def _run_bundle(
                 InconclusiveResult(
                     "known_case_requires_complete_facts",
                     diagnostic_codes=tuple(
-                        f"missing_fact:{key}" for key in sorted(assembly.missing_facts)
+                        f"missing_fact:{key}"
+                        for key in sorted(assembly.missing_facts)
                     ),
                 ),
                 assembly.traces,
@@ -122,7 +120,8 @@ def _run_bundle(
                 "missing_fact_configuration_defect",
                 procedure_id=knowledge.procedure.procedure_id,
                 diagnostic_codes=tuple(
-                    f"missing_plan_question:{key}" for key in sorted(assembly.missing_facts)
+                    f"missing_plan_question:{key}"
+                    for key in sorted(assembly.missing_facts)
                 ),
             ),
             assembly.traces,
@@ -141,17 +140,31 @@ def _execute_scenario(
     facts: Mapping[str, object],
     locale: Locale,
     evaluation_date: date,
+    generated_on: date | None = None,
 ) -> _ScenarioRun:
     if locale not in ("ar", "en"):
         return _ScenarioRun(_invalid("unsupported_locale"))
     if type(evaluation_date) is not date:
         return _ScenarioRun(_invalid("invalid_evaluation_date"))
 
+    generation_date = evaluation_date if generated_on is None else generated_on
+    if type(generation_date) is not date:
+        return _ScenarioRun(_invalid("invalid_generation_date"))
+
     if isinstance(knowledge, KnowledgeBundle):
-        knowledge_diagnostics = validate_bundle(knowledge, FACT_DEFINITIONS)
+        knowledge_diagnostics = validate_bundle(
+            knowledge,
+            FACT_DEFINITIONS,
+        )
         if knowledge_diagnostics:
-            return _ScenarioRun(_invalid("invalid_knowledge", knowledge_diagnostics))
-        fact_diagnostics = _validate_facts(facts, FACT_DEFINITIONS, evaluation_date)
+            return _ScenarioRun(
+                _invalid("invalid_knowledge", knowledge_diagnostics)
+            )
+        fact_diagnostics = _validate_facts(
+            facts,
+            FACT_DEFINITIONS,
+            evaluation_date,
+        )
         if fact_diagnostics:
             return _ScenarioRun(_invalid("invalid_facts", fact_diagnostics))
         return _run_bundle(
@@ -160,14 +173,21 @@ def _execute_scenario(
             facts=facts,
             locale=locale,
             evaluation_date=evaluation_date,
+            generated_on=generation_date,
         )
 
     knowledge_diagnostics = validate_catalog(knowledge)
     if knowledge_diagnostics:
-        return _ScenarioRun(_invalid("invalid_knowledge", knowledge_diagnostics))
+        return _ScenarioRun(
+            _invalid("invalid_knowledge", knowledge_diagnostics)
+        )
 
     definitions = knowledge.fact_definitions or FACT_DEFINITIONS
-    fact_diagnostics = _validate_facts(facts, definitions, evaluation_date)
+    fact_diagnostics = _validate_facts(
+        facts,
+        definitions,
+        evaluation_date,
+    )
     if fact_diagnostics:
         return _ScenarioRun(_invalid("invalid_facts", fact_diagnostics))
 
@@ -249,7 +269,9 @@ def _execute_scenario(
             InconclusiveResult(
                 "procedure_selection_configuration_defect",
                 procedure_id=candidate.procedure_id,
-                diagnostic_codes=("selected_procedure_fixture_missing_or_mismatched",),
+                diagnostic_codes=(
+                    "selected_procedure_fixture_missing_or_mismatched",
+                ),
             ),
             tuple(traces),
         )
@@ -260,6 +282,7 @@ def _execute_scenario(
         facts=facts,
         locale=locale,
         evaluation_date=evaluation_date,
+        generated_on=generation_date,
         catalog=knowledge,
     )
     return _ScenarioRun(
@@ -275,14 +298,16 @@ def run_scenario(
     facts: Mapping[str, object],
     locale: Locale,
     evaluation_date: date,
+    generated_on: date | None = None,
 ) -> PlanningResult:
-    """The prototype's public, trace-free application-level seam."""
+    """Public trace-free seam with an explicit optional generation date."""
     return _execute_scenario(
         knowledge=knowledge,
         goal_id=goal_id,
         facts=facts,
         locale=locale,
         evaluation_date=evaluation_date,
+        generated_on=generated_on,
     ).result
 
 
@@ -293,13 +318,14 @@ def inspect_scenario(
     facts: Mapping[str, object],
     locale: Locale,
     evaluation_date: date,
+    generated_on: date | None = None,
 ) -> ScenarioInspection:
-    """Run the same scenario while retaining editor-facing Evaluation Traces."""
     execution = _execute_scenario(
         knowledge=knowledge,
         goal_id=goal_id,
         facts=facts,
         locale=locale,
         evaluation_date=evaluation_date,
+        generated_on=generated_on,
     )
     return ScenarioInspection(execution.result, execution.traces)

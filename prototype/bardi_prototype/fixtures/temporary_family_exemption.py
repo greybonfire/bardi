@@ -5,6 +5,7 @@ from datetime import date
 from ..contracts import (
     ClaimDefinition,
     EvidenceLink,
+    FeeDefinition,
     GoalDefinition,
     KnowledgeBundle,
     LocalizedText,
@@ -114,6 +115,8 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-MOD-SUPPORTING-DOCS",),
             verification_state="current",
             display_order=10,
+            document_type_id="military_supporting_documents",
+            scope="shared",
         ),
         ClaimDefinition(
             id="mil.basis.only_son_living_father",
@@ -129,8 +132,11 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
             evidence_link_ids=("EL-LAW127-ART7-II-A",),
             verification_state="needs_reverification",
             display_order=20,
+            scope="eligibility_basis",
+            eligibility_basis_id="family.only_son_living_father",
         ),
     )
+
     steps = (
         StepDefinition(
             id="mil.step.submit_supporting_documents",
@@ -143,6 +149,7 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-MOD-SUPPORTING-DOCS",),
             verification_state="current",
+            phase_order=10,
         ),
         StepDefinition(
             id="mil.step.authority_review",
@@ -155,8 +162,24 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
             applicability=None,
             evidence_link_ids=("EL-TAGNED-CERT-REVIEW",),
             verification_state="current",
+            phase_order=20,
         ),
     )
+
+    fees = (
+        FeeDefinition(
+            id="mil.fee.current",
+            text=t("رسم شهادة الإعفاء", "Exemption-certificate fee"),
+            amount=None,
+            currency="EGP",
+            applicability=None,
+            evidence_link_ids=(),
+            verification_state="unknown",
+            value_state="unknown",
+            fee_type="certificate",
+        ),
+    )
+
     service_points = (
         ServicePointDefinition(
             id="sp.recruitment_region_giza",
@@ -167,6 +190,7 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
             verification_state="current",
         ),
     )
+
     warnings = (
         WarningDefinition(
             id="mil.warning.candidate_not_decision",
@@ -175,6 +199,8 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
                 "Matching a researched route is not an exemption decision; specialist and authority confirmation are required.",
             ),
             severity="important",
+            kind="product",
+            role="limitation",
         ),
         WarningDefinition(
             id="mil.warning.recheck",
@@ -183,21 +209,17 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
                 "Re-check current instructions before acting.",
             ),
             severity="important",
+            kind="product",
+            role="regeneration",
         ),
     )
+
     unknowns = (
         UnknownDefinition(
             id="mil.documents.basis_specific",
             text=t(
                 "القائمة الدقيقة للمستندات الخاصة بهذا الأساس لم تُثبت بعد.",
                 "The exact basis-specific document list is not yet established.",
-            ),
-        ),
-        UnknownDefinition(
-            id="mil.fee.current",
-            text=t(
-                "قيمة رسم شهادة الإعفاء الحالية غير مثبتة في هذه الحزمة.",
-                "The current exemption-certificate fee amount is not established by this fixture.",
             ),
         ),
     )
@@ -210,7 +232,7 @@ def load_temporary_family_exemption_fixture() -> KnowledgeBundle:
         evidence_links=evidence_links,
         claims=claims,
         steps=steps,
-        fees=(),
+        fees=fees,
         service_points=service_points,
         warnings=warnings,
         unknowns=unknowns,

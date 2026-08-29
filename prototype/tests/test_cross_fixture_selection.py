@@ -68,7 +68,10 @@ class CrossFixtureSelectionTests(unittest.TestCase):
         self.assertIsInstance(result, PlanResult)
         plan = result.plan  # type: ignore[union-attr]
         self.assertEqual(plan.procedure_id, "ordinary_domestic_national_id_renewal")
-        self.assertEqual(plan.fees, ())
+        self.assertEqual(len(plan.fees), 1)
+        self.assertEqual(plan.fees[0].id, "nid.fee.ordinary")
+        self.assertEqual(plan.fees[0].value_state, "unknown")
+        self.assertIsNone(plan.fees[0].amount)
         self.assertIn(
             "nid.requirement.renew_after_expiry",
             {item.id for item in plan.checklist},
@@ -77,7 +80,6 @@ class CrossFixtureSelectionTests(unittest.TestCase):
             "nid.requirement.previous_card",
             {item.id for item in plan.checklist},
         )
-        self.assertTrue(any("fee" in unknown.lower() for unknown in plan.unknowns))
 
     def test_military_only_son_candidate_runs_same_seam(self) -> None:
         result = self.run_case(

@@ -16,6 +16,10 @@ ChecklistScope = Literal["shared", "eligibility_basis"]
 FeeValueState = Literal["known", "range", "unknown", "unverified"]
 WarningKind = Literal["administrative", "product"]
 WarningRole = Literal["general", "regeneration", "limitation"]
+DependencyRelation = Literal["blocking_prerequisite"]
+DependencyStatus = Literal["satisfied", "blocking", "unsupported_target"]
+ServicePointAvailability = Literal["available", "unknown"]
+RoutingStatus = Literal["resolved", "partially_resolved", "unresolved"]
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,23 @@ class ProcedureVersionDefinition:
 
 
 @dataclass(frozen=True)
+class VerificationPathDefinition:
+    id: str
+    text: LocalizedText
+    evidence_link_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class EligibilityBasisDefinition:
+    id: str
+    text: LocalizedText
+    applicability: Predicate
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+    display_order: int
+
+
+@dataclass(frozen=True)
 class ClaimDefinition:
     id: str
     text: LocalizedText
@@ -105,6 +126,8 @@ class StepDefinition:
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
     phase_order: int = 0
+    scope: ChecklistScope = "shared"
+    eligibility_basis_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -123,11 +146,45 @@ class FeeDefinition:
 
 
 @dataclass(frozen=True)
-class ServicePointDefinition:
+class ProcedureDependencyDefinition:
     id: str
     text: LocalizedText
+    target_procedure_id: str
+    relation: DependencyRelation
+    applicability: Predicate | None
+    satisfied_when: Predicate
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+    verification_path: VerificationPathDefinition
+
+
+@dataclass(frozen=True)
+class ServicePointDefinition:
+    """Stable Service Point identity only; material details are versioned separately."""
+
+    id: str
+    text: LocalizedText
+
+
+@dataclass(frozen=True)
+class ServicePointVersionDefinition:
+    id: str
+    service_point_id: str
     address: LocalizedText
+    availability: ServicePointAvailability
+    effective_from: date | None
+    effective_to: date | None
+    evidence_link_ids: tuple[str, ...]
+    verification_state: VerificationState
+
+
+@dataclass(frozen=True)
+class ProcedureServicePointAssociationDefinition:
+    id: str
+    service_point_version_id: str
     applicability: Predicate
+    effective_from: date | None
+    effective_to: date | None
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
 
@@ -162,6 +219,13 @@ class KnowledgeBundle:
     service_points: tuple[ServicePointDefinition, ...]
     warnings: tuple[WarningDefinition, ...]
     unknowns: tuple[UnknownDefinition, ...]
+    eligibility_bases: tuple[EligibilityBasisDefinition, ...] = ()
+    dependencies: tuple[ProcedureDependencyDefinition, ...] = ()
+    service_point_versions: tuple[ServicePointVersionDefinition, ...] = ()
+    service_point_associations: tuple[ProcedureServicePointAssociationDefinition, ...] = ()
+    basis_verification_path: VerificationPathDefinition | None = None
+    no_applicable_basis_text: LocalizedText | None = None
+    routing_verification_path: VerificationPathDefinition | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +285,13 @@ class EvidenceSummary:
 
 
 @dataclass(frozen=True)
+class RenderedVerificationPath:
+    id: str
+    text: str
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
 class RenderedChecklistItem:
     id: str
     text: str
@@ -249,6 +320,8 @@ class RenderedStep:
     phase: str
     phase_order: int
     slot: int
+    scope: ChecklistScope
+    eligibility_basis_id: str | None
     sources: tuple[EvidenceSummary, ...]
 
 
@@ -267,11 +340,48 @@ class RenderedFee:
 
 
 @dataclass(frozen=True)
-class RenderedServicePoint:
+class RenderedEligibilityBasis:
     id: str
     text: str
-    address: str
+    verification_state: VerificationState
+    checklist_item_ids: tuple[str, ...]
+    step_ids: tuple[str, ...]
     sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class RenderedDependency:
+    id: str
+    text: str
+    relation: DependencyRelation
+    status: DependencyStatus
+    target_procedure_id: str
+    target_procedure: str
+    target_procedure_version_id: str | None
+    sources: tuple[EvidenceSummary, ...]
+    verification_path: RenderedVerificationPath
+
+
+@dataclass(frozen=True)
+class RenderedServicePoint:
+    id: str
+    version_id: str
+    association_id: str
+    text: str
+    address: str
+    availability: ServicePointAvailability
+    effective_from: date | None
+    effective_to: date | None
+    sources: tuple[EvidenceSummary, ...]
+
+
+@dataclass(frozen=True)
+class RenderedRouting:
+    status: RoutingStatus
+    service_points: tuple[RenderedServicePoint, ...]
+    unresolved_association_ids: tuple[str, ...]
+    unresolved_fact_keys: tuple[str, ...]
+    verification_path: RenderedVerificationPath | None
 
 
 @dataclass(frozen=True)
@@ -314,6 +424,10 @@ class PersonalizedPlan:
     regeneration_warning: RenderedWarning
     unknowns: tuple[str, ...]
     freshness: Freshness
+    eligibility_bases: tuple[RenderedEligibilityBasis, ...] = ()
+    basis_verification_path: RenderedVerificationPath | None = None
+    dependencies: tuple[RenderedDependency, ...] = ()
+    routing: RenderedRouting | None = None
 
 
 @dataclass(frozen=True)
@@ -335,6 +449,8 @@ class InconclusiveResult:
     reason_code: str
     procedure_id: str | None = None
     diagnostic_codes: tuple[str, ...] = ()
+    message: str = ""
+    verification_path: RenderedVerificationPath | None = None
     kind: Literal["inconclusive"] = field(default="inconclusive", init=False)
 
 

@@ -9,7 +9,6 @@ from prototype.bardi_prototype.contracts import (
     InconclusiveResult,
     InvalidResult,
     LocalizedText,
-    NextQuestionResult,
     PlanResult,
     ProcedureDependencyDefinition,
     ProcedureServicePointAssociationDefinition,
@@ -78,11 +77,25 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                 "family.support_mother",
             ),
         )
-        self.assertTrue(all(basis.verification_state == "needs_reverification" for basis in bases))
+        self.assertTrue(
+            all(
+                basis.verification_state == "needs_reverification"
+                for basis in bases
+            )
+        )
         self.assertTrue(all(basis.sources for basis in bases))
-        self.assertFalse(hasattr(result.plan, "recommended_eligibility_basis_id"))  # type: ignore[union-attr]
+        self.assertEqual(
+            result.plan.inconclusive_basis_ids,  # type: ignore[union-attr]
+            (
+                "family.only_son_living_father",
+                "family.support_mother",
+            ),
+        )
+        self.assertFalse(
+            hasattr(result.plan, "recommended_eligibility_basis_id")  # type: ignore[union-attr]
+        )
 
-    def test_matching_one_basis_does_not_hide_unknown_alternatives(self) -> None:
+    def test_untrusted_unknown_bases_do_not_trigger_more_questions(self) -> None:
         result = run_scenario(
             knowledge=self.catalog,
             goal_id="handle_military_service_paperwork",
@@ -94,9 +107,20 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             locale="en",
             evaluation_date=date(2026, 8, 26),
         )
-        self.assertIsInstance(result, NextQuestionResult)
-        self.assertEqual(result.question_id, "q.mil.father_capacity")  # type: ignore[union-attr]
-        self.assertEqual(result.fact_key, "father_unable_to_earn_status")  # type: ignore[union-attr]
+        self.assertIsInstance(result, PlanResult)
+        plan = result.plan  # type: ignore[union-attr]
+        self.assertEqual(
+            tuple(basis.id for basis in plan.eligibility_bases),
+            ("family.only_son_living_father",),
+        )
+        self.assertIn(
+            "family.only_son_living_father",
+            plan.inconclusive_basis_ids,
+        )
+        self.assertIn(
+            "family.support_father_or_incapable_brothers",
+            plan.inconclusive_basis_ids,
+        )
 
     def test_no_applicable_basis_is_safe_and_has_official_verification_path(self) -> None:
         result = run_scenario(
@@ -148,9 +172,22 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             display_order=16,
             eligibility_basis_id="family.support_mother",
         )
+        # This test isolates the #10 additive-grouping capability. The real
+        # military Bases remain needs_reverification; make only this synthetic
+        # variant trusted so Basis-scoped current guidance may be unlocked.
+        trusted_bases = tuple(
+            replace(basis, verification_state="current")
+            for basis in fixture.eligibility_bases
+        )
         variant = replace(
             fixture,
-            claims=(fixture.claims[0], only_son_claim, mother_claim, *fixture.claims[1:]),
+            eligibility_bases=trusted_bases,
+            claims=(
+                fixture.claims[0],
+                only_son_claim,
+                mother_claim,
+                *fixture.claims[1:],
+            ),
         )
 
         result = run_scenario(
@@ -358,7 +395,9 @@ class BasisDependencyRoutingTests(unittest.TestCase):
         self.assertEqual(result.diagnostic_code, "invalid_knowledge")
 
     def test_all_matching_service_point_associations_are_returned(self) -> None:
-        military = self.catalog.fixtures["temporary_family_exemption_from_military_service"]
+        military = self.catalog.fixtures[
+            "temporary_family_exemption_from_military_service"
+        ]
         giza, mansoura, zagazig = military.service_point_associations
         second_giza_match = replace(
             mansoura,
@@ -378,7 +417,9 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             versioned_fixtures={
                 **self.catalog.versioned_fixtures,
                 military.procedure.procedure_id: (
-                    self.catalog.versioned_fixtures[military.procedure.procedure_id][0],
+                    self.catalog.versioned_fixtures[
+                        military.procedure.procedure_id
+                    ][0],
                     variant,
                 ),
             },
@@ -421,7 +462,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
         self.assertTrue(plan.steps)
         self.assertEqual(plan.service_points, ())
         self.assertEqual(plan.routing.status, "unresolved")
-        self.assertEqual(plan.routing.unresolved_fact_keys, ("residence_governorate",))
+        self.assertEqual(
+            plan.routing.unresolved_fact_keys,
+            ("residence_governorate",),
+        )
         self.assertIsNotNone(plan.routing.verification_path)
         self.assertTrue(plan.routing.verification_path.sources)
 

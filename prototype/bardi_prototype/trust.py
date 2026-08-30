@@ -245,22 +245,24 @@ def is_historical_context_candidate(
 
     ``needs_reverification``, ``disputed`` and ``unknown`` are current trust
     problems, not proof of a historical value. Historical context is reserved
-    for explicitly stale material or a previously verified item whose authored
-    effective interval has ended.
+    for an explicitly stale or ended item with its own item-level verification
+    date. The containing Procedure Version date is never enough.
     """
+    del bundle
+    verified_on = verification_date(item)
+    if type(verified_on) is not date or verified_on > evaluation_date:
+        return False
     explicit = getattr(
         item,
         "verification_state",
         getattr(item, "trust_state", "current"),
     )
     if explicit == "stale":
-        return verification_date(item) is not None or getattr(item, "effective_to", None) is not None
+        return True
     if explicit != "current":
         return False
     effective_to = getattr(item, "effective_to", None)
-    if type(effective_to) is date and evaluation_date > effective_to:
-        return verification_date(item) is not None or effective_to is not None
-    return False
+    return type(effective_to) is date and evaluation_date > effective_to
 
 
 def assess_bundle(

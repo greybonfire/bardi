@@ -9,11 +9,14 @@ from ..contracts import (
     GoalDefinition,
     KnowledgeBundle,
     LocalizedText,
+    ProcedureServicePointAssociationDefinition,
     ProcedureVersionDefinition,
     ServicePointDefinition,
+    ServicePointVersionDefinition,
     Source,
     StepDefinition,
     UnknownDefinition,
+    VerificationPathDefinition,
     WarningDefinition,
 )
 from ..evaluator import all_of, eq, gte, lt, one_of
@@ -278,10 +281,27 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
         ServicePointDefinition(
             id="sp.giza_passport_office",
             text=t("قسم جوازات الجيزة", "Giza Passport Office"),
+        ),
+    )
+    service_point_versions = (
+        ServicePointVersionDefinition(
+            id="spv.giza_passport_office.research-2026-08-25",
+            service_point_id="sp.giza_passport_office",
             address=t(
                 "مبنى قسم شرطة الجيزة، شارع البحر الأعظم، الجيزة",
                 "Giza Police Department building, Bahr El-Azam Street, Giza",
             ),
+            availability="available",
+            effective_from=None,
+            effective_to=None,
+            evidence_link_ids=("EL-MOI-GIZA-01",),
+            verification_state="current",
+        ),
+    )
+    service_point_associations = (
+        ProcedureServicePointAssociationDefinition(
+            id="spa.passport_renewal.giza_standard",
+            service_point_version_id="spv.giza_passport_office.research-2026-08-25",
             applicability=all_of(
                 eq("service_level", "standard"),
                 one_of(
@@ -296,7 +316,9 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
                     ),
                 ),
             ),
-            evidence_link_ids=("EL-MOI-GIZA-01", "EL-MOI-ROUTING-01"),
+            effective_from=None,
+            effective_to=None,
+            evidence_link_ids=("EL-MOI-ROUTING-01",),
             verification_state="current",
         ),
     )
@@ -367,4 +389,14 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
         service_points=service_points,
         warnings=warnings,
         unknowns=unknowns,
+        service_point_versions=service_point_versions,
+        service_point_associations=service_point_associations,
+        routing_verification_path=VerificationPathDefinition(
+            id="passport.routing.verify",
+            text=t(
+                "تحقق من قسم الجوازات المختص وقواعد الاختصاص قبل التوجه.",
+                "Verify the competent passport office and jurisdiction rules before acting.",
+            ),
+            evidence_link_ids=("EL-MOI-ROUTING-01",),
+        ),
     )

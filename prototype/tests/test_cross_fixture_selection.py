@@ -88,6 +88,11 @@ class CrossFixtureSelectionTests(unittest.TestCase):
                 "application_location": "inside_egypt",
                 "father_alive": True,
                 "other_living_sons_of_father_count": 0,
+                "father_unable_to_earn_status": "not_documented_unable",
+                "mother_family_status": "other",
+                "unmarried_sisters_requiring_support_count": 0,
+                "missing_relative_category": "none",
+                "sibling_service_status": "none",
                 "residence_governorate": "giza",
             },
         )
@@ -96,6 +101,10 @@ class CrossFixtureSelectionTests(unittest.TestCase):
         self.assertEqual(
             plan.procedure_id,
             "temporary_family_exemption_from_military_service",
+        )
+        self.assertEqual(
+            tuple(basis.id for basis in plan.eligibility_bases),
+            ("family.only_son_living_father",),
         )
         self.assertIn(
             "mil.shared.supporting_documents",
@@ -113,6 +122,7 @@ class CrossFixtureSelectionTests(unittest.TestCase):
             tuple(point.id for point in plan.service_points),
             ("sp.recruitment_region_giza",),
         )
+        self.assertEqual(plan.routing.status, "resolved")
 
     def test_passport_missing_state_asks_authored_question_deterministically(self) -> None:
         facts = {

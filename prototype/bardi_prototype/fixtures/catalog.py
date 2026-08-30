@@ -283,6 +283,46 @@ def load_researched_catalog() -> KnowledgeCatalog:
             60,
         ),
         QuestionDefinition(
+            "q.mil.missing_category",
+            "handle_military_service_paperwork",
+            "missing_relative_category",
+            t(
+                "إذا كان الطلب مرتبطًا بشخص مفقود، فما صفته المسجلة؟",
+                "If the request concerns a missing person, what recorded category applies to that relative?",
+            ),
+            65,
+        ),
+        QuestionDefinition(
+            "q.mil.missing_cause",
+            "handle_military_service_paperwork",
+            "missing_relative_cause",
+            t(
+                "إذا كان الطلب مرتبطًا بشخص مفقود، فما سبب الفقد المسجل؟",
+                "If the request concerns a missing person, what recorded cause of disappearance applies?",
+            ),
+            70,
+        ),
+        QuestionDefinition(
+            "q.mil.missing_alive_status",
+            "handle_military_service_paperwork",
+            "missing_relative_alive_status",
+            t(
+                "ما الحالة المسجلة حاليًا للشخص المفقود؟",
+                "What is the currently recorded status of the missing relative?",
+            ),
+            72,
+        ),
+        QuestionDefinition(
+            "q.mil.largest_eligible_relative",
+            "handle_military_service_paperwork",
+            "applicant_largest_eligible_relative_status",
+            t(
+                "هل لديك حالة معتمدة تثبت أنك القريب الأكبر المستوفي لوصف التجنيد المطلوب لهذا الأساس؟",
+                "Do you have an authority-recorded status establishing that you are the largest eligible conscription relative for this ground?",
+            ),
+            75,
+        ),
+        QuestionDefinition(
             "q.mil.sibling_service",
             "handle_military_service_paperwork",
             "sibling_service_status",
@@ -291,6 +331,36 @@ def load_researched_catalog() -> KnowledgeCatalog:
                 "Is one of your brothers currently in compulsory service or called for qualifying reserve service?",
             ),
             80,
+        ),
+        QuestionDefinition(
+            "q.mil.eldest_remaining_brother",
+            "handle_military_service_paperwork",
+            "applicant_eldest_remaining_brother_status",
+            t(
+                "هل لديك حالة معتمدة تثبت انطباق ترتيب الأخ الأكبر المتبقي عليك؟",
+                "Do you have an authority-recorded status establishing that the eldest-remaining-brother condition applies to you?",
+            ),
+            85,
+        ),
+        QuestionDefinition(
+            "q.mil.article7_third_exclusion",
+            "handle_military_service_paperwork",
+            "article7_third_exclusion_status",
+            t(
+                "هل توجد حالة معتمدة تُظهر وجود أحد استبعادات المادة 7/ثالثاً؟",
+                "Is there an authority-recorded status showing that an Article 7/Third exclusion applies?",
+            ),
+            87,
+        ),
+        QuestionDefinition(
+            "q.mil.governorate",
+            "handle_military_service_paperwork",
+            "residence_governorate",
+            t(
+                "ما محافظة محل الإقامة المستخدمة في معاملتك التجنيدية؟",
+                "Which governorate of residence is used for your recruitment transaction?",
+            ),
+            90,
         ),
     )
 

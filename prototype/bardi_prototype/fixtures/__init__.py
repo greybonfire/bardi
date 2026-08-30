@@ -82,16 +82,6 @@ def load_researched_catalog():
             ),
             60,
         ),
-        QuestionDefinition(
-            "q.mil.governorate",
-            "handle_military_service_paperwork",
-            "residence_governorate",
-            _t(
-                "ما محافظة محل الإقامة المستخدمة في معاملتك التجنيدية؟",
-                "Which governorate of residence is used for your recruitment transaction?",
-            ),
-            90,
-        ),
     )
     contradictions = (
         ContradictionDefinition(

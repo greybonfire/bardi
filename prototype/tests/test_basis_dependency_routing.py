@@ -9,6 +9,7 @@ from prototype.bardi_prototype.contracts import (
     InconclusiveResult,
     InvalidResult,
     LocalizedText,
+    NextQuestionResult,
     PlanResult,
     ProcedureDependencyDefinition,
     ProcedureServicePointAssociationDefinition,
@@ -95,7 +96,7 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             hasattr(result.plan, "recommended_eligibility_basis_id")  # type: ignore[union-attr]
         )
 
-    def test_untrusted_unknown_bases_do_not_trigger_more_questions(self) -> None:
+    def test_matching_one_basis_does_not_hide_unknown_alternatives(self) -> None:
         result = run_scenario(
             knowledge=self.catalog,
             goal_id="handle_military_service_paperwork",
@@ -107,20 +108,9 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             locale="en",
             evaluation_date=date(2026, 8, 26),
         )
-        self.assertIsInstance(result, PlanResult)
-        plan = result.plan  # type: ignore[union-attr]
-        self.assertEqual(
-            tuple(basis.id for basis in plan.eligibility_bases),
-            ("family.only_son_living_father",),
-        )
-        self.assertIn(
-            "family.only_son_living_father",
-            plan.inconclusive_basis_ids,
-        )
-        self.assertIn(
-            "family.support_father_or_incapable_brothers",
-            plan.inconclusive_basis_ids,
-        )
+        self.assertIsInstance(result, NextQuestionResult)
+        self.assertEqual(result.question_id, "q.mil.father_capacity")  # type: ignore[union-attr]
+        self.assertEqual(result.fact_key, "father_unable_to_earn_status")  # type: ignore[union-attr]
 
     def test_no_applicable_basis_is_safe_and_has_official_verification_path(self) -> None:
         result = run_scenario(

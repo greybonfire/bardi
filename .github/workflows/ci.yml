@@ -44,3 +44,16 @@ jobs:
 
       - name: Run prototype unit tests
         run: python -m unittest discover -s prototype/tests -v
+
+  required:
+    name: CI required
+    needs: test
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Verify test matrix passed
+        env:
+          TEST_RESULT: ${{ needs.test.result }}
+        run: test "$TEST_RESULT" = "success"

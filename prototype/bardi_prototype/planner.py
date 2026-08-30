@@ -21,7 +21,11 @@ from .contracts import (
 )
 from .derivations import derive_facts
 from .evaluator import RuleEvaluationRecord, TruthValue, evaluate, record_evaluation
-from .trust import is_currently_trusted, trust_state
+from .trust import (
+    is_currently_trusted,
+    is_historical_context_candidate,
+    trust_state,
+)
 from .versions import resolve_procedure_version
 
 
@@ -114,6 +118,18 @@ class NoApplicableBasis(Exception):
         self.traces = traces
 
 
+def _date_applies(
+    evaluation_date: date,
+    effective_from: date | None,
+    effective_to: date | None,
+) -> bool:
+    if effective_from is not None and evaluation_date < effective_from:
+        return False
+    if effective_to is not None and evaluation_date > effective_to:
+        return False
+    return True
+
+
 def _current_items(
     knowledge: KnowledgeBundle,
     items,
@@ -134,6 +150,12 @@ def _current_items(
     )
 
 
+def _belongs_to_matched_basis(item, matched_basis_ids: frozenset[str]) -> bool:
+    if getattr(item, "scope", "shared") != "eligibility_basis":
+        return True
+    return getattr(item, "eligibility_basis_id", None) in matched_basis_ids
+
+
 def _historical_items(
     knowledge: KnowledgeBundle,
     items,
@@ -144,7 +166,13 @@ def _historical_items(
     kind: str,
     matched_basis_ids: frozenset[str] = frozenset(),
 ):
-    """Keep applicable stale material as dated context, never current advice."""
+    """Keep established past values as context, never current advice.
+
+    A generic trust problem is not a historical value. In particular,
+    ``needs_reverification``, ``disputed`` and ``unknown`` items stay out of
+    this projection unless they also have an authored ended interval that
+    proves a previously-established value.
+    """
     selected: list[SemanticHistoricalItem] = []
     for item in items:
         if not _belongs_to_matched_basis(item, matched_basis_ids):
@@ -152,10 +180,10 @@ def _historical_items(
         effective_from = getattr(item, "effective_from", None)
         if effective_from is not None and effective_from > evaluation_date:
             continue
-        if is_currently_trusted(knowledge, item, evaluation_date) and _date_applies(
+        if not is_historical_context_candidate(
+            knowledge,
+            item,
             evaluation_date,
-            getattr(item, "effective_from", None),
-            getattr(item, "effective_to", None),
         ):
             continue
         result = evaluate(
@@ -163,14 +191,15 @@ def _historical_items(
             facts,
             submitted_keys=submitted_keys,
         )
-        if result.value is TruthValue.TRUE:
-            state = trust_state(knowledge, item, evaluation_date)
-            if kind == "fee" and getattr(item, "value_state", None) == "unknown":
-                # There is no prior value to present as historical context.
-                continue
-            if state == "current":
-                state = "stale"
-            selected.append(SemanticHistoricalItem(item, kind, state))
+        if result.value is not TruthValue.TRUE:
+            continue
+        if kind == "fee" and getattr(item, "value_state", None) == "unknown":
+            # There is no prior value to present as historical context.
+            continue
+        state = trust_state(knowledge, item, evaluation_date)
+        if state == "current":
+            state = "stale"
+        selected.append(SemanticHistoricalItem(item, kind, state))
     return tuple(selected)
 
 
@@ -204,16 +233,20 @@ def _select_bases(
             )
         )
         state = trust_state(knowledge, basis, evaluation_date)
+        untrusted = state in {
+            "needs_reverification",
+            "stale",
+            "disputed",
+            "unknown",
+        }
         if result.value is TruthValue.TRUE:
-            # A stale/disputed/unknown Basis is still a factual candidate, but
-            # it cannot establish eligibility or unlock Basis-scoped guidance.
-            # Keep it visible as a local inconclusive result instead of turning
-            # it into a FALSE/no-basis outcome.
+            # Keep a factual candidate visible, but do not let an untrusted
+            # legal Basis establish eligibility or unlock Basis-scoped advice.
             selected.append(basis)
-            if state in {"stale", "disputed", "unknown"}:
+            if untrusted:
                 inconclusive.add(basis.id)
         elif result.value is TruthValue.UNKNOWN:
-            if state in {"stale", "disputed", "unknown"}:
+            if untrusted:
                 inconclusive.add(basis.id)
             else:
                 missing.update(result.missing_facts)
@@ -223,12 +256,6 @@ def _select_bases(
         tuple(traces),
         frozenset(inconclusive),
     )
-
-
-def _belongs_to_matched_basis(item, matched_basis_ids: frozenset[str]) -> bool:
-    if getattr(item, "scope", "shared") != "eligibility_basis":
-        return True
-    return getattr(item, "eligibility_basis_id", None) in matched_basis_ids
 
 
 def _select_items(
@@ -267,6 +294,38 @@ def _select_items(
     return tuple(selected), frozenset(missing), tuple(traces)
 
 
+def _applicable_untrusted_items(
+    knowledge: KnowledgeBundle,
+    items,
+    facts: Mapping[str, object],
+    submitted_keys: frozenset[str],
+    evaluation_date: date,
+    *,
+    matched_basis_ids: frozenset[str] = frozenset(),
+):
+    """Return current-date items whose rule matches but trust is not current."""
+    selected = []
+    for item in items:
+        if not _belongs_to_matched_basis(item, matched_basis_ids):
+            continue
+        if not _date_applies(
+            evaluation_date,
+            getattr(item, "effective_from", None),
+            getattr(item, "effective_to", None),
+        ):
+            continue
+        if is_currently_trusted(knowledge, item, evaluation_date):
+            continue
+        result = evaluate(
+            getattr(item, "applicability", None),
+            facts,
+            submitted_keys=submitted_keys,
+        )
+        if result.value is TruthValue.TRUE:
+            selected.append(item)
+    return tuple(selected)
+
+
 def _select_fees(
     knowledge: KnowledgeBundle,
     items,
@@ -274,7 +333,12 @@ def _select_fees(
     submitted_keys: frozenset[str],
     evaluation_date: date,
 ):
-    """Select all explicit fee states, including unknown/unverified values."""
+    """Select current fee states while retaining explicit unverified states.
+
+    A stale/ended fee is historical context only. A current-date unverified or
+    disputed fee may still render as an explicit current-value-unknown fee; the
+    presentation layer suppresses its amount.
+    """
     selected = []
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
@@ -297,9 +361,16 @@ def _select_fees(
                 consequential_to_planning=True,
             )
         )
+        state = trust_state(knowledge, item, evaluation_date)
         if result.value is TruthValue.TRUE:
+            if state == "stale" or is_historical_context_candidate(
+                knowledge,
+                item,
+                evaluation_date,
+            ):
+                continue
             selected.append(item)
-        elif result.value is TruthValue.UNKNOWN:
+        elif result.value is TruthValue.UNKNOWN and state == "current":
             missing.update(result.missing_facts)
     return tuple(selected), frozenset(missing), tuple(traces)
 
@@ -334,12 +405,13 @@ def _select_dependencies(
                     consequential_to_planning=True,
                 )
             )
-            # Trust uncertainty must not make an UNKNOWN edge disappear: it
-            # may be a blocking prerequisite once its applicability is
-            # re-established. Keep both TRUE and UNKNOWN edges local and
-            # inconclusive, without asking a question about an untrusted rule.
+            # Trust uncertainty must not make a possible blocking edge vanish.
+            # Keep TRUE/UNKNOWN edges local and inconclusive without asking
+            # questions about an untrusted rule.
             if applies.value is not TruthValue.FALSE:
-                selected.append(SemanticDependency(dependency, "inconclusive", None))
+                selected.append(
+                    SemanticDependency(dependency, "inconclusive", None)
+                )
             continue
         applies = evaluate(
             dependency.applicability,
@@ -390,19 +462,11 @@ def _select_dependencies(
             status = "blocking"
         selected.append(SemanticDependency(dependency, status, target))
 
-    return tuple(sorted(selected, key=lambda item: item.definition.id)), frozenset(missing), tuple(traces)
-
-
-def _date_applies(
-    evaluation_date: date,
-    effective_from: date | None,
-    effective_to: date | None,
-) -> bool:
-    if effective_from is not None and evaluation_date < effective_from:
-        return False
-    if effective_to is not None and evaluation_date > effective_to:
-        return False
-    return True
+    return (
+        tuple(sorted(selected, key=lambda item: item.definition.id)),
+        frozenset(missing),
+        tuple(traces),
+    )
 
 
 def _select_routing(
@@ -412,7 +476,9 @@ def _select_routing(
     evaluation_date: date,
 ):
     point_by_id = {point.id: point for point in knowledge.service_points}
-    version_by_id = {version.id: version for version in knowledge.service_point_versions}
+    version_by_id = {
+        version.id: version for version in knowledge.service_point_versions
+    }
     selected: list[SemanticServicePoint] = []
     unresolved_associations: set[str] = set()
     unresolved_facts: set[str] = set()
@@ -468,7 +534,11 @@ def _select_routing(
 
     selected = sorted(
         selected,
-        key=lambda item: (item.point.id, item.version.id, item.association.id),
+        key=lambda item: (
+            item.point.id,
+            item.version.id,
+            item.association.id,
+        ),
     )
     if selected and unresolved_associations:
         status = "partially_resolved"
@@ -498,7 +568,7 @@ def assemble_plan(
     historical: bool = False,
     upcoming_versions: tuple[KnowledgeBundle, ...] = (),
 ) -> PlanAssembly:
-    """Assemble one Procedure plan while preserving local routing uncertainty."""
+    """Assemble one Procedure plan while preserving local uncertainty."""
     submitted = frozenset(facts) if submitted_keys is None else submitted_keys
     generated = evaluation_date if generated_on is None else generated_on
     derived = derive_facts(dict(facts), evaluation_date)
@@ -551,9 +621,7 @@ def assemble_plan(
             knowledge.basis_verification_path,
             tuple(traces),
         )
-    # Stale/disputed/unknown candidates are shown as local status only and
-    # cannot contribute Basis-scoped current guidance. The researched fixture's
-    # needs-reverification candidates remain visible for specialist review.
+
     matched_basis_ids = frozenset(
         basis.id for basis in bases if basis.id not in inconclusive_basis_ids
     )
@@ -654,29 +722,32 @@ def assemble_plan(
             matched_basis_ids=matched_basis_ids,
         )
     )
-    untrusted_ids = {
-        entry.item.id
-        for entry in historical_items
-        if entry.kind in {"claim", "step", "fee"}
-    }
+
+    untrusted_claims = _applicable_untrusted_items(
+        knowledge,
+        knowledge.claims,
+        derived,
+        submitted,
+        evaluation_date,
+        matched_basis_ids=matched_basis_ids,
+    )
+    untrusted_steps = _applicable_untrusted_items(
+        knowledge,
+        knowledge.steps,
+        derived,
+        submitted,
+        evaluation_date,
+        matched_basis_ids=matched_basis_ids,
+    )
+    # Candidate/research-only claim records remain internal unless they become
+    # current. Only consequential official requirements/steps are surfaced as
+    # local inconclusive decisions.
     inconclusive_claim_ids = {
         item.id
-        for item in (*knowledge.claims, *knowledge.steps)
-        if is_currently_trusted(knowledge, item, evaluation_date)
-        and set(getattr(item, "claim_dependencies", ())) & untrusted_ids
+        for item in untrusted_claims
+        if getattr(item, "classification", None) == "official_requirement"
     }
-    # Candidate/legal-basis claims may remain historical context without
-    # invalidating the reliable shared plan. Consequential official claims,
-    # by contrast, are explicitly surfaced as local unknowns.
-    inconclusive_claim_ids.update(
-        item.item.id
-        for item in historical_items
-        if item.kind in {"claim", "step"}
-        and getattr(item.item, "classification", "official_requirement")
-        == "official_requirement"
-    )
-    claims = tuple(item for item in claims if item.id not in inconclusive_claim_ids)
-    steps = tuple(item for item in steps if item.id not in inconclusive_claim_ids)
+    inconclusive_claim_ids.update(item.id for item in untrusted_steps)
 
     missing = claim_missing | step_missing | fee_missing | dependency_missing
     if missing:

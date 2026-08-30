@@ -297,7 +297,14 @@ async function runSingleAgent(
 		};
 	}
 
-	const args: string[] = ["--mode", "json", "-p", "--no-session"];
+	const args: string[] = [
+		"--mode",
+		"json",
+		"-p",
+		"--no-session",
+		"--no-extensions",
+		"--no-skills",
+	];
 	const inheritsDispatchConfig = !agent.model;
 	const model = agent.model ?? dispatchDefaults.model;
 	if (model) args.push("--model", model);

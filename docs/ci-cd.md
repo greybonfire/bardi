@@ -21,9 +21,11 @@ The workflow uses Ubuntu and tests Python 3.11, 3.12, and 3.13. Each matrix job:
    python -m unittest discover -s prototype/tests -v
    ```
 
+A final `CI required` job depends on the complete matrix and succeeds only when every matrix job succeeds. This gives branch protection one stable required-check name even if the Python matrix changes later.
+
 The workflow needs no repository secrets and has read-only repository permissions.
 
-After this workflow is merged and has produced a successful check, `main` should be protected so the CI test job is required before merge.
+After this workflow is merged and has produced a successful `CI required` check, protect `main` and require `CI required` before merge.
 
 ## Continuous delivery
 

@@ -68,6 +68,24 @@ function formatUsageStats(
 	return parts.join(" ");
 }
 
+function formatElapsedMs(elapsedMs: number): string {
+	const milliseconds = Math.max(0, elapsedMs);
+	if (milliseconds < 1000) return `${Math.round(milliseconds)}ms`;
+
+	const totalSeconds = milliseconds / 1000;
+	if (totalSeconds < 60) return `${totalSeconds.toFixed(1)}s`;
+
+	const totalMinutes = Math.floor(totalSeconds / 60);
+	const seconds = Math.floor(totalSeconds % 60)
+		.toString()
+		.padStart(2, "0");
+	if (totalMinutes < 60) return `${totalMinutes}m ${seconds}s`;
+
+	const hours = Math.floor(totalMinutes / 60);
+	const minutes = (totalMinutes % 60).toString().padStart(2, "0");
+	return `${hours}h ${minutes}m ${seconds}s`;
+}
+
 function formatToolCall(
 	toolName: string,
 	args: Record<string, unknown>,
@@ -158,6 +176,8 @@ interface SingleResult {
 	stopReason?: string;
 	errorMessage?: string;
 	step?: number;
+	startedAt?: number;
+	finishedAt?: number;
 }
 
 interface SubagentDetails {
@@ -165,6 +185,36 @@ interface SubagentDetails {
 	agentScope: AgentScope;
 	projectAgentsDir: string | null;
 	results: SingleResult[];
+}
+
+function getElapsedMs(result: SingleResult): number {
+	if (result.startedAt === undefined) return 0;
+	return Math.max(0, (result.finishedAt ?? Date.now()) - result.startedAt);
+}
+
+function formatResultElapsed(result: SingleResult): string {
+	return result.startedAt === undefined ? "" : `⏱ ${formatElapsedMs(getElapsedMs(result))}`;
+}
+
+function formatResultsElapsed(results: SingleResult[]): string {
+	const startedAt = results
+		.map((result) => result.startedAt)
+		.filter((timestamp): timestamp is number => timestamp !== undefined);
+	if (startedAt.length === 0) return "";
+
+	const now = Date.now();
+	const finishedAt = results
+		.filter((result) => result.startedAt !== undefined)
+		.map((result) => result.finishedAt ?? now);
+	return `⏱ ${formatElapsedMs(Math.max(...finishedAt) - Math.min(...startedAt))}`;
+}
+
+function formatResultStats(result: SingleResult, usage: string): string {
+	return [formatResultElapsed(result), usage].filter(Boolean).join(" ");
+}
+
+function formatTotalStats(results: SingleResult[], usage: string): string {
+	return [formatResultsElapsed(results), usage].filter(Boolean).join(" ");
 }
 
 function getFinalOutput(messages: Message[]): string {
@@ -316,6 +366,7 @@ async function runSingleAgent(
 
 	let tmpPromptDir: string | null = null;
 	let tmpPromptPath: string | null = null;
+	let updateTimer: ReturnType<typeof setInterval> | undefined;
 
 	const currentResult: SingleResult = {
 		agent: agentName,
@@ -327,6 +378,7 @@ async function runSingleAgent(
 		usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, cost: 0, contextTokens: 0, turns: 0 },
 		model,
 		step,
+		startedAt: Date.now(),
 	};
 
 	const emitUpdate = () => {
@@ -347,6 +399,7 @@ async function runSingleAgent(
 		}
 
 		args.push(`Task: ${task}`);
+		if (onUpdate) updateTimer = setInterval(emitUpdate, 1000);
 		let wasAborted = false;
 
 		const exitCode = await new Promise<number>((resolve) => {
@@ -432,6 +485,8 @@ async function runSingleAgent(
 		if (wasAborted) throw new Error("Subagent was aborted");
 		return currentResult;
 	} finally {
+		if (updateTimer) clearInterval(updateTimer);
+		currentResult.finishedAt = Date.now();
 		if (tmpPromptPath)
 			try {
 				fs.unlinkSync(tmpPromptPath);
@@ -444,6 +499,7 @@ async function runSingleAgent(
 			} catch {
 				/* ignore */
 			}
+		emitUpdate();
 	}
 }
 
@@ -834,10 +890,10 @@ export default function (pi: ExtensionAPI) {
 							container.addChild(new Markdown(finalOutput.trim(), 0, 0, mdTheme));
 						}
 					}
-					const usageStr = formatUsageStats(r.usage, r.model);
-					if (usageStr) {
+					const statsStr = formatResultStats(r, formatUsageStats(r.usage, r.model));
+					if (statsStr) {
 						container.addChild(new Spacer(1));
-						container.addChild(new Text(theme.fg("dim", usageStr), 0, 0));
+						container.addChild(new Text(theme.fg("dim", statsStr), 0, 0));
 					}
 					return container;
 				}
@@ -850,8 +906,8 @@ export default function (pi: ExtensionAPI) {
 					text += `\n${renderDisplayItems(displayItems, COLLAPSED_ITEM_COUNT)}`;
 					if (displayItems.length > COLLAPSED_ITEM_COUNT) text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
 				}
-				const usageStr = formatUsageStats(r.usage, r.model);
-				if (usageStr) text += `\n${theme.fg("dim", usageStr)}`;
+				const statsStr = formatResultStats(r, formatUsageStats(r.usage, r.model));
+				if (statsStr) text += `\n${theme.fg("dim", statsStr)}`;
 				return new Text(text, 0, 0);
 			}
 
@@ -919,14 +975,14 @@ export default function (pi: ExtensionAPI) {
 							container.addChild(new Markdown(finalOutput.trim(), 0, 0, mdTheme));
 						}
 
-						const stepUsage = formatUsageStats(r.usage, r.model);
-						if (stepUsage) container.addChild(new Text(theme.fg("dim", stepUsage), 0, 0));
+						const stepStats = formatResultStats(r, formatUsageStats(r.usage, r.model));
+						if (stepStats) container.addChild(new Text(theme.fg("dim", stepStats), 0, 0));
 					}
 
-					const usageStr = formatUsageStats(aggregateUsage(details.results));
-					if (usageStr) {
+					const totalStats = formatTotalStats(details.results, formatUsageStats(aggregateUsage(details.results)));
+					if (totalStats) {
 						container.addChild(new Spacer(1));
-						container.addChild(new Text(theme.fg("dim", `Total: ${usageStr}`), 0, 0));
+						container.addChild(new Text(theme.fg("dim", `Total: ${totalStats}`), 0, 0));
 					}
 					return container;
 				}
@@ -939,13 +995,14 @@ export default function (pi: ExtensionAPI) {
 					theme.fg("accent", `${successCount}/${details.results.length} steps`);
 				for (const r of details.results) {
 					const rIcon = r.exitCode === 0 ? theme.fg("success", "✓") : theme.fg("error", "✗");
+					const elapsed = formatResultElapsed(r);
 					const displayItems = getDisplayItems(r.messages);
-					text += `\n\n${theme.fg("muted", `─── Step ${r.step}: `)}${theme.fg("accent", r.agent)} ${rIcon}`;
+					text += `\n\n${theme.fg("muted", `─── Step ${r.step}: `)}${theme.fg("accent", r.agent)} ${rIcon}${elapsed ? ` ${theme.fg("dim", elapsed)}` : ""}`;
 					if (displayItems.length === 0) text += `\n${theme.fg("muted", "(no output)")}`;
 					else text += `\n${renderDisplayItems(displayItems, 5)}`;
 				}
-				const usageStr = formatUsageStats(aggregateUsage(details.results));
-				if (usageStr) text += `\n\n${theme.fg("dim", `Total: ${usageStr}`)}`;
+				const totalStats = formatTotalStats(details.results, formatUsageStats(aggregateUsage(details.results)));
+				if (totalStats) text += `\n\n${theme.fg("dim", `Total: ${totalStats}`)}`;
 				text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
 				return new Text(text, 0, 0);
 			}
@@ -1004,14 +1061,14 @@ export default function (pi: ExtensionAPI) {
 							container.addChild(new Markdown(finalOutput.trim(), 0, 0, mdTheme));
 						}
 
-						const taskUsage = formatUsageStats(r.usage, r.model);
-						if (taskUsage) container.addChild(new Text(theme.fg("dim", taskUsage), 0, 0));
+						const taskStats = formatResultStats(r, formatUsageStats(r.usage, r.model));
+						if (taskStats) container.addChild(new Text(theme.fg("dim", taskStats), 0, 0));
 					}
 
-					const usageStr = formatUsageStats(aggregateUsage(details.results));
-					if (usageStr) {
+					const totalStats = formatTotalStats(details.results, formatUsageStats(aggregateUsage(details.results)));
+					if (totalStats) {
 						container.addChild(new Spacer(1));
-						container.addChild(new Text(theme.fg("dim", `Total: ${usageStr}`), 0, 0));
+						container.addChild(new Text(theme.fg("dim", `Total: ${totalStats}`), 0, 0));
 					}
 					return container;
 				}
@@ -1025,16 +1082,15 @@ export default function (pi: ExtensionAPI) {
 							: isFailedResult(r)
 								? theme.fg("error", "✗")
 								: theme.fg("success", "✓");
+					const elapsed = formatResultElapsed(r);
 					const displayItems = getDisplayItems(r.messages);
-					text += `\n\n${theme.fg("muted", "─── ")}${theme.fg("accent", r.agent)} ${rIcon}`;
+					text += `\n\n${theme.fg("muted", "─── ")}${theme.fg("accent", r.agent)} ${rIcon}${elapsed ? ` ${theme.fg("dim", elapsed)}` : ""}`;
 					if (displayItems.length === 0)
 						text += `\n${theme.fg("muted", r.exitCode === -1 ? "(running...)" : "(no output)")}`;
 					else text += `\n${renderDisplayItems(displayItems, 5)}`;
 				}
-				if (!isRunning) {
-					const usageStr = formatUsageStats(aggregateUsage(details.results));
-					if (usageStr) text += `\n\n${theme.fg("dim", `Total: ${usageStr}`)}`;
-				}
+				const totalStats = formatTotalStats(details.results, formatUsageStats(aggregateUsage(details.results)));
+				if (totalStats) text += `\n\n${theme.fg("dim", `Total: ${totalStats}`)}`;
 				if (!expanded) text += `\n${theme.fg("muted", "(Ctrl+O to expand)")}`;
 				return new Text(text, 0, 0);
 			}

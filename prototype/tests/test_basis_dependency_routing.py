@@ -78,9 +78,23 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                 "family.support_mother",
             ),
         )
-        self.assertTrue(all(basis.verification_state == "needs_reverification" for basis in bases))
+        self.assertTrue(
+            all(
+                basis.verification_state == "needs_reverification"
+                for basis in bases
+            )
+        )
         self.assertTrue(all(basis.sources for basis in bases))
-        self.assertFalse(hasattr(result.plan, "recommended_eligibility_basis_id"))  # type: ignore[union-attr]
+        self.assertEqual(
+            result.plan.inconclusive_basis_ids,  # type: ignore[union-attr]
+            (
+                "family.only_son_living_father",
+                "family.support_mother",
+            ),
+        )
+        self.assertFalse(
+            hasattr(result.plan, "recommended_eligibility_basis_id")  # type: ignore[union-attr]
+        )
 
     def test_matching_one_basis_does_not_hide_unknown_alternatives(self) -> None:
         result = run_scenario(
@@ -148,9 +162,22 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             display_order=16,
             eligibility_basis_id="family.support_mother",
         )
+        # This test isolates the #10 additive-grouping capability. The real
+        # military Bases remain needs_reverification; make only this synthetic
+        # variant trusted so Basis-scoped current guidance may be unlocked.
+        trusted_bases = tuple(
+            replace(basis, verification_state="current")
+            for basis in fixture.eligibility_bases
+        )
         variant = replace(
             fixture,
-            claims=(fixture.claims[0], only_son_claim, mother_claim, *fixture.claims[1:]),
+            eligibility_bases=trusted_bases,
+            claims=(
+                fixture.claims[0],
+                only_son_claim,
+                mother_claim,
+                *fixture.claims[1:],
+            ),
         )
 
         result = run_scenario(
@@ -223,6 +250,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                 **self.catalog.fixtures,
                 passport.procedure.procedure_id: passport_variant,
             },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (passport_variant,),
+            },
         )
 
         result = run_scenario(
@@ -261,6 +292,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             fixtures={
                 **self.catalog.fixtures,
                 passport.procedure.procedure_id: passport_variant,
+            },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (passport_variant,),
             },
         )
 
@@ -324,6 +359,15 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                     dependencies=(national_id_dependency,),
                 ),
             },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (
+                    replace(passport, dependencies=(passport_dependency,)),
+                ),
+                national_id.procedure.procedure_id: (
+                    replace(national_id, dependencies=(national_id_dependency,)),
+                ),
+            },
         )
 
         diagnostics = validate_catalog(catalog)
@@ -341,7 +385,9 @@ class BasisDependencyRoutingTests(unittest.TestCase):
         self.assertEqual(result.diagnostic_code, "invalid_knowledge")
 
     def test_all_matching_service_point_associations_are_returned(self) -> None:
-        military = self.catalog.fixtures["temporary_family_exemption_from_military_service"]
+        military = self.catalog.fixtures[
+            "temporary_family_exemption_from_military_service"
+        ]
         giza, mansoura, zagazig = military.service_point_associations
         second_giza_match = replace(
             mansoura,
@@ -357,6 +403,15 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             fixtures={
                 **self.catalog.fixtures,
                 military.procedure.procedure_id: variant,
+            },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                military.procedure.procedure_id: (
+                    self.catalog.versioned_fixtures[
+                        military.procedure.procedure_id
+                    ][0],
+                    variant,
+                ),
             },
         )
 
@@ -397,7 +452,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
         self.assertTrue(plan.steps)
         self.assertEqual(plan.service_points, ())
         self.assertEqual(plan.routing.status, "unresolved")
-        self.assertEqual(plan.routing.unresolved_fact_keys, ("residence_governorate",))
+        self.assertEqual(
+            plan.routing.unresolved_fact_keys,
+            ("residence_governorate",),
+        )
         self.assertIsNotNone(plan.routing.verification_path)
         self.assertTrue(plan.routing.verification_path.sources)
 
@@ -421,6 +479,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             fixtures={
                 **self.catalog.fixtures,
                 passport.procedure.procedure_id: bad_passport,
+            },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (bad_passport,),
             },
         )
         diagnostics = validate_catalog(catalog)

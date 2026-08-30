@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 from ..contracts import (
@@ -79,6 +80,70 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
         ),
         "EL-MOI-VALIDITY-01": EvidenceLink("EL-MOI-VALIDITY-01", ("SRC-MOI-PASSPORT-REQ",)),
     }
+    exact_passages = {
+        "EL-MOI-REQ-01": "بطاقة الرقم القومي لمن بلغت أعمارهم 15 سنة",
+        "EL-MOI-REQ-02": "شهادة الميلاد المميكنة لمن هم دون 15 سنة",
+        "EL-MOI-REQ-03": "شهادة القيد الدراسي للعام الحالي",
+        "EL-MOI-REQ-04": "مستند التجنيد",
+        "EL-MOI-REQ-05": "ثلاث صور شخصية ملونة حديثة خلفية بيضاء مقاس 4×6",
+        "EL-MOI-REQ-06": "أصول المستندات وصورة منها",
+        "EL-MOI-PROCESS-01": "نموذج 29 جوازات مميكن مجاناً",
+        "EL-MOI-FEE-01": "705 جنيه",
+        "EL-MOI-VALIDITY-01": "سبع سنوات",
+    }
+    locations = {
+        key: "Ministry passport requirements/instructions page"
+        for key in (
+            "EL-MOI-REQ-01",
+            "EL-MOI-REQ-02",
+            "EL-MOI-REQ-03",
+            "EL-MOI-REQ-04",
+            "EL-MOI-REQ-05",
+            "EL-MOI-REQ-06",
+            "EL-MOI-PROCESS-01",
+            "EL-MOI-PROCESS-02",
+            "EL-MOI-FEE-01",
+            "EL-MOI-PASSPORT-NATURE-01",
+            "EL-MOI-VALIDITY-01",
+        )
+    }
+    locations.update(
+        {
+            "EL-PSM-SERVICE-01": "Public Services directory service listing",
+            "EL-MOI-URGENT-01": "Ministry accelerated-service announcement",
+            "EL-MOI-PREMIUM-01": "Ministry accelerated-service announcement",
+            "EL-MOI-ROUTING-01": "Ministry directory and accelerated-service announcements",
+            "EL-MOI-GIZA-01": "Ministry passport-office directory entry",
+        }
+    )
+    applicability_contexts = {
+        "EL-MOI-REQ-01": "Current Ministry requirements page; domestic ordinary passport applicants aged 15 or older.",
+        "EL-MOI-REQ-02": "Current Ministry requirements page; domestic ordinary passport applicants under age 15.",
+        "EL-MOI-REQ-03": "Current Ministry requirements page; students on the ordinary domestic passport path.",
+        "EL-MOI-REQ-04": "Current Ministry requirements page; applicable male ordinary domestic passport branch.",
+        "EL-MOI-REQ-05": "Current Ministry requirements page; ordinary domestic passport renewal.",
+        "EL-MOI-REQ-06": "Current Ministry requirements page; supporting documents on the ordinary domestic passport path.",
+        "EL-MOI-PROCESS-01": "Current Ministry instructions; Form 29 for the ordinary domestic passport path.",
+        "EL-MOI-PROCESS-02": "Current Ministry instructions; form-completion step on the ordinary domestic passport path.",
+        "EL-MOI-FEE-01": "Current Ministry-published base fee at retrieval; effective-from date not exposed.",
+        "EL-MOI-URGENT-01": "Current Ministry accelerated-service announcement; effective-from date not exposed.",
+        "EL-MOI-PREMIUM-01": "Current Ministry accelerated-service announcement; effective-from date not exposed.",
+        "EL-MOI-ROUTING-01": "Domestic ordinary territorial routing and identified accelerated-service locations.",
+        "EL-MOI-GIZA-01": "Current Giza passport-office directory entry and listed police-jurisdiction coverage.",
+        "EL-MOI-PASSPORT-NATURE-01": "Current Ministry requirements page; personal machine-readable passport nature.",
+        "EL-MOI-VALIDITY-01": "Current Ministry-published standard validity at retrieval.",
+        "EL-PSM-SERVICE-01": "Government service-directory identity for expired/page-full replacement; not proof of a current domestic previous-passport requirement.",
+    }
+    evidence_links = {
+        key: replace(
+            link,
+            exact_passage=exact_passages.get(key),
+            location=locations.get(key),
+            applicability_context=applicability_contexts.get(key),
+            retrieved_on=VERIFIED_ON,
+        )
+        for key, link in evidence_links.items()
+    }
 
     goal = GoalDefinition(
         id="get_egyptian_passport",
@@ -99,6 +164,9 @@ def load_passport_renewal_fixture() -> KnowledgeBundle:
             one_of("existing_passport_state", ("expired", "pages_full")),
         ),
         verified_on=VERIFIED_ON,
+        publication_state="published",
+        published_on=VERIFIED_ON,
+        trust_state="current",
     )
 
     claims = (

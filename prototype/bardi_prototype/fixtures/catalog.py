@@ -11,7 +11,10 @@ from ..contracts import (
 from ..evaluator import all_of, eq, one_of
 from .national_id_renewal import load_national_id_renewal_fixture
 from .passport_renewal import load_passport_renewal_fixture
-from .temporary_family_exemption import load_temporary_family_exemption_fixture
+from .temporary_family_exemption import (
+    load_temporary_family_exemption_fixture,
+    load_temporary_family_exemption_historical_fixture,
+)
 
 
 def t(ar: str, en: str) -> LocalizedText:
@@ -22,12 +25,34 @@ def load_researched_catalog() -> KnowledgeCatalog:
     passport = load_passport_renewal_fixture()
     national_id = load_national_id_renewal_fixture()
     military = load_temporary_family_exemption_fixture()
+    military_historical = load_temporary_family_exemption_historical_fixture()
+
+    # Goal-level candidate predicates identify the stable administrative
+    # transaction. They are intentionally authored separately from any one
+    # Procedure Version's applicability so a historical/future snapshot may
+    # change version-specific rules without becoming unreachable at selection.
+    passport_renewal_selection = all_of(
+        eq("citizenship", "egyptian"),
+        eq("application_location", "inside_egypt"),
+        eq("passport_class", "ordinary"),
+        one_of("existing_passport_state", ("expired", "pages_full")),
+    )
+    national_id_renewal_selection = all_of(
+        eq("application_location", "inside_egypt"),
+        eq("national_id_possession_state", "held"),
+        eq("national_id_data_change_kind", "none"),
+        eq("card_expired_before_evaluation_date", True),
+    )
+    military_family_exemption_selection = eq(
+        "application_location",
+        "inside_egypt",
+    )
 
     passport_candidates = (
         ProcedureCandidateDefinition(
             procedure_id=passport.procedure.procedure_id,
             text=passport.procedure.text,
-            applicability=passport.procedure.applicability,
+            applicability=passport_renewal_selection,
             fixture_id=passport.procedure.procedure_id,
         ),
         ProcedureCandidateDefinition(
@@ -77,7 +102,7 @@ def load_researched_catalog() -> KnowledgeCatalog:
         ProcedureCandidateDefinition(
             procedure_id=national_id.procedure.procedure_id,
             text=national_id.procedure.text,
-            applicability=national_id.procedure.applicability,
+            applicability=national_id_renewal_selection,
             fixture_id=national_id.procedure.procedure_id,
         ),
         ProcedureCandidateDefinition(
@@ -127,7 +152,7 @@ def load_researched_catalog() -> KnowledgeCatalog:
         ProcedureCandidateDefinition(
             procedure_id=military.procedure.procedure_id,
             text=military.procedure.text,
-            applicability=military.procedure.applicability,
+            applicability=military_family_exemption_selection,
             fixture_id=military.procedure.procedure_id,
         ),
     )
@@ -373,4 +398,9 @@ def load_researched_catalog() -> KnowledgeCatalog:
             military.procedure.procedure_id: military,
         },
         questions=questions,
+        versioned_fixtures={
+            passport.procedure.procedure_id: (passport,),
+            national_id.procedure.procedure_id: (national_id,),
+            military.procedure.procedure_id: (military_historical, military),
+        },
     )

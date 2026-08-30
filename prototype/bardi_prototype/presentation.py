@@ -15,8 +15,12 @@ from .contracts import (
     RenderedStep,
     RenderedVerificationPath,
     RenderedWarning,
+    RenderedHistoricalClaim,
+    UpcomingProcedureVersion,
     VerificationPathDefinition,
 )
+from .trust import assess_bundle, trust_state, verification_date
+from .versions import upcoming_projection
 from .planner import SemanticPlan, SemanticServicePoint
 
 
@@ -42,6 +46,7 @@ def _source_summaries(
             authority=plan.knowledge.sources[source_id].authority,
             title=plan.knowledge.sources[source_id].title,
             verified_on=plan.knowledge.sources[source_id].retrieved_on,
+            classification=plan.knowledge.sources[source_id].classification,
         )
         for source_id in source_ids
     )
@@ -122,6 +127,36 @@ def _service_point(
     )
 
 
+def _historical_claim(
+    plan: SemanticPlan,
+    item,
+    kind: str,
+    state: str,
+    locale: Locale,
+) -> RenderedHistoricalClaim:
+    return RenderedHistoricalClaim(
+        id=item.id,
+        text=item.text.render(locale),
+        kind=kind,
+        verification_state=state,
+        verified_on=verification_date(item, plan.knowledge),
+        effective_from=getattr(item, "effective_from", None),
+        effective_to=getattr(item, "effective_to", None),
+        current_value_unknown=True,
+        sources=_source_summaries(plan, item.evidence_link_ids),
+        previous_amount=getattr(item, "amount", None) if kind == "fee" else None,
+        previous_minimum_amount=(
+            getattr(item, "minimum_amount", None) if kind == "fee" else None
+        ),
+        previous_maximum_amount=(
+            getattr(item, "maximum_amount", None) if kind == "fee" else None
+        ),
+        previous_value_state=(
+            getattr(item, "value_state", None) if kind == "fee" else None
+        ),
+    )
+
+
 def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
     knowledge = plan.knowledge
     checklist = tuple(
@@ -157,14 +192,27 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
         RenderedFee(
             id=item.id,
             text=item.text.render(locale),
-            value_state=item.value_state,
-            amount=item.amount,
-            minimum_amount=item.minimum_amount,
-            maximum_amount=item.maximum_amount,
+            value_state=(
+                item.value_state
+                if trust_state(knowledge, item, plan.evaluation_date) == "current"
+                or item.value_state == "unknown"
+                else "unverified"
+            ),
+            amount=(item.amount if trust_state(knowledge, item, plan.evaluation_date) == "current" else None),
+            minimum_amount=(
+                item.minimum_amount if trust_state(knowledge, item, plan.evaluation_date) == "current" else None
+            ),
+            maximum_amount=(
+                item.maximum_amount if trust_state(knowledge, item, plan.evaluation_date) == "current" else None
+            ),
             currency=item.currency,
             fee_type=item.fee_type,
-            verification_state=item.verification_state,
+            verification_state=trust_state(knowledge, item, plan.evaluation_date),
             sources=_source_summaries(plan, item.evidence_link_ids),
+            current_value_unknown=(
+                trust_state(knowledge, item, plan.evaluation_date) != "current"
+                or item.value_state == "unknown"
+            ),
         )
         for item in plan.fees
     )
@@ -191,7 +239,9 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
         RenderedEligibilityBasis(
             id=basis.id,
             text=basis.text.render(locale),
-            verification_state=basis.verification_state,
+            verification_state=trust_state(
+                knowledge, basis, plan.evaluation_date
+            ),
             checklist_item_ids=tuple(
                 item.id
                 for item in checklist
@@ -270,6 +320,9 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
             last_verified_on=knowledge.procedure.verified_on,
             evaluation_date=plan.evaluation_date,
             generated_on=plan.generated_on,
+            publication_state=knowledge.procedure.publication_state,
+            historical=plan.historical,
+            trust_state=assess_bundle(knowledge, plan.evaluation_date).state,
         ),
         eligibility_bases=eligibility_bases,
         basis_verification_path=_verification_path(
@@ -279,4 +332,13 @@ def project_plan(plan: SemanticPlan, locale: Locale) -> PersonalizedPlan:
         ),
         dependencies=dependencies,
         routing=routing,
+        historical_claims=tuple(
+            _historical_claim(
+                plan, entry.item, entry.kind, entry.verification_state, locale
+            )
+            for entry in plan.historical_items
+        ),
+        upcoming_versions=upcoming_projection(plan.upcoming_versions, locale),
+        inconclusive_claim_ids=plan.inconclusive_claim_ids,
+        inconclusive_basis_ids=plan.inconclusive_basis_ids,
     )

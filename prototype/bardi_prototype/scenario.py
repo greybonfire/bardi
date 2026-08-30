@@ -25,6 +25,12 @@ from .presentation import project_plan
 from .questions import pick_question
 from .selection import SelectedProcedure, SelectionFailure, SelectionQuestion, resolve_procedure
 from .validation import validate_bundle, validate_catalog
+from .versions import (
+    bundles_for_procedure,
+    resolve_bundle_version,
+    resolve_procedure_version,
+    upcoming_projection,
+)
 
 
 @dataclass(frozen=True)
@@ -83,6 +89,7 @@ def _render_verification_path(
                 authority=knowledge.sources[source_id].authority,
                 title=knowledge.sources[source_id].title,
                 verified_on=knowledge.sources[source_id].retrieved_on,
+                classification=knowledge.sources[source_id].classification,
             )
             for source_id in source_ids
         ),
@@ -98,6 +105,8 @@ def _run_bundle(
     evaluation_date: date,
     generated_on: date,
     catalog: KnowledgeCatalog | None = None,
+    historical: bool = False,
+    upcoming_versions=(),
 ) -> _ScenarioRun:
     if goal_id != knowledge.goal.id:
         return _ScenarioRun(_invalid("unknown_goal"))
@@ -110,6 +119,8 @@ def _run_bundle(
             submitted_keys=frozenset(facts),
             generated_on=generated_on,
             catalog=catalog,
+            historical=historical,
+            upcoming_versions=upcoming_versions,
         )
     except NoApplicableBasis as exc:
         return _ScenarioRun(
@@ -122,6 +133,7 @@ def _run_bundle(
                     exc.verification_path,
                     locale,
                 ),
+                upcoming_versions=upcoming_projection(upcoming_versions, locale),
             ),
             exc.traces,
         )
@@ -155,6 +167,7 @@ def _run_bundle(
                     question_id=question.id,
                     fact_key=question.fact_key,
                     question=question.text.render(locale),
+                    upcoming_versions=upcoming_projection(upcoming_versions, locale),
                 ),
                 assembly.traces,
             )
@@ -167,6 +180,7 @@ def _run_bundle(
                     f"missing_plan_question:{key}"
                     for key in sorted(assembly.missing_facts)
                 ),
+                upcoming_versions=upcoming_projection(upcoming_versions, locale),
             ),
             assembly.traces,
         )
@@ -185,6 +199,9 @@ def _execute_scenario(
     locale: Locale,
     evaluation_date: date,
     generated_on: date | None = None,
+    historical_version_id: str | None = None,
+    procedure_version_id: str | None = None,
+    version_id: str | None = None,
 ) -> _ScenarioRun:
     if locale not in ("ar", "en"):
         return _ScenarioRun(_invalid("unsupported_locale"))
@@ -194,6 +211,15 @@ def _execute_scenario(
     generation_date = evaluation_date if generated_on is None else generated_on
     if type(generation_date) is not date:
         return _ScenarioRun(_invalid("invalid_generation_date"))
+
+    requested_version_ids = tuple(
+        value
+        for value in (historical_version_id, procedure_version_id, version_id)
+        if value is not None
+    )
+    if len(set(requested_version_ids)) > 1:
+        return _ScenarioRun(_invalid("invalid_procedure_version_selector"))
+    requested_version_id = requested_version_ids[0] if requested_version_ids else None
 
     if isinstance(knowledge, KnowledgeBundle):
         knowledge_diagnostics = validate_bundle(
@@ -211,13 +237,28 @@ def _execute_scenario(
         )
         if fact_diagnostics:
             return _ScenarioRun(_invalid("invalid_facts", fact_diagnostics))
+        version = resolve_bundle_version(
+            knowledge,
+            evaluation_date,
+            version_id=requested_version_id,
+        )
+        if version.bundle is None:
+            return _ScenarioRun(
+                InconclusiveResult(
+                    version.reason_code or "no_applicable_procedure_version",
+                    procedure_id=knowledge.procedure.procedure_id,
+                    upcoming_versions=upcoming_projection(version.upcoming, locale),
+                )
+            )
         return _run_bundle(
-            knowledge=knowledge,
+            knowledge=version.bundle,
             goal_id=goal_id,
             facts=facts,
             locale=locale,
             evaluation_date=evaluation_date,
             generated_on=generation_date,
+            historical=version.historical,
+            upcoming_versions=version.upcoming,
         )
 
     knowledge_diagnostics = validate_catalog(knowledge)
@@ -298,7 +339,10 @@ def _execute_scenario(
 
     assert isinstance(selection, SelectedProcedure)
     candidate = selection.candidate
-    if candidate.fixture_id is None:
+    if (
+        candidate.fixture_id is None
+        and not bundles_for_procedure(knowledge, candidate.procedure_id)
+    ):
         return _ScenarioRun(
             InconclusiveResult(
                 "procedure_not_researched",
@@ -307,27 +351,52 @@ def _execute_scenario(
             tuple(traces),
         )
 
-    fixture = knowledge.fixtures.get(candidate.fixture_id)
-    if fixture is None or fixture.procedure.procedure_id != candidate.procedure_id:
+    if candidate.fixture_id is not None and not bundles_for_procedure(
+        knowledge, candidate.procedure_id
+    ):
+        legacy_fixture = knowledge.fixtures.get(candidate.fixture_id)
+        version = (
+            resolve_bundle_version(
+                legacy_fixture,
+                evaluation_date,
+                version_id=requested_version_id,
+            )
+            if legacy_fixture is not None
+            and legacy_fixture.procedure.procedure_id == candidate.procedure_id
+            else resolve_procedure_version(
+                knowledge,
+                candidate.procedure_id,
+                evaluation_date,
+                version_id=requested_version_id,
+            )
+        )
+    else:
+        version = resolve_procedure_version(
+            knowledge,
+            candidate.procedure_id,
+            evaluation_date,
+            version_id=requested_version_id,
+        )
+    if version.bundle is None:
         return _ScenarioRun(
             InconclusiveResult(
-                "procedure_selection_configuration_defect",
+                version.reason_code or "no_applicable_procedure_version",
                 procedure_id=candidate.procedure_id,
-                diagnostic_codes=(
-                    "selected_procedure_fixture_missing_or_mismatched",
-                ),
+                upcoming_versions=upcoming_projection(version.upcoming, locale),
             ),
             tuple(traces),
         )
 
     bundle_run = _run_bundle(
-        knowledge=fixture,
+        knowledge=version.bundle,
         goal_id=goal_id,
         facts=facts,
         locale=locale,
         evaluation_date=evaluation_date,
         generated_on=generation_date,
         catalog=knowledge,
+        historical=version.historical,
+        upcoming_versions=version.upcoming,
     )
     return _ScenarioRun(
         bundle_run.result,
@@ -343,6 +412,9 @@ def run_scenario(
     locale: Locale,
     evaluation_date: date,
     generated_on: date | None = None,
+    historical_version_id: str | None = None,
+    procedure_version_id: str | None = None,
+    version_id: str | None = None,
 ) -> PlanningResult:
     """Public trace-free seam with an explicit optional generation date."""
     return _execute_scenario(
@@ -352,6 +424,9 @@ def run_scenario(
         locale=locale,
         evaluation_date=evaluation_date,
         generated_on=generated_on,
+        historical_version_id=historical_version_id,
+        procedure_version_id=procedure_version_id,
+        version_id=version_id,
     ).result
 
 
@@ -363,6 +438,9 @@ def inspect_scenario(
     locale: Locale,
     evaluation_date: date,
     generated_on: date | None = None,
+    historical_version_id: str | None = None,
+    procedure_version_id: str | None = None,
+    version_id: str | None = None,
 ) -> ScenarioInspection:
     execution = _execute_scenario(
         knowledge=knowledge,
@@ -371,5 +449,8 @@ def inspect_scenario(
         locale=locale,
         evaluation_date=evaluation_date,
         generated_on=generated_on,
+        historical_version_id=historical_version_id,
+        procedure_version_id=procedure_version_id,
+        version_id=version_id,
     )
     return ScenarioInspection(execution.result, execution.traces)

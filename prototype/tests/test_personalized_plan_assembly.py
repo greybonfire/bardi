@@ -126,6 +126,8 @@ class PersonalizedPlanAssemblyTests(unittest.TestCase):
         by_id = {fee.id: fee for fee in variant_result.plan.fees}  # type: ignore[union-attr]
         self.assertEqual((by_id["test.fee.range"].minimum_amount, by_id["test.fee.range"].maximum_amount), (700, 800))
         self.assertEqual(by_id["test.fee.unverified"].verification_state, "needs_reverification")
+        self.assertTrue(by_id["test.fee.unverified"].current_value_unknown)
+        self.assertIsNone(by_id["test.fee.unverified"].amount)
 
     def test_step_order_uses_phase_order_then_slot(self) -> None:
         fixture = load_passport_renewal_fixture()
@@ -162,7 +164,15 @@ class PersonalizedPlanAssemblyTests(unittest.TestCase):
             scope="eligibility_basis",
             eligibility_basis_id="family.only_son_living_father",
         )
-        variant = replace(fixture, claims=(shared, basis, *fixture.claims[1:]))
+        trusted_bases = tuple(
+            replace(item, verification_state="current")
+            for item in fixture.eligibility_bases
+        )
+        variant = replace(
+            fixture,
+            eligibility_bases=trusted_bases,
+            claims=(shared, basis, *fixture.claims[1:]),
+        )
         result = run_scenario(
             knowledge=variant,
             goal_id=variant.goal.id,

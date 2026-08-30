@@ -45,8 +45,6 @@ FACT_DEFINITIONS: Mapping[str, FactDefinition] = {
     "renewal_deadline_date": FactDefinition("renewal_deadline_date", "date", derived=True),
     "renewal_deadline_passed": FactDefinition("renewal_deadline_passed", "boolean", derived=True),
     "only_son_candidate": FactDefinition("only_son_candidate", "boolean", derived=True),
-    "missing_person_basis_uses_2026_wording": FactDefinition("missing_person_basis_uses_2026_wording", "boolean", derived=True),
-    "terrorist_operations_in_missing_basis": FactDefinition("terrorist_operations_in_missing_basis", "boolean", derived=True),
 }
 
 

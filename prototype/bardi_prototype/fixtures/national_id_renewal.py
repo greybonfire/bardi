@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 from ..contracts import (
@@ -32,6 +33,8 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             authority="Egyptian Official Gazette",
             title="Civil Status Law No. 143 of 1994",
             retrieved_on=VERIFIED_ON,
+            published_on=date(1994, 6, 9),
+            effective_from=date(1994, 6, 10),
         ),
         "SRC-PSM-CIVIL-STATUS-SERVICES": Source(
             id="SRC-PSM-CIVIL-STATUS-SERVICES",
@@ -49,6 +52,29 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             "EL-PSM-NID-SERVICE",
             ("SRC-PSM-CIVIL-STATUS-SERVICES",),
         ),
+    }
+    evidence_metadata = {
+        "EL-CIVIL-LAW-52": (
+            "خلال ثلاثة أشهر من تاريخ انتهاء مدة سريانها",
+            "Civil Status Law, Article 52; Official Gazette scan page 18",
+            "National ID cardholder renewal; original Article 52 wording.",
+        ),
+        "EL-PSM-NID-SERVICE": (
+            None,
+            "Public Services Guide ordinary National ID service listing",
+            "Current directory behavior; governorate/area input is exposed, but no nationwide office mapping is asserted.",
+        ),
+    }
+    evidence_links = {
+        key: replace(
+            link,
+            exact_passage=metadata[0],
+            location=metadata[1],
+            applicability_context=metadata[2],
+            retrieved_on=VERIFIED_ON,
+        )
+        for key, link in evidence_links.items()
+        for metadata in (evidence_metadata[key],)
     }
 
     goal = GoalDefinition(
@@ -70,6 +96,9 @@ def load_national_id_renewal_fixture() -> KnowledgeBundle:
             eq("card_expired_before_evaluation_date", True),
         ),
         verified_on=VERIFIED_ON,
+        publication_state="published",
+        published_on=VERIFIED_ON,
+        trust_state="current",
     )
 
     claims = (

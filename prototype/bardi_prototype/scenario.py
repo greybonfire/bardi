@@ -199,7 +199,6 @@ def _execute_scenario(
     locale: Locale,
     evaluation_date: date,
     generated_on: date | None = None,
-    detailed_diagnostics: bool = False,
     historical_version_id: str | None = None,
     procedure_version_id: str | None = None,
     version_id: str | None = None,
@@ -229,12 +228,7 @@ def _execute_scenario(
         )
         if knowledge_diagnostics:
             return _ScenarioRun(
-                _invalid(
-                    "invalid_knowledge",
-                    knowledge_diagnostics
-                    if detailed_diagnostics
-                    else ("invalid_knowledge",),
-                )
+                _invalid("invalid_knowledge", knowledge_diagnostics)
             )
         fact_diagnostics = _validate_facts(
             facts,
@@ -270,12 +264,7 @@ def _execute_scenario(
     knowledge_diagnostics = validate_catalog(knowledge)
     if knowledge_diagnostics:
         return _ScenarioRun(
-            _invalid(
-                "invalid_knowledge",
-                knowledge_diagnostics
-                if detailed_diagnostics
-                else ("invalid_knowledge",),
-            )
+            _invalid("invalid_knowledge", knowledge_diagnostics)
         )
 
     definitions = knowledge.fact_definitions or FACT_DEFINITIONS
@@ -350,7 +339,10 @@ def _execute_scenario(
 
     assert isinstance(selection, SelectedProcedure)
     candidate = selection.candidate
-    if candidate.fixture_id is None and not bundles_for_procedure(knowledge, candidate.procedure_id):
+    if (
+        candidate.fixture_id is None
+        and not bundles_for_procedure(knowledge, candidate.procedure_id)
+    ):
         return _ScenarioRun(
             InconclusiveResult(
                 "procedure_not_researched",
@@ -457,7 +449,6 @@ def inspect_scenario(
         locale=locale,
         evaluation_date=evaluation_date,
         generated_on=generated_on,
-        detailed_diagnostics=True,
         historical_version_id=historical_version_id,
         procedure_version_id=procedure_version_id,
         version_id=version_id,

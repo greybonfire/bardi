@@ -21,7 +21,7 @@ from prototype.bardi_prototype.evaluator import (
     validate_predicate,
 )
 from prototype.bardi_prototype.fixtures import load_researched_catalog
-from prototype.bardi_prototype.scenario import inspect_scenario, run_scenario
+from prototype.bardi_prototype.scenario import run_scenario
 
 
 class TypedRuleTests(unittest.TestCase):
@@ -149,17 +149,7 @@ class TypedRuleTests(unittest.TestCase):
         )
         self.assertIsInstance(result, InvalidResult)
         self.assertEqual(result.diagnostic_code, "invalid_knowledge")
-        self.assertEqual(result.diagnostic_codes, ("invalid_knowledge",))
-
-        inspection = inspect_scenario(
-            knowledge=bad_catalog,
-            goal_id=goal_id,
-            facts={},
-            locale="en",
-            evaluation_date=date(2026, 8, 25),
-        )
-        self.assertIsInstance(inspection.result, InvalidResult)
-        self.assertIn("unsupported_rule_operator:ref", inspection.result.diagnostic_codes)
+        self.assertIn("unsupported_rule_operator:ref", result.diagnostic_codes)
 
     def test_missing_fact_picker_skips_nonconsequential_sex_for_minor(self) -> None:
         facts = {

@@ -170,8 +170,8 @@ def _historical_items(
 
     A generic trust problem is not a historical value. In particular,
     ``needs_reverification``, ``disputed`` and ``unknown`` items stay out of
-    this projection unless they also have an authored ended interval that
-    proves a previously-established value.
+    this projection unless they have explicitly become stale with their own
+    item-level verification date.
     """
     selected: list[SemanticHistoricalItem] = []
     for item in items:
@@ -233,20 +233,19 @@ def _select_bases(
             )
         )
         state = trust_state(knowledge, basis, evaluation_date)
-        untrusted = state in {
-            "needs_reverification",
-            "stale",
-            "disputed",
-            "unknown",
-        }
         if result.value is TruthValue.TRUE:
-            # Keep a factual candidate visible, but do not let an untrusted
-            # legal Basis establish eligibility or unlock Basis-scoped advice.
+            # A researched Basis may still be shown as a factual candidate, but
+            # every non-current trust state prevents it from establishing
+            # eligibility or unlocking Basis-scoped current guidance.
             selected.append(basis)
-            if untrusted:
+            if state != "current":
                 inconclusive.add(basis.id)
         elif result.value is TruthValue.UNKNOWN:
-            if untrusted:
+            if state in {"stale", "disputed", "unknown"}:
+                # Do not ask users to resolve an UNKNOWN rule that is itself no
+                # longer trustworthy. needs_reverification is different: those
+                # researched candidates still need factual resolution so #10's
+                # exhaustive alternative set remains deterministic.
                 inconclusive.add(basis.id)
             else:
                 missing.update(result.missing_facts)

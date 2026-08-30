@@ -1,6 +1,6 @@
 """Centralized evidence and local trust assessment.
 
-Rule evaluation remains a pure TRUE/FALSE/UNKNOWN operation.  This module
+Rule evaluation remains a pure TRUE/FALSE/UNKNOWN operation. This module
 answers a different question: whether a material definition may be presented
 as current guidance.
 """
@@ -25,12 +25,15 @@ class TrustAssessment:
 _UNTRUSTED = {"needs_reverification", "stale", "disputed", "unknown"}
 
 
-def verification_date(item: Any, bundle: KnowledgeBundle) -> date | None:
-    return (
-        getattr(item, "reverified_on", None)
-        or getattr(item, "verified_on", None)
-        or bundle.procedure.verified_on
-    )
+def verification_date(item: Any, bundle: KnowledgeBundle | None = None) -> date | None:
+    """Return only an item-level verification date.
+
+    A Procedure Version verification date must never be used as evidence that a
+    particular claim/step/fee was itself previously verified. ``bundle`` is
+    retained as an ignored compatibility argument for existing callers.
+    """
+    del bundle
+    return getattr(item, "reverified_on", None) or getattr(item, "verified_on", None)
 
 
 def _date_is_current(
@@ -92,7 +95,11 @@ def evidence_trust_state(
                 source_states.append("current")
         if link.verification_state in _UNTRUSTED:
             states.append(link.verification_state)
-        elif evaluation_date is not None and link.reverification_due_on is not None and evaluation_date > link.reverification_due_on:
+        elif (
+            evaluation_date is not None
+            and link.reverification_due_on is not None
+            and evaluation_date > link.reverification_due_on
+        ):
             states.append("needs_reverification")
         elif not source_states or "disputed" in source_states:
             states.append("disputed")
@@ -184,13 +191,21 @@ def _trust_state(
     if dependencies:
         claim_by_id = {claim.id: claim for claim in bundle.claims}
         dependency_states = {
-            _trust_state(bundle, claim_by_id[dependency_id], evaluation_date, seen | {item_id})
+            _trust_state(
+                bundle,
+                claim_by_id[dependency_id],
+                evaluation_date,
+                seen | {item_id},
+            )
             for dependency_id in dependencies
             if dependency_id in claim_by_id
         }
         if "disputed" in dependency_states:
             return "disputed"
-        if any(state in {"needs_reverification", "stale"} for state in dependency_states):
+        if any(
+            state in {"needs_reverification", "stale"}
+            for state in dependency_states
+        ):
             return "needs_reverification"
         if "unknown" in dependency_states:
             return "unknown"
@@ -221,6 +236,33 @@ def is_currently_trusted(
     return trust_state(bundle, item, evaluation_date) == "current"
 
 
+def is_historical_context_candidate(
+    bundle: KnowledgeBundle,
+    item: Any,
+    evaluation_date: date,
+) -> bool:
+    """Return whether an item represents an established past value.
+
+    ``needs_reverification``, ``disputed`` and ``unknown`` are current trust
+    problems, not proof of a historical value. Historical context is reserved
+    for explicitly stale material or a previously verified item whose authored
+    effective interval has ended.
+    """
+    explicit = getattr(
+        item,
+        "verification_state",
+        getattr(item, "trust_state", "current"),
+    )
+    if explicit == "stale":
+        return verification_date(item) is not None or getattr(item, "effective_to", None) is not None
+    if explicit != "current":
+        return False
+    effective_to = getattr(item, "effective_to", None)
+    if type(effective_to) is date and evaluation_date > effective_to:
+        return verification_date(item) is not None or effective_to is not None
+    return False
+
+
 def assess_bundle(
     bundle: KnowledgeBundle,
     evaluation_date: date | None = None,
@@ -244,7 +286,7 @@ def assess_bundle(
             and getattr(item, "effective_to", None) is not None
             and evaluation_date > item.effective_to
         ):
-            state = "needs_reverification"
+            state = "stale"
         states[item.id] = state
     states[f"procedure_version:{bundle.procedure.version_id}"] = trust_state(
         bundle, bundle.procedure, evaluation_date

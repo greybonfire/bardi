@@ -223,6 +223,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                 **self.catalog.fixtures,
                 passport.procedure.procedure_id: passport_variant,
             },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (passport_variant,),
+            },
         )
 
         result = run_scenario(
@@ -261,6 +265,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             fixtures={
                 **self.catalog.fixtures,
                 passport.procedure.procedure_id: passport_variant,
+            },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (passport_variant,),
             },
         )
 
@@ -324,6 +332,15 @@ class BasisDependencyRoutingTests(unittest.TestCase):
                     dependencies=(national_id_dependency,),
                 ),
             },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (
+                    replace(passport, dependencies=(passport_dependency,)),
+                ),
+                national_id.procedure.procedure_id: (
+                    replace(national_id, dependencies=(national_id_dependency,)),
+                ),
+            },
         )
 
         diagnostics = validate_catalog(catalog)
@@ -357,6 +374,13 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             fixtures={
                 **self.catalog.fixtures,
                 military.procedure.procedure_id: variant,
+            },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                military.procedure.procedure_id: (
+                    self.catalog.versioned_fixtures[military.procedure.procedure_id][0],
+                    variant,
+                ),
             },
         )
 
@@ -421,6 +445,10 @@ class BasisDependencyRoutingTests(unittest.TestCase):
             fixtures={
                 **self.catalog.fixtures,
                 passport.procedure.procedure_id: bad_passport,
+            },
+            versioned_fixtures={
+                **self.catalog.versioned_fixtures,
+                passport.procedure.procedure_id: (bad_passport,),
             },
         )
         diagnostics = validate_catalog(catalog)

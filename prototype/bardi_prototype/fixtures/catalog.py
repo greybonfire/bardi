@@ -11,7 +11,10 @@ from ..contracts import (
 from ..evaluator import all_of, eq, one_of
 from .national_id_renewal import load_national_id_renewal_fixture
 from .passport_renewal import load_passport_renewal_fixture
-from .temporary_family_exemption import load_temporary_family_exemption_fixture
+from .temporary_family_exemption import (
+    load_temporary_family_exemption_fixture,
+    load_temporary_family_exemption_historical_fixture,
+)
 
 
 def t(ar: str, en: str) -> LocalizedText:
@@ -22,6 +25,7 @@ def load_researched_catalog() -> KnowledgeCatalog:
     passport = load_passport_renewal_fixture()
     national_id = load_national_id_renewal_fixture()
     military = load_temporary_family_exemption_fixture()
+    military_historical = load_temporary_family_exemption_historical_fixture()
 
     passport_candidates = (
         ProcedureCandidateDefinition(
@@ -373,4 +377,9 @@ def load_researched_catalog() -> KnowledgeCatalog:
             military.procedure.procedure_id: military,
         },
         questions=questions,
+        versioned_fixtures={
+            passport.procedure.procedure_id: (passport,),
+            national_id.procedure.procedure_id: (national_id,),
+            military.procedure.procedure_id: (military_historical, military),
+        },
     )

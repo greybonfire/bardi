@@ -21,6 +21,8 @@ from .contracts import (
 )
 from .derivations import derive_facts
 from .evaluator import RuleEvaluationRecord, TruthValue, evaluate, record_evaluation
+from .trust import is_currently_trusted, trust_state
+from .versions import resolve_procedure_version
 
 
 @dataclass(frozen=True)
@@ -47,6 +49,13 @@ class SemanticRouting:
 
 
 @dataclass(frozen=True)
+class SemanticHistoricalItem:
+    item: object
+    kind: str
+    verification_state: str
+
+
+@dataclass(frozen=True)
 class SemanticPlan:
     knowledge: KnowledgeBundle
     facts: Mapping[str, object]
@@ -61,6 +70,11 @@ class SemanticPlan:
     eligibility_bases: tuple[EligibilityBasisDefinition, ...]
     dependencies: tuple[SemanticDependency, ...]
     routing: SemanticRouting
+    historical_items: tuple[SemanticHistoricalItem, ...] = ()
+    inconclusive_claim_ids: tuple[str, ...] = ()
+    inconclusive_basis_ids: tuple[str, ...] = ()
+    historical: bool = False
+    upcoming_versions: tuple[KnowledgeBundle, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -100,23 +114,83 @@ class NoApplicableBasis(Exception):
         self.traces = traces
 
 
-def _current_items(items):
+def _current_items(
+    knowledge: KnowledgeBundle,
+    items,
+    evaluation_date: date | None = None,
+):
     return tuple(
         item
         for item in items
-        if getattr(item, "verification_state", "current") == "current"
+        if is_currently_trusted(knowledge, item, evaluation_date)
+        and (
+            evaluation_date is None
+            or _date_applies(
+                evaluation_date,
+                getattr(item, "effective_from", None),
+                getattr(item, "effective_to", None),
+            )
+        )
     )
+
+
+def _historical_items(
+    knowledge: KnowledgeBundle,
+    items,
+    facts: Mapping[str, object],
+    submitted_keys: frozenset[str],
+    evaluation_date: date,
+    *,
+    kind: str,
+    matched_basis_ids: frozenset[str] = frozenset(),
+):
+    """Keep applicable stale material as dated context, never current advice."""
+    selected: list[SemanticHistoricalItem] = []
+    for item in items:
+        if not _belongs_to_matched_basis(item, matched_basis_ids):
+            continue
+        effective_from = getattr(item, "effective_from", None)
+        if effective_from is not None and effective_from > evaluation_date:
+            continue
+        if is_currently_trusted(knowledge, item, evaluation_date) and _date_applies(
+            evaluation_date,
+            getattr(item, "effective_from", None),
+            getattr(item, "effective_to", None),
+        ):
+            continue
+        result = evaluate(
+            getattr(item, "applicability", None),
+            facts,
+            submitted_keys=submitted_keys,
+        )
+        if result.value is TruthValue.TRUE:
+            state = trust_state(knowledge, item, evaluation_date)
+            if kind == "fee" and getattr(item, "value_state", None) == "unknown":
+                # There is no prior value to present as historical context.
+                continue
+            if state == "current":
+                state = "stale"
+            selected.append(SemanticHistoricalItem(item, kind, state))
+    return tuple(selected)
 
 
 def _select_bases(
     knowledge: KnowledgeBundle,
     facts: Mapping[str, object],
     submitted_keys: frozenset[str],
+    evaluation_date: date,
 ):
     selected: list[EligibilityBasisDefinition] = []
+    inconclusive: set[str] = set()
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
     for basis in knowledge.eligibility_bases:
+        if not _date_applies(
+            evaluation_date,
+            basis.effective_from,
+            basis.effective_to,
+        ):
+            continue
         result = evaluate(
             basis.applicability,
             facts,
@@ -129,14 +203,25 @@ def _select_bases(
                 consequential_to_planning=True,
             )
         )
+        state = trust_state(knowledge, basis, evaluation_date)
         if result.value is TruthValue.TRUE:
+            # A stale/disputed/unknown Basis is still a factual candidate, but
+            # it cannot establish eligibility or unlock Basis-scoped guidance.
+            # Keep it visible as a local inconclusive result instead of turning
+            # it into a FALSE/no-basis outcome.
             selected.append(basis)
+            if state in {"stale", "disputed", "unknown"}:
+                inconclusive.add(basis.id)
         elif result.value is TruthValue.UNKNOWN:
-            missing.update(result.missing_facts)
+            if state in {"stale", "disputed", "unknown"}:
+                inconclusive.add(basis.id)
+            else:
+                missing.update(result.missing_facts)
     return (
         tuple(sorted(selected, key=lambda item: (item.display_order, item.id))),
         frozenset(missing),
         tuple(traces),
+        frozenset(inconclusive),
     )
 
 
@@ -147,6 +232,7 @@ def _belongs_to_matched_basis(item, matched_basis_ids: frozenset[str]) -> bool:
 
 
 def _select_items(
+    knowledge: KnowledgeBundle,
     items,
     facts: Mapping[str, object],
     submitted_keys: frozenset[str],
@@ -154,11 +240,12 @@ def _select_items(
     context_prefix: str,
     consequential: bool,
     matched_basis_ids: frozenset[str] = frozenset(),
+    evaluation_date: date | None = None,
 ):
     selected = []
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
-    for item in _current_items(items):
+    for item in _current_items(knowledge, items, evaluation_date):
         if not _belongs_to_matched_basis(item, matched_basis_ids):
             continue
         result = evaluate(
@@ -181,15 +268,23 @@ def _select_items(
 
 
 def _select_fees(
+    knowledge: KnowledgeBundle,
     items,
     facts: Mapping[str, object],
     submitted_keys: frozenset[str],
+    evaluation_date: date,
 ):
     """Select all explicit fee states, including unknown/unverified values."""
     selected = []
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
     for item in items:
+        if not _date_applies(
+            evaluation_date,
+            item.effective_from,
+            item.effective_to,
+        ):
+            continue
         result = evaluate(
             item.applicability,
             facts,
@@ -214,11 +309,38 @@ def _select_dependencies(
     catalog: KnowledgeCatalog | None,
     facts: Mapping[str, object],
     submitted_keys: frozenset[str],
+    evaluation_date: date,
 ):
     selected: list[SemanticDependency] = []
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
-    for dependency in _current_items(knowledge.dependencies):
+    for dependency in knowledge.dependencies:
+        if not _date_applies(
+            evaluation_date,
+            dependency.effective_from,
+            dependency.effective_to,
+        ):
+            continue
+        if not is_currently_trusted(knowledge, dependency, evaluation_date):
+            applies = evaluate(
+                dependency.applicability,
+                facts,
+                submitted_keys=submitted_keys,
+            )
+            traces.append(
+                record_evaluation(
+                    f"dependency_applicability:{dependency.id}",
+                    applies,
+                    consequential_to_planning=True,
+                )
+            )
+            # Trust uncertainty must not make an UNKNOWN edge disappear: it
+            # may be a blocking prerequisite once its applicability is
+            # re-established. Keep both TRUE and UNKNOWN edges local and
+            # inconclusive, without asking a question about an untrusted rule.
+            if applies.value is not TruthValue.FALSE:
+                selected.append(SemanticDependency(dependency, "inconclusive", None))
+            continue
         applies = evaluate(
             dependency.applicability,
             facts,
@@ -253,7 +375,13 @@ def _select_dependencies(
             missing.update(satisfied.missing_facts)
             continue
 
-        target = None if catalog is None else catalog.fixtures.get(dependency.target_procedure_id)
+        target = None
+        if catalog is not None:
+            target = resolve_procedure_version(
+                catalog,
+                dependency.target_procedure_id,
+                evaluation_date,
+            ).bundle
         if satisfied.value is TruthValue.TRUE:
             status = "satisfied"
         elif target is None:
@@ -291,8 +419,6 @@ def _select_routing(
     traces: list[RuleEvaluationRecord] = []
 
     for association in knowledge.service_point_associations:
-        if association.verification_state != "current":
-            continue
         if not _date_applies(
             evaluation_date,
             association.effective_from,
@@ -318,11 +444,14 @@ def _select_routing(
             unresolved_associations.add(association.id)
             unresolved_facts.update(result.missing_facts)
             continue
+        if not is_currently_trusted(knowledge, association, evaluation_date):
+            unresolved_associations.add(association.id)
+            continue
 
         version = version_by_id.get(association.service_point_version_id)
         if (
             version is None
-            or version.verification_state != "current"
+            or not is_currently_trusted(knowledge, version, evaluation_date)
             or not _date_applies(
                 evaluation_date,
                 version.effective_from,
@@ -366,6 +495,8 @@ def assemble_plan(
     submitted_keys: frozenset[str] | None = None,
     generated_on: date | None = None,
     catalog: KnowledgeCatalog | None = None,
+    historical: bool = False,
+    upcoming_versions: tuple[KnowledgeBundle, ...] = (),
 ) -> PlanAssembly:
     """Assemble one Procedure plan while preserving local routing uncertainty."""
     submitted = frozenset(facts) if submitted_keys is None else submitted_keys
@@ -397,15 +528,21 @@ def assemble_plan(
             tuple(traces),
         )
 
-    bases, basis_missing, basis_traces = _select_bases(
+    (
+        bases,
+        basis_missing,
+        basis_traces,
+        inconclusive_basis_ids,
+    ) = _select_bases(
         knowledge,
         derived,
         submitted,
+        evaluation_date,
     )
     traces.extend(basis_traces)
     if basis_missing:
         return PlanAssembly(None, basis_missing, tuple(traces))
-    if knowledge.eligibility_bases and not bases:
+    if knowledge.eligibility_bases and not bases and not inconclusive_basis_ids:
         assert knowledge.no_applicable_basis_text is not None
         assert knowledge.basis_verification_path is not None
         raise NoApplicableBasis(
@@ -414,32 +551,43 @@ def assemble_plan(
             knowledge.basis_verification_path,
             tuple(traces),
         )
-    matched_basis_ids = frozenset(basis.id for basis in bases)
+    # Stale/disputed/unknown candidates are shown as local status only and
+    # cannot contribute Basis-scoped current guidance. The researched fixture's
+    # needs-reverification candidates remain visible for specialist review.
+    matched_basis_ids = frozenset(
+        basis.id for basis in bases if basis.id not in inconclusive_basis_ids
+    )
 
     claims, claim_missing, claim_traces = _select_items(
+        knowledge,
         knowledge.claims,
         derived,
         submitted,
         context_prefix="claim",
         consequential=True,
         matched_basis_ids=matched_basis_ids,
+        evaluation_date=evaluation_date,
     )
     traces.extend(claim_traces)
 
     steps, step_missing, step_traces = _select_items(
+        knowledge,
         knowledge.steps,
         derived,
         submitted,
         context_prefix="step",
         consequential=True,
         matched_basis_ids=matched_basis_ids,
+        evaluation_date=evaluation_date,
     )
     traces.extend(step_traces)
 
     fees, fee_missing, fee_traces = _select_fees(
+        knowledge,
         knowledge.fees,
         derived,
         submitted,
+        evaluation_date,
     )
     traces.extend(fee_traces)
 
@@ -448,6 +596,7 @@ def assemble_plan(
         catalog,
         derived,
         submitted,
+        evaluation_date,
     )
     traces.extend(dependency_traces)
 
@@ -476,6 +625,59 @@ def assemble_plan(
         if result.value is TruthValue.TRUE:
             unknowns.append(item)
 
+    historical_items = (
+        _historical_items(
+            knowledge,
+            knowledge.claims,
+            derived,
+            submitted,
+            evaluation_date,
+            kind="claim",
+            matched_basis_ids=matched_basis_ids,
+        )
+        + _historical_items(
+            knowledge,
+            knowledge.steps,
+            derived,
+            submitted,
+            evaluation_date,
+            kind="step",
+            matched_basis_ids=matched_basis_ids,
+        )
+        + _historical_items(
+            knowledge,
+            knowledge.fees,
+            derived,
+            submitted,
+            evaluation_date,
+            kind="fee",
+            matched_basis_ids=matched_basis_ids,
+        )
+    )
+    untrusted_ids = {
+        entry.item.id
+        for entry in historical_items
+        if entry.kind in {"claim", "step", "fee"}
+    }
+    inconclusive_claim_ids = {
+        item.id
+        for item in (*knowledge.claims, *knowledge.steps)
+        if is_currently_trusted(knowledge, item, evaluation_date)
+        and set(getattr(item, "claim_dependencies", ())) & untrusted_ids
+    }
+    # Candidate/legal-basis claims may remain historical context without
+    # invalidating the reliable shared plan. Consequential official claims,
+    # by contrast, are explicitly surfaced as local unknowns.
+    inconclusive_claim_ids.update(
+        item.item.id
+        for item in historical_items
+        if item.kind in {"claim", "step"}
+        and getattr(item.item, "classification", "official_requirement")
+        == "official_requirement"
+    )
+    claims = tuple(item for item in claims if item.id not in inconclusive_claim_ids)
+    steps = tuple(item for item in steps if item.id not in inconclusive_claim_ids)
+
     missing = claim_missing | step_missing | fee_missing | dependency_missing
     if missing:
         return PlanAssembly(None, missing, tuple(traces))
@@ -496,11 +698,30 @@ def assemble_plan(
         ),
         fees=tuple(sorted(fees, key=lambda item: item.id)),
         service_points=routing.service_points,
-        warnings=knowledge.warnings,
+        warnings=tuple(
+            warning
+            for warning in knowledge.warnings
+            if warning.role == "regeneration"
+            or is_currently_trusted(knowledge, warning, evaluation_date)
+        ),
         unknowns=tuple(sorted(unknowns, key=lambda item: item.id)),
         eligibility_bases=bases,
         dependencies=dependencies,
         routing=routing,
+        historical_items=tuple(
+            sorted(
+                historical_items,
+                key=lambda entry: (
+                    entry.kind,
+                    getattr(entry.item, "display_order", 0),
+                    getattr(entry.item, "id", ""),
+                ),
+            )
+        ),
+        inconclusive_claim_ids=tuple(sorted(inconclusive_claim_ids)),
+        inconclusive_basis_ids=tuple(sorted(inconclusive_basis_ids)),
+        historical=historical,
+        upcoming_versions=upcoming_versions,
     )
     return PlanAssembly(semantic_plan, traces=tuple(traces))
 

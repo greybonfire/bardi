@@ -65,7 +65,7 @@ Source Facts remain strictly typed; omission is UNKNOWN and null is invalid. Str
 
 There is no Django, PostgreSQL, ORM, HTTP server, Next.js client, persistence layer, network access, implicit system clock, random identifier generation, or raw-Fact logging.
 
-Issue #10 does not implement the generalized Procedure-Version freshness/trust behavior in #11. Service Point detail/association dates exist only because routing itself requires date-applicable material details. Future/withdrawn Procedure Versions, stale/disputed claims, and publication-state versus calculated-trust behavior remain deferred.
+Issue #11 adds date-aware immutable Procedure-Version collections. Published versions use inclusive effective intervals; drafts are excluded, future versions are exposed as upcoming, and withdrawn versions require an explicit version ID for historical inspection. Publication state remains separate from claim/source trust. Stale or disputed material is retained as dated historical context with its current value unknown, while reliable claims and routing continue locally. Internal evidence discrepancies and raw Evidence Links remain outside public plans.
 
 ## Run the tests
 
@@ -75,4 +75,4 @@ From the repository root:
 python -m unittest discover -s prototype/tests -v
 ```
 
-The suite includes the earlier #5–#9 behavior plus issue #10 scenarios for exhaustive Basis alternatives, no-applicable-basis handling, additive Basis claims, one-level dependency resolution, unsupported dependency targets, blocking-cycle rejection, multiple Service Point matches, local routing uncertainty, and date-specific Service Point details.
+The suite includes the earlier behavior plus issue #10 routing/dependency scenarios and issue #11 scenarios for inclusive version boundaries, future/draft/withdrawn publication states, historical inspection, trust propagation, evidence conflicts, stale local degradation, and bilingual parity.

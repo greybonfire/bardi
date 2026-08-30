@@ -38,5 +38,4 @@ def derive_facts(facts: dict[str, object], evaluation_date: date) -> dict[str, o
         derived["renewal_deadline_date"] = deadline
         derived["renewal_deadline_passed"] = evaluation_date > deadline
 
-    derived["missing_person_basis_uses_2026_wording"] = evaluation_date >= date(2026, 3, 25)
     return derived

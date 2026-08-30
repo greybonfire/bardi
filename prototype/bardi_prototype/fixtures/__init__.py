@@ -6,7 +6,11 @@ from ..facts import FACT_DEFINITIONS
 from .catalog import load_researched_catalog as _load_researched_catalog
 from .national_id_renewal import load_national_id_renewal_fixture
 from .passport_renewal import load_passport_renewal_fixture
-from .temporary_family_exemption import load_temporary_family_exemption_fixture
+from .temporary_family_exemption import (
+    load_temporary_family_exemption_fixture,
+    load_temporary_family_exemption_historical_fixture,
+    load_temporary_family_exemption_versions,
+)
 
 
 def _t(ar: str, en: str) -> LocalizedText:
@@ -133,5 +137,7 @@ __all__ = [
     "load_passport_renewal_fixture",
     "load_national_id_renewal_fixture",
     "load_temporary_family_exemption_fixture",
+    "load_temporary_family_exemption_historical_fixture",
+    "load_temporary_family_exemption_versions",
     "load_researched_catalog",
 ]

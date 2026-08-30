@@ -99,8 +99,8 @@ Facts below are candidate inputs. Where a statutory term is itself a legal/medic
 ### Derived Facts
 
 - `only_son_candidate = father_alive && other_living_sons_of_father_count == 0`.
-- `missing_person_basis_uses_2026_wording = evaluation_date >= 2026-03-25`.
-- `terrorist_operations_in_missing_basis = missing_person_basis_uses_2026_wording && missing_relative_cause == terrorist_operations`.
+- The pre-amendment Procedure Version applies through 2026-03-24 and the published amended version applies from 2026-03-25 (inclusive).
+- The amended version's missing-relative Basis directly contains the terrorist-operations predicate; no runtime date-derived legal wording flag is used.
 
 No derived Fact may convert `none_known` into a legal conclusion that the applicant is the statutory sole breadwinner. That mapping remains specialist-sensitive.
 

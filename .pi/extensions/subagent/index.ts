@@ -21,9 +21,11 @@ import type { Message } from "@earendil-works/pi-ai";
 import { StringEnum } from "@earendil-works/pi-ai";
 import {
 	CONFIG_DIR_NAME,
+	DefaultPackageManager,
 	type ExtensionAPI,
 	getAgentDir,
 	getMarkdownTheme,
+	SettingsManager,
 	withFileMutationQueue,
 } from "@earendil-works/pi-coding-agent";
 import { Container, Markdown, Spacer, Text } from "@earendil-works/pi-tui";
@@ -34,6 +36,7 @@ const MAX_PARALLEL_TASKS = 8;
 const MAX_CONCURRENCY = 4;
 const COLLAPSED_ITEM_COUNT = 10;
 const PER_TASK_OUTPUT_CAP = 50 * 1024;
+const PACKAGE_EXTENSION_SOURCE_PATTERN = /^(?:npm|git|github|https?|ssh):/;
 
 function formatTokens(count: number): string {
 	if (count < 1000) return count.toString();
@@ -317,6 +320,7 @@ type OnUpdateCallback = (partial: AgentToolResult<SubagentDetails>) => void;
 interface DispatchDefaults {
 	model?: string;
 	thinkingLevel?: ThinkingLevel;
+	projectTrusted: boolean;
 }
 
 async function runSingleAgent(
@@ -362,10 +366,12 @@ async function runSingleAgent(
 	if (thinkingLevel) {
 		args.push("--thinking", thinkingLevel);
 	}
+	for (const skill of agent.skills ?? []) args.push("--skill", skill);
 	if (agent.tools && agent.tools.length > 0) args.push("--tools", agent.tools.join(","));
 
 	let tmpPromptDir: string | null = null;
 	let tmpPromptPath: string | null = null;
+	let packageTempDir: string | null = null;
 	let updateTimer: ReturnType<typeof setInterval> | undefined;
 
 	const currentResult: SingleResult = {
@@ -381,6 +387,21 @@ async function runSingleAgent(
 		startedAt: Date.now(),
 	};
 
+	const missingResources = [
+		...(agent.skills ?? []).map((resourcePath) => ({ kind: "skill", resourcePath })),
+		...(agent.extensions ?? [])
+			.filter((resourcePath) => !PACKAGE_EXTENSION_SOURCE_PATTERN.test(resourcePath))
+			.map((resourcePath) => ({ kind: "extension", resourcePath })),
+	].filter(({ resourcePath }) => !fs.existsSync(resourcePath));
+	if (missingResources.length > 0) {
+		currentResult.exitCode = 1;
+		currentResult.stderr = `Missing agent resources:\n${missingResources
+			.map(({ kind, resourcePath }) => `- ${kind}: ${resourcePath}`)
+			.join("\n")}`;
+		currentResult.finishedAt = Date.now();
+		return currentResult;
+	}
+
 	const emitUpdate = () => {
 		if (onUpdate) {
 			onUpdate({
@@ -391,6 +412,44 @@ async function runSingleAgent(
 	};
 
 	try {
+		let extensionPaths = agent.extensions ?? [];
+		const packageSources = extensionPaths.filter((source) => PACKAGE_EXTENSION_SOURCE_PATTERN.test(source));
+		if (packageSources.length > 0) {
+			try {
+				if (signal?.aborted) throw new Error("Subagent was aborted");
+				packageTempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "pi-subagent-packages-"));
+				const effectiveCwd = cwd ?? defaultCwd;
+				const settingsManager = SettingsManager.create(defaultCwd, getAgentDir(), {
+					projectTrusted: dispatchDefaults.projectTrusted,
+				});
+				const packageManager = new DefaultPackageManager({
+					cwd: effectiveCwd,
+					agentDir: packageTempDir,
+					settingsManager,
+				});
+				const resolved = await packageManager.resolveExtensionSources(extensionPaths, { temporary: true });
+				if (signal?.aborted) throw new Error("Subagent was aborted");
+				extensionPaths = resolved.extensions
+					.filter((resource) => resource.enabled)
+					.map((resource) => resource.path);
+
+				const unresolvedSources = packageSources.filter(
+					(source) => !resolved.extensions.some((resource) => resource.metadata.source === source),
+				);
+				if (unresolvedSources.length > 0) {
+					throw new Error(`No extensions found for: ${unresolvedSources.join(", ")}`);
+				}
+			} catch (error) {
+				if (signal?.aborted) throw error;
+				const message = error instanceof Error ? error.message : String(error);
+				currentResult.exitCode = 1;
+				currentResult.errorMessage = `Failed to resolve agent extensions: ${message}`;
+				currentResult.stderr = currentResult.errorMessage;
+				return currentResult;
+			}
+		}
+		for (const extensionPath of extensionPaths) args.push("--extension", extensionPath);
+
 		if (agent.systemPrompt.trim()) {
 			const tmp = await writePromptToTempFile(agent.name, agent.systemPrompt);
 			tmpPromptDir = tmp.dir;
@@ -499,6 +558,12 @@ async function runSingleAgent(
 			} catch {
 				/* ignore */
 			}
+		if (packageTempDir)
+			try {
+				fs.rmSync(packageTempDir, { recursive: true, force: true });
+			} catch {
+				/* ignore */
+			}
 		emitUpdate();
 	}
 }
@@ -539,6 +604,7 @@ export default function (pi: ExtensionAPI) {
 		description: [
 			"Delegate tasks to specialized subagents with isolated context.",
 			"Modes: single (agent + task), parallel (tasks array), chain (sequential with {previous} placeholder).",
+			"Each agent can independently load skills and extensions declared in its frontmatter.",
 			`Default agent scope is "user" (from ${path.join(getAgentDir(), "agents")}).`,
 			`To enable project-local agents in ${CONFIG_DIR_NAME}/agents, set agentScope: "both" (or "project").`,
 		].join(" "),
@@ -549,6 +615,7 @@ export default function (pi: ExtensionAPI) {
 			const dispatchDefaults: DispatchDefaults = {
 				model: ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : undefined,
 				thinkingLevel: ctx.thinkingLevel,
+				projectTrusted: ctx.isProjectTrusted(),
 			};
 			const discovery = discoverAgents(ctx.cwd, agentScope);
 			const agents = discovery.agents;
@@ -581,12 +648,7 @@ export default function (pi: ExtensionAPI) {
 				};
 			}
 
-			if (
-				(agentScope === "project" || agentScope === "both") &&
-				confirmProjectAgents &&
-				ctx.hasUI &&
-				!ctx.isProjectTrusted()
-			) {
+			if ((agentScope === "project" || agentScope === "both") && !ctx.isProjectTrusted()) {
 				const requestedAgentNames = new Set<string>();
 				if (params.chain) for (const step of params.chain) requestedAgentNames.add(step.agent);
 				if (params.tasks) for (const t of params.tasks) requestedAgentNames.add(t.agent);
@@ -595,13 +657,36 @@ export default function (pi: ExtensionAPI) {
 				const projectAgentsRequested = Array.from(requestedAgentNames)
 					.map((name) => agents.find((a) => a.name === name))
 					.filter((a): a is AgentConfig => a?.source === "project");
+				const projectExtensionsRequested = projectAgentsRequested.filter(
+					(agent) => (agent.extensions?.length ?? 0) > 0,
+				);
 
-				if (projectAgentsRequested.length > 0) {
+				if (projectExtensionsRequested.length > 0 && !ctx.hasUI) {
+					return {
+						content: [
+							{
+								type: "text",
+								text: "Canceled: project-local agent extensions require a trusted project. Restart Pi with project approval.",
+							},
+						],
+						details: makeDetails(hasChain ? "chain" : hasTasks ? "parallel" : "single")([]),
+					};
+				}
+
+				if (
+					projectAgentsRequested.length > 0 &&
+					ctx.hasUI &&
+					(confirmProjectAgents || projectExtensionsRequested.length > 0)
+				) {
 					const names = projectAgentsRequested.map((a) => a.name).join(", ");
 					const dir = discovery.projectAgentsDir ?? "(unknown)";
+					const extensionWarning =
+						projectExtensionsRequested.length > 0
+							? "\n\nOne or more requested agents load extensions, which execute code with full system permissions."
+							: "";
 					const ok = await ctx.ui.confirm(
 						"Run project-local agents?",
-						`Agents: ${names}\nSource: ${dir}\n\nProject agents are repo-controlled. Only continue for trusted repositories.`,
+						`Agents: ${names}\nSource: ${dir}${extensionWarning}\n\nProject agents are repo-controlled. Only continue for trusted repositories.`,
 					);
 					if (!ok)
 						return {

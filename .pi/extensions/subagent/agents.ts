@@ -3,7 +3,9 @@
  */
 
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import { CONFIG_DIR_NAME, getAgentDir, parseFrontmatter } from "@earendil-works/pi-coding-agent";
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 
@@ -13,6 +15,8 @@ export interface AgentConfig {
 	name: string;
 	description: string;
 	tools?: string[];
+	skills?: string[];
+	extensions?: string[];
 	model?: string;
 	thinkingLevel?: ThinkingLevel;
 	systemPrompt: string;
@@ -37,29 +41,64 @@ type AgentFrontmatter = {
 	name?: unknown;
 	description?: unknown;
 	tools?: unknown;
+	skills?: unknown;
+	extensions?: unknown;
 	model?: unknown;
 	thinking?: unknown;
 };
 
-/**
- * Normalize a frontmatter `tools` value to a list of tool names.
- *
- * Both spellings are valid YAML and both are in use:
- *
- *     tools: read, bash        # string
- *     tools: [read, bash]      # array
- *
- * so accept either. Anything else (a number, a map, a nested list) yields no
- * tools rather than throwing: this runs inside agent discovery, where a single
- * bad file must not take down every other agent in the same directory.
- */
+/** Normalize a comma-separated or YAML-array frontmatter tool list. */
 function parseToolList(value: unknown): string[] | undefined {
 	const raw = Array.isArray(value) ? value : typeof value === "string" ? value.split(",") : [];
 	const tools = raw
-		.filter((t): t is string => typeof t === "string")
-		.map((t) => t.trim())
+		.filter((item): item is string => typeof item === "string")
+		.map((item) => item.trim())
 		.filter(Boolean);
 	return tools.length > 0 ? tools : undefined;
+}
+
+/**
+ * Normalize resource references without splitting scalar paths on commas.
+ * Paths are opaque values; use a YAML array when configuring multiple entries.
+ */
+function parseResourceList(value: unknown): string[] | undefined {
+	const raw = Array.isArray(value) ? value : typeof value === "string" ? [value] : [];
+	const resources = raw
+		.filter((item): item is string => typeof item === "string")
+		.map((item) => item.trim())
+		.filter(Boolean);
+	return resources.length > 0 ? resources : undefined;
+}
+
+function resolveResourceReferences(
+	value: unknown,
+	agentFilePath: string,
+	allowPackageSources = false,
+): string[] | undefined {
+	const references = parseResourceList(value);
+	if (!references) return undefined;
+
+	let resourceBaseFile = agentFilePath;
+	try {
+		resourceBaseFile = fs.realpathSync(agentFilePath);
+	} catch {
+		// The file was readable during discovery; fall back if it changes concurrently.
+	}
+
+	return references.map((reference) => {
+		if (allowPackageSources && /^(?:npm|git|github|https?|ssh):/.test(reference)) return reference;
+		if (reference === "~") return os.homedir();
+		if (reference.startsWith("~/")) return path.join(os.homedir(), reference.slice(2));
+		if (reference.startsWith("file://")) {
+			try {
+				return fileURLToPath(reference);
+			} catch {
+				return reference;
+			}
+		}
+		if (path.isAbsolute(reference)) return path.normalize(reference);
+		return path.resolve(path.dirname(resourceBaseFile), reference);
+	});
 }
 
 const THINKING_LEVELS = new Set<ThinkingLevel>(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
@@ -106,6 +145,8 @@ function loadAgentsFromDir(dir: string, source: "user" | "project"): AgentConfig
 			name: frontmatter.name,
 			description: frontmatter.description,
 			tools: parseToolList(frontmatter.tools),
+			skills: resolveResourceReferences(frontmatter.skills, filePath),
+			extensions: resolveResourceReferences(frontmatter.extensions, filePath, true),
 			model: typeof frontmatter.model === "string" ? frontmatter.model : undefined,
 			thinkingLevel: parseThinkingLevel(frontmatter.thinking),
 			systemPrompt: body,

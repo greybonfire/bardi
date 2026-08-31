@@ -209,14 +209,10 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
         published_on=VERIFIED_ON if amended else date(2026, 3, 24),
     )
 
-    missing_relative_applicability = all_of(
+    missing_relative_qualification = all_of(
         eq(
             "applicant_largest_eligible_relative_status",
             "authority_documented_yes",
-        ),
-        one_of(
-            "missing_relative_category",
-            ("officer", "volunteer", "conscript", "citizen"),
         ),
         eq("missing_relative_alive_status", "missing"),
         (
@@ -246,10 +242,8 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
         EligibilityBasisDefinition(
             id="family.only_son_living_father",
             text=t("الابن الوحيد لأبيه الحي", "Only son of a living father"),
-            applicability=all_of(
-                eq("father_alive", True),
-                eq("other_living_sons_of_father_count", 0),
-            ),
+            applicability=eq("father_alive", True),
+            qualification=eq("other_living_sons_of_father_count", 0),
             evidence_link_ids=("EL-LAW127-ART7-II-A",),
             verification_state="needs_reverification",
             display_order=10,
@@ -260,7 +254,11 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
                 "أساس إعالة الأب غير القادر على الكسب أو الصياغة المرتبطة بالإخوة غير القادرين",
                 "Father/incapable-brother family-support ground",
             ),
-            applicability=eq(
+            # This gate models only the currently encoded father sub-route.
+            # The incapable-brother wording remains specialist-sensitive and is
+            # intentionally not turned into invented Facts/qualification rules.
+            applicability=eq("father_alive", True),
+            qualification=eq(
                 "father_unable_to_earn_status",
                 "authority_documented_unable",
             ),
@@ -271,7 +269,8 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
         EligibilityBasisDefinition(
             id="family.support_mother",
             text=t("أساس إعالة الأم", "Mother family-support ground"),
-            applicability=one_of(
+            applicability=None,
+            qualification=one_of(
                 "mother_family_status",
                 (
                     "widowed",
@@ -289,7 +288,8 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
                 "أساس إعالة الأخت أو الأخوات غير المتزوجات",
                 "Unmarried-sister family-support ground",
             ),
-            applicability=gt("unmarried_sisters_requiring_support_count", 0),
+            applicability=None,
+            qualification=gt("unmarried_sisters_requiring_support_count", 0),
             evidence_link_ids=("EL-LAW127-ART7-II-D",),
             verification_state="needs_reverification",
             display_order=40,
@@ -297,7 +297,11 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
         EligibilityBasisDefinition(
             id="family.missing_war_or_terror_relative",
             text=missing_basis_text,
-            applicability=missing_relative_applicability,
+            applicability=one_of(
+                "missing_relative_category",
+                ("officer", "volunteer", "conscript", "citizen"),
+            ),
+            qualification=missing_relative_qualification,
             evidence_link_ids=missing_basis_evidence,
             verification_state="needs_reverification",
             display_order=50,
@@ -308,11 +312,11 @@ def load_temporary_family_exemption_fixture(amended: bool = True) -> KnowledgeBu
                 "أساس وجود أخ في الخدمة الإلزامية أو استدعاء احتياط مؤهل",
                 "Sibling currently in compulsory service or qualifying reserve recall",
             ),
-            applicability=all_of(
-                one_of(
-                    "sibling_service_status",
-                    ("compulsory_service", "reserve_recall"),
-                ),
+            applicability=one_of(
+                "sibling_service_status",
+                ("compulsory_service", "reserve_recall"),
+            ),
+            qualification=all_of(
                 eq(
                     "applicant_eldest_remaining_brother_status",
                     "authority_documented_yes",

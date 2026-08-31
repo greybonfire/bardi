@@ -203,6 +203,21 @@ def _historical_items(
     return tuple(selected)
 
 
+def _skipped_basis_qualification_record(
+    basis: EligibilityBasisDefinition,
+    reachability,
+) -> RuleEvaluationRecord:
+    """Editor-only marker that qualification was gated off, not evaluated."""
+    assert reachability.trace is not None
+    return RuleEvaluationRecord(
+        context=f"eligibility_basis_qualification_skipped_unreachable:{basis.id}",
+        value=reachability.value,
+        missing_facts=frozenset(),
+        consequential_to_planning=False,
+        trace=reachability.trace,
+    )
+
+
 def _select_bases(
     knowledge: KnowledgeBundle,
     facts: Mapping[str, object],
@@ -213,6 +228,7 @@ def _select_bases(
     inconclusive: set[str] = set()
     missing: set[str] = set()
     traces: list[RuleEvaluationRecord] = []
+
     for basis in knowledge.eligibility_bases:
         if not _date_applies(
             evaluation_date,
@@ -220,27 +236,57 @@ def _select_bases(
             basis.effective_to,
         ):
             continue
-        result = evaluate(
+
+        state = trust_state(knowledge, basis, evaluation_date)
+        reachability = evaluate(
             basis.applicability,
             facts,
             submitted_keys=submitted_keys,
         )
         traces.append(
             record_evaluation(
-                f"eligibility_basis:{basis.id}",
-                result,
+                f"eligibility_basis_reachability:{basis.id}",
+                reachability,
                 consequential_to_planning=True,
             )
         )
-        state = trust_state(knowledge, basis, evaluation_date)
-        if result.value is TruthValue.TRUE:
+
+        if reachability.value is TruthValue.FALSE:
+            traces.append(_skipped_basis_qualification_record(basis, reachability))
+            continue
+
+        if reachability.value is TruthValue.UNKNOWN:
+            # Qualification is deliberately not evaluated until the gate is
+            # resolved. This is the key #27 invariant: qualification-only
+            # Facts cannot leak into the Missing-Fact Picker yet.
+            if state in {"stale", "disputed", "unknown"}:
+                inconclusive.add(basis.id)
+            else:
+                missing.update(reachability.missing_facts)
+            continue
+
+        assert basis.qualification is not None
+        qualification = evaluate(
+            basis.qualification,
+            facts,
+            submitted_keys=submitted_keys,
+        )
+        traces.append(
+            record_evaluation(
+                f"eligibility_basis_qualification:{basis.id}",
+                qualification,
+                consequential_to_planning=True,
+            )
+        )
+
+        if qualification.value is TruthValue.TRUE:
             # A researched Basis may still be shown as a factual candidate, but
             # every non-current trust state prevents it from establishing
             # eligibility or unlocking Basis-scoped current guidance.
             selected.append(basis)
             if state != "current":
                 inconclusive.add(basis.id)
-        elif result.value is TruthValue.UNKNOWN:
+        elif qualification.value is TruthValue.UNKNOWN:
             if state in {"stale", "disputed", "unknown"}:
                 # Do not ask users to resolve an UNKNOWN rule that is itself no
                 # longer trustworthy. needs_reverification is different: those
@@ -248,7 +294,8 @@ def _select_bases(
                 # exhaustive alternative set remains deterministic.
                 inconclusive.add(basis.id)
             else:
-                missing.update(result.missing_facts)
+                missing.update(qualification.missing_facts)
+
     return (
         tuple(sorted(selected, key=lambda item: (item.display_order, item.id))),
         frozenset(missing),

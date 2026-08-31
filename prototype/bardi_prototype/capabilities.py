@@ -8,6 +8,13 @@ from .versions import bundles_for_procedure
 
 
 @dataclass(frozen=True)
+class EligibilityBasisCapability:
+    id: str
+    reachability_fact_keys: tuple[str, ...]
+    qualification_fact_keys: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FixtureCapability:
     goal_id: str
     procedure_id: str
@@ -23,6 +30,7 @@ class FixtureCapability:
     claim_attributes: tuple[str, ...]
     eligibility_basis_count: int
     eligibility_basis_states: tuple[str, ...]
+    eligibility_basis_fact_stages: tuple[EligibilityBasisCapability, ...]
     basis_scoped_claim_ids: tuple[str, ...]
     dependency_relations: tuple[str, ...]
     dependency_count: int
@@ -85,6 +93,7 @@ _FIXTURE_NOTES = {
     "temporary_family_exemption_from_military_service": (
         (
             "Eligibility Basis matches are research candidates, not exemption determinations; specialist and authority review remain required.",
+            "Article 7 II-B reachability gates only the currently modeled father sub-route; incapable-brother qualification semantics remain unresolved and are not separately modeled.",
             "Exact Basis-specific document lists are unresolved.",
             "The exemption-certificate fee amount is unknown.",
             "Only researched recruitment-region mappings are modeled; there is no nearest-office ranking.",
@@ -92,6 +101,7 @@ _FIXTURE_NOTES = {
         ),
         (
             "all six Eligibility Bases remain needs_reverification",
+            "Article 7 II-B incapable-brother semantics remain unresolved",
             "mil.documents.basis_specific remains unresolved",
             "mil.fee.current amount remains unknown",
             "the 2026 amendment text uses official Gazette metadata plus a secondary legal-text mirror",
@@ -107,6 +117,18 @@ def _walk(predicate: Predicate | None) -> Iterable[Predicate]:
     for child in predicate.children:
         nodes.extend(_walk(child))
     return tuple(nodes)
+
+
+def _fact_keys(predicate: Predicate | None) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            {
+                node.fact
+                for node in _walk(predicate)
+                if node.fact is not None
+            }
+        )
+    )
 
 
 def _predicates_for_bundle(bundle: KnowledgeBundle) -> tuple[Predicate, ...]:
@@ -125,6 +147,7 @@ def _predicates_for_bundle(bundle: KnowledgeBundle) -> tuple[Predicate, ...]:
         add(item.applicability)
     for item in bundle.eligibility_bases:
         add(item.applicability)
+        add(item.qualification)
     for item in bundle.dependencies:
         add(item.applicability)
         add(item.satisfied_when)
@@ -206,6 +229,28 @@ def _unresolved_evidence(bundles: tuple[KnowledgeBundle, ...]) -> tuple[str, ...
             if source.classification != "official":
                 unresolved.add(f"source:{source.id}:{source.classification}")
     return tuple(sorted(unresolved))
+
+
+def _basis_fact_stages(
+    bundles: tuple[KnowledgeBundle, ...],
+) -> tuple[EligibilityBasisCapability, ...]:
+    stages: dict[str, tuple[set[str], set[str]]] = {}
+    for bundle in bundles:
+        for basis in bundle.eligibility_bases:
+            reachability, qualification = stages.setdefault(
+                basis.id,
+                (set(), set()),
+            )
+            reachability.update(_fact_keys(basis.applicability))
+            qualification.update(_fact_keys(basis.qualification))
+    return tuple(
+        EligibilityBasisCapability(
+            id=basis_id,
+            reachability_fact_keys=tuple(sorted(reachability)),
+            qualification_fact_keys=tuple(sorted(qualification)),
+        )
+        for basis_id, (reachability, qualification) in sorted(stages.items())
+    )
 
 
 def fixture_capability(
@@ -297,6 +342,7 @@ def fixture_capability(
                 }
             )
         ),
+        eligibility_basis_fact_stages=_basis_fact_stages(bundles),
         basis_scoped_claim_ids=tuple(
             sorted(
                 {
@@ -392,6 +438,7 @@ def render_capability_report(catalog: KnowledgeCatalog) -> str:
         "- The same stateless `run_scenario()` seam executes passport renewal, National ID renewal, and military family-exemption research fixtures.",
         "- Omitted Facts remain UNKNOWN; raw Facts and Anonymous Cases do not need to be persisted for deterministic execution.",
         "- Rules use a small typed predicate AST with strong-Kleene three-valued evaluation.",
+        "- Eligibility Basis reachability and qualification are separate stages; an unreachable Basis cannot make qualification-only Facts consequential.",
         "- Real researched fixtures currently establish no direct blocking Procedure dependency; that capability remains generic and synthetic-test-only.",
         "- Service Point identity, versioned material details, and Procedure-Version routing associations remain separate concepts.",
         "- Publication/version state remains separate from item/evidence trust state.",
@@ -430,6 +477,24 @@ def render_capability_report(catalog: KnowledgeCatalog) -> str:
                 f"- Verification/trust states represented: {_csv(capability.verification_states)}",
                 f"- Fee value states represented: {_csv(capability.fee_value_states)}",
                 f"- Source classifications represented: {_csv(capability.source_classifications)}",
+                "",
+                "### Eligibility Basis reachability and qualification Facts",
+                "",
+            ]
+        )
+        if capability.eligibility_basis_fact_stages:
+            for basis in capability.eligibility_basis_fact_stages:
+                lines.extend(
+                    [
+                        f"- `{basis.id}`",
+                        f"  - Reachability: {_csv(basis.reachability_fact_keys)}",
+                        f"  - Qualification: {_csv(basis.qualification_fact_keys)}",
+                    ]
+                )
+        else:
+            lines.append("- None")
+        lines.extend(
+            [
                 "",
                 "### Unresolved evidence / research state",
                 "",

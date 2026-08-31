@@ -20,6 +20,7 @@ def _bundle_rules(bundle: KnowledgeBundle) -> Iterable[Predicate | None]:
     yield bundle.procedure.applicability
     for basis in bundle.eligibility_bases:
         yield basis.applicability
+        yield basis.qualification
     for item in bundle.claims:
         yield item.applicability
     for item in bundle.steps:
@@ -238,6 +239,8 @@ def validate_bundle(
         if basis.id in basis_ids:
             diagnostics.append(f"duplicate_eligibility_basis_id:{basis.id}")
         basis_ids.add(basis.id)
+        if basis.qualification is None:
+            diagnostics.append(f"missing_basis_qualification:{basis.id}")
         if basis.verification_state not in {"current", "needs_reverification", "stale", "disputed", "unknown"}:
             diagnostics.append(f"unsupported_basis_verification_state:{basis.id}")
         for metadata_name in (
@@ -973,6 +976,7 @@ def validate_catalog(catalog: KnowledgeCatalog) -> tuple[str, ...]:
     diagnostics.extend(_blocking_dependency_cycle_diagnostics(catalog))
 
     question_ids: set[str] = set()
+    question_keys_by_goal: dict[str, set[str]] = {}
     for question in catalog.questions:
         if question.id in question_ids:
             diagnostics.append(f"duplicate_question_id:{question.id}")
@@ -987,6 +991,28 @@ def validate_catalog(catalog: KnowledgeCatalog) -> tuple[str, ...]:
         for key in question.resolved_keys:
             if key not in definitions:
                 diagnostics.append(f"unsupported_question_resolved_fact:{key}")
+            question_keys_by_goal.setdefault(question.goal_id, set()).add(key)
+
+    # Reachability and qualification are separate authoring stages, but both
+    # must remain answerable from source Facts when they are consequential.
+    # Derived Facts are excluded because their source Question owns coverage.
+    for fixture in seen_bundles.values():
+        covered = question_keys_by_goal.get(fixture.goal.id, set())
+        for basis in fixture.eligibility_bases:
+            for stage, predicate in (
+                ("reachability", basis.applicability),
+                ("qualification", basis.qualification),
+            ):
+                if predicate is None:
+                    continue
+                for key in sorted(_predicate_fact_keys(predicate)):
+                    definition = definitions.get(key)
+                    if definition is None or definition.derived:
+                        continue
+                    if key not in covered:
+                        diagnostics.append(
+                            f"missing_basis_{stage}_question:{basis.id}:{key}"
+                        )
 
     contradiction_ids: set[str] = set()
     for contradiction in catalog.contradictions:

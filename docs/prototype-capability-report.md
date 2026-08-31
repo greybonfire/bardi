@@ -1,6 +1,6 @@
 # Prototype capability report
 
-This report closes the research-prototype loop for the three evidence-backed Procedures. It records what the fixtures actually require after issues #5–#11; it is **not** a proposed Django model, database schema, API contract, or publication workflow.
+This report closes the research-prototype loop for the three evidence-backed Procedures. It records what the fixtures actually require after issues #5–#12 and the final Eligibility-Basis reachability refinement in #27; it is **not** a proposed Django model, database schema, API contract, or publication workflow.
 
 The structural portions can be reproduced from `prototype.bardi_prototype.capabilities.build_capability_report()`. The caveats below remain deliberately human-authored because they describe evidence limits and product boundaries rather than Python structure.
 
@@ -8,7 +8,7 @@ The structural portions can be reproduced from `prototype.bardi_prototype.capabi
 
 All three researched evidence packs execute through the same stateless `run_scenario()` seam. Identical Goal, Facts, locale, Procedure Version, rules-contract version, and evaluation date produce structurally equal results without storing an Anonymous Case or raw Facts.
 
-The fixture-proven rule language remains small: typed predicates, derived Facts, strong-Kleene TRUE/FALSE/UNKNOWN evaluation, deterministic Questions, explicit contradictions, and local routing uncertainty. Real evidence packs establish no direct blocking Procedure Dependency; direct dependency behavior is therefore a generic capability exercised only by synthetic tests.
+The fixture-proven rule language remains small: typed predicates, derived Facts, strong-Kleene TRUE/FALSE/UNKNOWN evaluation, deterministic Questions, explicit contradictions, and local routing uncertainty. Eligibility Bases add one explicit structural distinction: **reachability/applicability is evaluated before qualification**. A Fact used only by an unreachable Basis cannot become a user Question. Real evidence packs establish no direct blocking Procedure Dependency; direct dependency behavior is therefore a generic capability exercised only by synthetic tests.
 
 ### Do not promote to the production contract
 
@@ -56,6 +56,10 @@ The fixture demonstrates claim classification, applicability, claim-specific Evi
 ### Eligibility Basis behavior
 
 None. Passport renewal has no Eligibility Basis collection.
+
+### Eligibility Basis reachability and qualification Facts
+
+None.
 
 ### Dependencies
 
@@ -112,6 +116,10 @@ The fixture demonstrates claim classification, Evidence Links, verification stat
 ### Eligibility Basis behavior
 
 None. National ID renewal has no Eligibility Basis collection.
+
+### Eligibility Basis reachability and qualification Facts
+
+None.
 
 ### Dependencies
 
@@ -184,7 +192,32 @@ Six researched candidate Bases are evaluated exhaustively:
 5. `family.missing_war_or_terror_relative`
 6. `family.sibling_current_service`
 
+Each Basis now has two explicit stages. Reachability answers whether the route is still relevant enough to investigate; qualification is evaluated only after reachability is TRUE. FALSE reachability skips qualification entirely for Missing-Fact purposes. UNKNOWN reachability can ask only reachability Facts. This prevents an impossible branch from leaking its downstream Facts into the interview.
+
 Every real Basis remains `needs_reverification`. TRUE untrusted Bases may be shown as candidate alternatives and listed in `inconclusive_basis_ids`, but they **cannot unlock Basis-scoped current guidance**. UNKNOWN `needs_reverification` candidates may still drive authored Questions so the researched alternative set can be factually resolved. If all Bases are FALSE, the result is `no_applicable_basis` with an official verification path; the planner never chooses a closest match.
+
+### Eligibility Basis reachability and qualification Facts
+
+- `family.only_son_living_father`
+  - Reachability: `father_alive`
+  - Qualification: `other_living_sons_of_father_count`
+- `family.support_father_or_incapable_brothers`
+  - Reachability: `father_alive`
+  - Qualification: `father_unable_to_earn_status`
+- `family.support_mother`
+  - Reachability: none; this researched candidate has no separate prerequisite gate.
+  - Qualification: `mother_family_status`
+- `family.support_unmarried_sisters`
+  - Reachability: none; this researched candidate has no separate prerequisite gate.
+  - Qualification: `unmarried_sisters_requiring_support_count`
+- `family.missing_war_or_terror_relative`
+  - Reachability: `missing_relative_category`
+  - Qualification: `missing_relative_cause`, `missing_relative_alive_status`, `applicant_largest_eligible_relative_status`
+- `family.sibling_current_service`
+  - Reachability: `sibling_service_status`
+  - Qualification: `applicant_eldest_remaining_brother_status`, `article7_third_exclusion_status`
+
+The Article 7 II-B Basis name still reflects the source wording that mentions the father/incapable-brother area. The explicit `father_alive` gate applies only to the currently modeled father sub-route. The evidence pack does **not** yet establish a precise incapable-brother qualification rule, so the prototype does not invent one merely to make the tree symmetrical.
 
 ### Dependencies
 
@@ -202,11 +235,12 @@ The exemption-certificate fee amount is `unknown`. Exact Basis-specific document
 
 ### Missing Questions
 
-None for the source Facts currently referenced by military Procedure/Basis/routing/contradiction rules. The question catalog covers the exhaustive Basis Fact set plus `residence_governorate`.
+None for the source Facts currently referenced by military Procedure/Basis/routing/contradiction rules. Publication validation separately checks reachability and qualification Fact coverage so a future Basis cannot introduce a consequential source Fact without an authored Question.
 
 ### Unsupported assumptions
 
 - A rule match is not an exemption decision or specialist legal approval.
+- Article 7 II-B incapable-brother qualification semantics remain unresolved; do not infer them from the currently modeled father sub-route.
 - Do not invent exact Basis-specific document lists.
 - Do not invent the certificate fee.
 - Do not infer nationwide routing or nearest-region behavior beyond researched associations.
@@ -214,7 +248,7 @@ None for the source Facts currently referenced by military Procedure/Basis/routi
 
 ## Acceptance-suite coverage
 
-`prototype/tests/test_reproducibility_and_capabilities.py` is the final high-level foundation suite. It adds explicit coverage for:
+`prototype/tests/test_reproducibility_and_capabilities.py` remains the high-level foundation suite. It covers:
 
 - repeated structurally identical runs using an explicit Procedure Version for all three researched Procedures;
 - no mutation or persistence requirement for supplied raw Facts;
@@ -224,4 +258,6 @@ None for the source Facts currently referenced by military Procedure/Basis/routi
 - the military March 24/25 immutable-version edge;
 - deterministic capability introspection and documentation of the one known missing Question (`citizenship`).
 
-The earlier focused suites remain authoritative for detailed typed-rule semantics, traces, trust propagation, dependency cycles, Service Point temporal behavior, bilingual projection, evidence gating, and synthetic supported-edge behavior. Issue #12 does not duplicate those tests or promote their synthetic fixture data into researched guidance.
+`prototype/tests/test_eligibility_basis_reachability.py` is the final structural regression suite. It verifies the father bug that motivated #27, reachability-first questioning, qualification skipping for unreachable father/missing-relative/sibling branches, ungated mother/sister qualification behavior, exhaustive alternatives, editor trace separation, per-Basis capability reporting, and publication-time Question coverage for both stages.
+
+The earlier focused suites remain authoritative for detailed typed-rule semantics, traces, trust propagation, dependency cycles, Service Point temporal behavior, bilingual projection, evidence gating, and synthetic supported-edge behavior. No synthetic fixture data is promoted into researched guidance.

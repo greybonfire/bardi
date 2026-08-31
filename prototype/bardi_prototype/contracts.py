@@ -150,10 +150,11 @@ class VerificationPathDefinition:
 class EligibilityBasisDefinition:
     id: str
     text: LocalizedText
-    applicability: Predicate
+    applicability: Predicate | None
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
     display_order: int
+    qualification: Predicate | None = None
     verified_on: date | None = None
     reverified_on: date | None = None
     effective_from: date | None = None

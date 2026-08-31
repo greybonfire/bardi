@@ -134,6 +134,7 @@ class ReproducibilityAndCapabilityTests(unittest.TestCase):
 
         self.assertEqual(military.eligibility_basis_count, 6)
         self.assertEqual(military.eligibility_basis_states, ("needs_reverification",))
+        self.assertEqual(len(military.eligibility_basis_fact_stages), 6)
         self.assertEqual(len(military.service_point_ids), 3)
         self.assertEqual(military.service_point_association_count, 3)
         self.assertEqual(len(military.procedure_version_ids), 2)
@@ -155,6 +156,7 @@ class ReproducibilityAndCapabilityTests(unittest.TestCase):
         for heading in (
             "Required Facts and Derived Facts",
             "Eligibility Basis behavior",
+            "Eligibility Basis reachability and qualification Facts",
             "Dependencies",
             "Routing",
             "Temporal and trust states",
@@ -296,7 +298,11 @@ class ReproducibilityAndCapabilityTests(unittest.TestCase):
             ),
             (
                 "family.support_father_or_incapable_brothers",
-                {"father_unable_to_earn_status": "authority_documented_unable"},
+                {
+                    "father_alive": True,
+                    "other_living_sons_of_father_count": 1,
+                    "father_unable_to_earn_status": "authority_documented_unable",
+                },
             ),
             (
                 "family.support_mother",

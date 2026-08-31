@@ -19,11 +19,22 @@ run_scenario(
 
 `inspect_scenario()` runs the same pipeline and adds ephemeral editor/research Evaluation Traces. Raw Facts and trace trees remain outside the public `PlanningResult`.
 
-Issues #5–#9 established Procedure selection, typed three-valued evaluation, deterministic missing-Fact questions, contradictions/traces, and bilingual evidence-backed Personalized Plans. Issue #10 completes the administrative route around a selected Procedure with Eligibility Basis alternatives, direct blocking dependencies, and Procedure-specific Service Point routing.
+Issues #5–#9 established Procedure selection, typed three-valued evaluation, deterministic missing-Fact questions, contradictions/traces, and bilingual evidence-backed Personalized Plans. Issue #10 completes the administrative route around a selected Procedure with Eligibility Basis alternatives, direct blocking dependencies, and Procedure-specific Service Point routing. Issue #11 adds immutable date-aware Procedure Versions and local trust behavior. Issue #12 verifies reproducibility and reports fixture capabilities. Issue #27 is the final structural refinement: Eligibility Basis reachability is separate from qualification.
 
 ## Eligibility Bases
 
-A Procedure may define zero or more `EligibilityBasisDefinition` records. When Bases exist, the planner evaluates every authored Basis so it can return all matching alternatives rather than stopping at the first TRUE rule. Consequential UNKNOWN researched candidate branches continue through the existing Missing-Fact Picker.
+A Procedure may define zero or more `EligibilityBasisDefinition` records. Each Basis has two distinct rule stages:
+
+- `applicability`: a reachability gate answering whether this route is still relevant enough to investigate;
+- `qualification`: the rule that determines whether the applicant actually matches the Basis once the route is reachable.
+
+The planner evaluates every authored Basis so it can return all matching alternatives rather than stopping at the first TRUE route. The stage boundary is explicit:
+
+- FALSE reachability makes the Basis unreachable and qualification is not evaluated for Missing-Fact purposes;
+- UNKNOWN reachability can make only reachability Facts consequential;
+- TRUE reachability allows qualification to be evaluated, after which qualification UNKNOWNs may drive the Missing-Fact Picker.
+
+This gives the prototype a hard interview invariant: **a Fact used only by an unreachable Eligibility Basis cannot become a user Question**. Question definitions remain primarily Fact-to-wording mappings; Basis business logic is not duplicated as independent Question-visibility predicates.
 
 Matched Bases are ordered only for deterministic presentation; the planner does not recommend or rank one legal ground over another. Shared claims remain shared. Basis-scoped claims and steps are added only for matched Basis IDs whose calculated trust is current, and they retain their own semantic identities.
 
@@ -31,7 +42,13 @@ A `needs_reverification` Basis may still be resolved factually so the researched
 
 If all authored Bases are FALSE, the top-level result is `no_applicable_basis` with bilingual explanation and an evidence-backed official verification path. The planner does not substitute a closest-match Basis.
 
-The military fixture encodes the six researched family-exemption candidate Bases from its evidence pack. Their `needs_reverification` state remains visible and the product warning still states that a planner match is not an exemption decision. Basis-specific candidate legal claims are not promoted to current authoritative checklist guidance before specialist review.
+The military fixture encodes the six researched family-exemption candidate Bases from its evidence pack. The only-son and currently modeled father-support sub-routes first gate on `father_alive`; missing-relative details are gated by an eligible `missing_relative_category`; and sibling ordering/exclusion details are gated by current qualifying sibling service. Mother-support and unmarried-sister candidates currently have no separate researched prerequisite gate and therefore place their existing rule directly in qualification.
+
+The Article 7 II-B father/incapable-brother wording remains specialist-sensitive. The `father_alive` gate applies only to the currently modeled father sub-route; the prototype does not invent a separate incapable-brother qualification rule. All six Bases retain `needs_reverification`, and the product warning still states that a planner match is not an exemption decision.
+
+Editor traces distinguish `eligibility_basis_reachability:<id>` from `eligibility_basis_qualification:<id>`. When reachability is FALSE, a `eligibility_basis_qualification_skipped_unreachable:<id>` marker records that qualification was deliberately not evaluated.
+
+Catalog validation checks both stages, requires every Basis to have qualification, and requires every non-derived source Fact used by either stage to have an authored Question for the Goal.
 
 ## Direct Procedure Dependencies
 
@@ -79,4 +96,4 @@ From the repository root:
 python -m unittest discover -s prototype/tests -v
 ```
 
-The suite includes the earlier behavior plus issue #10 routing/dependency scenarios and issue #11 scenarios for inclusive version boundaries, future/draft/withdrawn publication states, version-independent Goal selection, historical inspection, local trust propagation, official-versus-field-report conflicts, stale-only historical context, prevention of later-evidence back-projection, and bilingual parity.
+The suite includes the earlier behavior plus issue #10 routing/dependency scenarios, issue #11 version/trust scenarios, issue #12 reproducibility/capability acceptance, and issue #27 reachability/qualification regressions covering conditional Questions, stage-specific traces, exhaustive alternatives, per-Basis capability reporting, and publication-time Question coverage.

@@ -37,7 +37,7 @@ class EligibilityBasisReachabilityTests(unittest.TestCase):
         facts.update(overrides)
         return facts
 
-    def run(self, facts: dict[str, object]):  # type: ignore[override]
+    def _run_scenario(self, facts: dict[str, object]):
         return run_scenario(
             knowledge=self.catalog,
             goal_id=GOAL_ID,
@@ -47,7 +47,7 @@ class EligibilityBasisReachabilityTests(unittest.TestCase):
         )
 
     def test_dead_father_skips_both_father_route_qualification_questions(self) -> None:
-        result = self.run(self.unrelated_false_facts())
+        result = self._run_scenario(self.unrelated_false_facts())
 
         self.assertIsInstance(result, InconclusiveResult)
         self.assertEqual(result.reason_code, "no_applicable_basis")
@@ -82,7 +82,7 @@ class EligibilityBasisReachabilityTests(unittest.TestCase):
         facts = self.unrelated_false_facts()
         del facts["father_alive"]
 
-        result = self.run(facts)
+        result = self._run_scenario(facts)
 
         self.assertIsInstance(result, NextQuestionResult)
         self.assertEqual(result.question_id, "q.mil.father_alive")
@@ -91,36 +91,36 @@ class EligibilityBasisReachabilityTests(unittest.TestCase):
     def test_living_father_unlocks_only_relevant_qualification_facts(self) -> None:
         facts = self.unrelated_false_facts(father_alive=True)
 
-        first = self.run(facts)
+        first = self._run_scenario(facts)
         self.assertIsInstance(first, NextQuestionResult)
         self.assertEqual(first.question_id, "q.mil.other_sons_count")
         self.assertEqual(first.fact_key, "other_living_sons_of_father_count")
 
         facts["other_living_sons_of_father_count"] = 1
-        second = self.run(facts)
+        second = self._run_scenario(facts)
         self.assertIsInstance(second, NextQuestionResult)
         self.assertEqual(second.question_id, "q.mil.father_capacity")
         self.assertEqual(second.fact_key, "father_unable_to_earn_status")
 
     def test_missing_relative_gate_skips_detail_questions_when_no_relative_exists(self) -> None:
-        result = self.run(self.unrelated_false_facts())
+        result = self._run_scenario(self.unrelated_false_facts())
         self.assertIsInstance(result, InconclusiveResult)
         self.assertEqual(result.reason_code, "no_applicable_basis")
 
         reachable = self.unrelated_false_facts(missing_relative_category="citizen")
-        result = self.run(reachable)
+        result = self._run_scenario(reachable)
         self.assertIsInstance(result, NextQuestionResult)
         self.assertEqual(result.question_id, "q.mil.missing_cause")
         self.assertEqual(result.fact_key, "missing_relative_cause")
 
     def test_sibling_service_gate_skips_order_and_exclusion_until_reachable(self) -> None:
-        result = self.run(self.unrelated_false_facts())
+        result = self._run_scenario(self.unrelated_false_facts())
         self.assertIsInstance(result, InconclusiveResult)
 
         reachable = self.unrelated_false_facts(
             sibling_service_status="compulsory_service"
         )
-        result = self.run(reachable)
+        result = self._run_scenario(reachable)
         self.assertIsInstance(result, NextQuestionResult)
         self.assertEqual(result.question_id, "q.mil.eldest_remaining_brother")
         self.assertEqual(
@@ -131,18 +131,18 @@ class EligibilityBasisReachabilityTests(unittest.TestCase):
     def test_ungated_mother_and_sister_bases_still_use_qualification_questions(self) -> None:
         mother_unknown = self.unrelated_false_facts()
         del mother_unknown["mother_family_status"]
-        result = self.run(mother_unknown)
+        result = self._run_scenario(mother_unknown)
         self.assertIsInstance(result, NextQuestionResult)
         self.assertEqual(result.question_id, "q.mil.mother_status")
 
         sister_unknown = self.unrelated_false_facts()
         del sister_unknown["unmarried_sisters_requiring_support_count"]
-        result = self.run(sister_unknown)
+        result = self._run_scenario(sister_unknown)
         self.assertIsInstance(result, NextQuestionResult)
         self.assertEqual(result.question_id, "q.mil.unmarried_sisters")
 
     def test_matching_one_basis_does_not_hide_other_reachable_alternatives(self) -> None:
-        result = self.run(
+        result = self._run_scenario(
             self.unrelated_false_facts(
                 father_alive=True,
                 other_living_sons_of_father_count=0,

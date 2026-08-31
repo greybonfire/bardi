@@ -150,10 +150,11 @@ class VerificationPathDefinition:
 class EligibilityBasisDefinition:
     id: str
     text: LocalizedText
-    applicability: Predicate
+    applicability: Predicate | None
     evidence_link_ids: tuple[str, ...]
     verification_state: VerificationState
     display_order: int
+    qualification: Predicate | None = None
     verified_on: date | None = None
     reverified_on: date | None = None
     effective_from: date | None = None
@@ -163,6 +164,13 @@ class EligibilityBasisDefinition:
     reverification_due_on: date | None = None
 
     def __post_init__(self) -> None:
+        # Compatibility for pre-#27 authored fixtures: one predicate meant
+        # qualification, not a separate reachability gate. Normalize that
+        # shape so old synthetic variants keep their meaning while new real
+        # fixtures can author both stages explicitly.
+        if self.qualification is None and self.applicability is not None:
+            object.__setattr__(self, "qualification", self.applicability)
+            object.__setattr__(self, "applicability", None)
         if self.depends_on_claim_ids and not self.claim_dependencies:
             object.__setattr__(self, "claim_dependencies", self.depends_on_claim_ids)
         if not self.depends_on_claim_ids:

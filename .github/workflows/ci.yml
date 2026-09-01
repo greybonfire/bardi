@@ -115,8 +115,8 @@ jobs:
       - name: Verify migration state
         run: uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 
-      - name: Run production backend tests
-        run: uv run python backend/manage.py test --settings=bardi.settings.test
+      - name: Run all production backend tests
+        run: cd backend && uv run python manage.py test --settings=bardi.settings.test
 
   required:
     name: CI required

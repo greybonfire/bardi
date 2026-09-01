@@ -1,5 +1,7 @@
 # Throwaway planning prototype
 
+> **FROZEN:** This prototype completed its design-pressure-test role on 2026-09-01. It is retained as an executable reference and must not be extended or imported by production code. See [`FROZEN.md`](FROZEN.md).
+
 This directory implements the research prototype from issues #5 onward. It is intentionally framework-independent and must not be treated as production backend code or imported into a future Django application.
 
 ## Application seams

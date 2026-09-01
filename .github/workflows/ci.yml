@@ -29,10 +29,10 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -45,15 +45,93 @@ jobs:
       - name: Run prototype unit tests
         run: python -m unittest discover -s prototype/tests -v
 
+  production:
+    name: Production backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      POSTGRES_DB: bardi_ci
+      POSTGRES_USER: bardi_ci
+      POSTGRES_PASSWORD: bardi-ci-postgres-password-only
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: "5432"
+      DJANGO_SECRET_KEY: ci-only-strong-django-secret-key-9f5e3d2c1b7a6e4d8c0f
+      DJANGO_DEBUG: "0"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+      CSRF_TRUSTED_ORIGINS: https://ci.example.test
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: bardi_ci
+          POSTGRES_USER: bardi_ci
+          POSTGRES_PASSWORD: bardi-ci-postgres-password-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bardi_ci -d bardi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --locked --extra dev
+
+      - name: Lint production backend
+        run: uv run ruff check backend
+
+      - name: Check production formatting
+        run: uv run ruff format --check backend
+
+      - name: Type-check production backend
+        run: uv run mypy backend
+
+      - name: Compile project Python
+        run: uv run python -m compileall -q backend prototype
+
+      - name: Run Django deploy checks
+        run: uv run python backend/manage.py check --deploy --settings=bardi.settings.production
+
+      - name: Check migrations are current
+        run: uv run python backend/manage.py makemigrations --check --dry-run --settings=bardi.settings.test
+
+      - name: Apply migrations
+        run: uv run python backend/manage.py migrate --noinput --settings=bardi.settings.test
+
+      - name: Verify migration state
+        run: uv run python backend/manage.py migrate --check --settings=bardi.settings.test
+
+      - name: Run all production backend tests
+        run: cd backend && uv run python manage.py test --settings=bardi.settings.test
+
   required:
     name: CI required
-    needs: test
+    needs:
+      - test
+      - production
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
     steps:
-      - name: Verify test matrix passed
+      - name: Verify prototype and production tracks passed
         env:
-          TEST_RESULT: ${{ needs.test.result }}
-        run: test "$TEST_RESULT" = "success"
+          PROTOTYPE_RESULT: ${{ needs.test.result }}
+          PRODUCTION_RESULT: ${{ needs.production.result }}
+        run: |
+          test "$PROTOTYPE_RESULT" = "success"
+          test "$PRODUCTION_RESULT" = "success"

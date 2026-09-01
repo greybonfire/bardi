@@ -2,6 +2,12 @@
 
 Bardi is transitioning from a completed research prototype to a production implementation.
 
+## Production backend scaffold
+
+The initial Django/PostgreSQL production backend scaffold provides environment-specific
+settings, Django Admin/authentication, reproducible uv tooling, and PostgreSQL-backed
+checks. See [`docs/development.md`](docs/development.md) for local setup and validation.
+
 ## Production design
 
 The authoritative production design starts at [`docs/architecture/README.md`](docs/architecture/README.md). Accepted architectural decisions are recorded in [`docs/adr/`](docs/adr/).

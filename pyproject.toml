@@ -1,0 +1,48 @@
+[project]
+name = "bardi"
+version = "0.1.0"
+description = "Bardi production backend and frozen research prototype"
+requires-python = ">=3.11"
+dependencies = [
+    "Django>=5.2,<5.3",
+    "django-ninja>=1.4,<2",
+    "psycopg[binary]>=3.2,<4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.11,<1",
+    "mypy>=1.15,<2",
+    "django-stubs[compatible-mypy]>=5.2,<5.3",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+include = ["backend/**/*.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+mypy_path = "backend"
+files = ["backend"]
+plugins = ["mypy_django_plugin.main"]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_unused_configs = true
+warn_unreachable = true
+warn_return_any = true
+exclude = ["backend/.*/migrations/.*\\.py$"]
+
+[tool.django-stubs]
+django_settings_module = "bardi.settings.development"

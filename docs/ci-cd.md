@@ -1,35 +1,37 @@
 # CI/CD
 
-The repository uses GitHub Actions for continuous integration and conservative continuous delivery of the framework-independent prototype.
+The repository uses GitHub Actions for continuous integration and conservative continuous
+delivery of the framework-independent prototype.
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs on:
+`.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual
+`workflow_dispatch` runs. It has two deliberately separate tracks:
 
-- every pull request;
-- every push to `main`;
-- manual `workflow_dispatch` runs.
+- The frozen prototype matrix remains unchanged on Python 3.11, 3.12, and 3.13. Each
+  version byte-compiles `prototype/` and runs the complete unittest suite.
+- A separate Python 3.13 production-backend job runs against PostgreSQL 17. It installs
+  only from the committed `uv.lock`, then runs Ruff, Mypy, compile checks, Django deploy
+  checks, migration consistency checks, and the built-in Admin/auth and PostgreSQL-backed
+  test suite. The production import-boundary test ensures backend code cannot import the
+  frozen prototype.
 
-The workflow uses Ubuntu and tests Python 3.11, 3.12, and 3.13. Each matrix job:
+The final `CI required` job depends on both tracks and succeeds only when both dependency
+results are exactly `success`. This stable aggregate name is the branch-protection check;
+it does not weaken or replace frozen prototype coverage.
 
-1. checks out the repository;
-2. installs the selected Python interpreter;
-3. byte-compiles the `prototype/` tree;
-4. runs the complete unittest suite with:
+The workflow uses read-only repository permissions. CI supplies explicit test-only
+PostgreSQL credentials, a strong Django secret, allowed hosts, and a valid HTTPS CSRF
+origin. No production credentials are committed.
 
-   ```bash
-   python -m unittest discover -s prototype/tests -v
-   ```
-
-A final `CI required` job depends on the complete matrix and succeeds only when every matrix job succeeds. This gives branch protection one stable required-check name even if the Python matrix changes later.
-
-The workflow needs no repository secrets and has read-only repository permissions.
-
-After this workflow is merged and has produced a successful `CI required` check, protect `main` and require `CI required` before merge.
+After this workflow is merged and has produced a successful `CI required` check, protect
+`main` and require `CI required` before merge.
 
 ## Continuous delivery
 
-There is no production application or hosting target yet, so the repository does not pretend to deploy one. Instead, `.github/workflows/release.yml` provides a release-only delivery boundary for immutable prototype snapshots.
+Release automation remains prototype-only. There is no production application deployment
+in this issue. `.github/workflows/release.yml` provides a release-only delivery boundary
+for immutable prototype snapshots and is unchanged by the backend scaffold.
 
 The release workflow runs only when a tag matching `prototype-v*` is pushed. For example:
 
@@ -38,20 +40,11 @@ git tag prototype-v0.1.0
 git push origin prototype-v0.1.0
 ```
 
-Before publishing anything, the workflow:
+Before publishing anything, it checks out the tagged commit, uses Python 3.12, compiles
+the prototype, reruns its complete unittest suite, packages `README.md`, `CONTEXT.md`,
+`docs/`, and `prototype/`, and publishes the archive and SHA-256 checksum on a GitHub
+Release using the existing tag.
 
-1. checks out the tagged commit;
-2. uses Python 3.12;
-3. byte-compiles the prototype;
-4. reruns the complete unittest suite;
-5. creates `bardi-<tag>.tar.gz` containing `README.md`, `CONTEXT.md`, `docs/`, and `prototype/`;
-6. creates a SHA-256 checksum;
-7. creates a GitHub Release from the existing tag and attaches both files.
-
-The release job uses only the automatically provided `GITHUB_TOKEN` with `contents: write`. No external deployment credentials are required.
-
-## Future production deployment
-
-When the Django/PostgreSQL backend and deployable frontend actually exist, add deployment jobs behind an explicit GitHub Environment such as `staging` or `production`. Keep environment credentials scoped to that environment and preserve the same rule: tests must pass before deployment.
-
-Do not overload the prototype release workflow with infrastructure assumptions before a deployment target is selected.
+When a deployable Django/Next.js application and hosting target exist, deployment jobs
+can be added behind an explicit GitHub Environment. Issue #31 introduces no backend
+deployment assumptions or credentials.

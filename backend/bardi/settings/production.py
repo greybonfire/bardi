@@ -1,0 +1,20 @@
+"""Fail-closed production settings."""
+
+# ruff: noqa: F403,F405
+from .base import *
+
+SECRET_KEY = required_env("DJANGO_SECRET_KEY")
+DEBUG = False
+ALLOWED_HOSTS = required_env_list("DJANGO_ALLOWED_HOSTS")
+CSRF_TRUSTED_ORIGINS = required_env_list("CSRF_TRUSTED_ORIGINS")
+DATABASES = {"default": postgres_database()}
+
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SECURE_HSTS_SECONDS = 31_536_000
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_HSTS_PRELOAD = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"

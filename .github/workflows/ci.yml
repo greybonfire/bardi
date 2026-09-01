@@ -89,7 +89,7 @@ jobs:
           enable-cache: true
 
       - name: Install locked dependencies
-        run: uv sync --frozen --extra dev
+        run: uv sync --locked --extra dev
 
       - name: Lint production backend
         run: uv run ruff check backend

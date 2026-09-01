@@ -29,13 +29,26 @@ Authored rules are data, not code. The `v1` operator vocabulary is:
 - leaf: `eq`, `in`, `lt`, `lte`, `gt`, `gte`, `exists`;
 - boolean: `all`, `any`, `not`.
 
-`lt/lte/gt/gte` are valid only for ordered Fact kinds supported by the contract, initially integer and date. `in` requires a non-empty collection of valid literals. `all` and `any` must be non-empty. `not` has exactly one child.
+The serialized JSON/JSONB contract is sparse and operator-specific. No other fields are allowed:
+
+```text
+{"op": "eq|lt|lte|gt|gte", "fact": "<key>", "value": <literal>}
+{"op": "in", "fact": "<key>", "value": [<literal>, ...]}
+{"op": "exists", "fact": "<key>"}
+{"op": "all|any|not", "children": [<node>, ...]}
+```
+
+Every node is an object and every child collection and `in` collection is a JSON array. Explicit nulls, missing required fields, unknown or irrelevant fields, executable forms, callbacks, named-rule references, and query objects are invalid. `lt/lte/gt/gte` support only integer and date Facts. `in`, `all`, and `any` require non-empty arrays; `not` requires exactly one child.
+
+A date literal in a serialized rule has exactly the tagged shape `{"$date": "YYYY-MM-DD"}`. The value must be a valid, canonical, zero-padded Gregorian date and is decoded only for a date Fact. This storage-boundary decoding does not permit date-string coercion in submitted Facts: Fact input requires an actual typed calendar `date`.
 
 `exists` tests whether a **source Fact key was submitted**. It does not test truthiness, non-empty value, or real-world existence inferred from another Fact.
 
-Rules may not contain executable text, callbacks, named-rule references, database queries, network calls, or hidden side effects.
+Version 1 accepts at most **128 predicate nodes**, including the root, and at most **128 operands** in an `in` array. The 129th node produces `rule_too_large`; an oversized `in` produces an invalid-operand diagnostic without decoding entries beyond the limit. These are fixed non-semantic resource guards.
 
-The prototype validated a maximum of 128 nodes per rule; production `v1` must preserve an equivalent or stricter non-semantic resource guard without changing valid rule meaning.
+Validation diagnostics have the structured shape `{"code": <string>, "path": <segments>}`. In Python the path is an immutable tuple of string or integer segments. Fact paths begin `("facts", key)`. Rule paths begin `("rule",)`, child paths append `("children", index)`, and field or operand paths append the field name and, for an individual `in` value, its index. Diagnostics are deterministic, retain equal codes at distinct paths, and are deduplicated only when both code and path are identical.
+
+Malformed serialized ASTs never produce a typed `Predicate`. This milestone validates and decodes rules only; it does not evaluate rules, derive Facts, or produce truth values.
 
 ## Three-valued evaluation
 

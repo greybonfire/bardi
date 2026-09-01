@@ -36,6 +36,14 @@ until the production ingress topology is selected and hardened under issue #54.
 
 Run the production scaffold checks with a running PostgreSQL service:
 
+The planning validation domain has a database-free fast suite:
+
+```bash
+(cd backend && uv run python -m unittest discover -s planning/tests -v)
+```
+
+Run the complete checks with PostgreSQL available:
+
 ```bash
 uv run ruff check backend
 uv run ruff format --check backend

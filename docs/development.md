@@ -45,13 +45,14 @@ uv run python backend/manage.py check --settings=bardi.settings.development
 uv run python backend/manage.py makemigrations --check --dry-run --settings=bardi.settings.test
 uv run python backend/manage.py migrate --noinput --settings=bardi.settings.test
 uv run python backend/manage.py migrate --check --settings=bardi.settings.test
-uv run python backend/manage.py test --settings=bardi.settings.test
+(cd backend && uv run python manage.py test --settings=bardi.settings.test)
 python -m unittest discover -s prototype/tests -v
 ```
 
-Django test discovery intentionally runs without an app label so future production apps
-are covered automatically. The prototype commands are retained as frozen reference coverage
-and are intentionally not included in the production Ruff or Mypy scope.
+Django test discovery intentionally runs without an app label **from the `backend/`
+directory** so it discovers the current tests and automatically includes future production
+apps. The prototype commands are retained as frozen reference coverage and are intentionally
+not included in the production Ruff or Mypy scope.
 
 ## Teardown
 

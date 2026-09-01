@@ -13,7 +13,7 @@ cp .env.example .env
 set -a
 . ./.env
 set +a
-uv sync --frozen --extra dev
+uv sync --locked --extra dev
 docker compose up -d postgres
 uv run python backend/manage.py migrate --settings=bardi.settings.development
 uv run python backend/manage.py createsuperuser --settings=bardi.settings.development

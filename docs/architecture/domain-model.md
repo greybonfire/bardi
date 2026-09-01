@@ -9,7 +9,7 @@ This document defines semantic ownership and identity. It is not a literal Djang
 
 ### Goal
 
-A stable bilingual user-entry grouping of closely related Procedures around one broad administrative objective. A Goal owns catalog/navigation membership and authored Questions used while planning that Goal. It does not own Procedure-specific requirements, fees, steps, routing, evidence, or legal Bases.
+A stable bilingual user-entry grouping of closely related Procedures around one broad administrative objective. A Goal owns catalog/navigation membership, authored Questions, and contradiction/case-invariant definitions used while planning that Goal. It does not own Procedure-specific requirements, fees, steps, routing, evidence, or legal Bases.
 
 ### Procedure
 
@@ -30,6 +30,14 @@ Source Facts are supplied by the caller. Derived Facts are computed deterministi
 A bilingual Goal-owned prompt that resolves one source Fact (or an explicitly declared small set when one answer deterministically supplies the same source information). Question wording contains no administrative conclusion. Questions are available before Procedure selection, so they are not owned exclusively by a Procedure Version.
 
 The Missing-Fact Picker determines whether a Question is needed; Question records do not duplicate business-rule visibility conditions.
+
+### Contradiction / case invariant
+
+A Goal-owned catalog rule that identifies a combination of circumstances that cannot coherently describe one case. It has a stable identifier, the source-Fact keys that should be named in a public correction diagnostic, and a validated typed predicate that becomes invalid only when it evaluates TRUE.
+
+Contradiction definitions live at Goal level because they may reject an incoherent case before a concrete Procedure has been selected. They are not Procedure-Version guidance and do not create administrative conclusions.
+
+UNKNOWN contradiction conditions do not drive the Missing-Fact Picker. A contradiction check only rejects an already-submitted case when the invariant is established as TRUE; missing information remains ordinary UNKNOWN planning input.
 
 ### Authority
 

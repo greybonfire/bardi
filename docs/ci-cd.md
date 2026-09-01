@@ -11,10 +11,10 @@ delivery of the framework-independent prototype.
 - The frozen prototype matrix remains unchanged on Python 3.11, 3.12, and 3.13. Each
   version byte-compiles `prototype/` and runs the complete unittest suite.
 - A separate Python 3.13 production-backend job runs against PostgreSQL 17. It installs
-  only from the committed `uv.lock`, then runs Ruff, Mypy, compile checks, Django deploy
-  checks, migration consistency checks, and the built-in Admin/auth and PostgreSQL-backed
-  test suite. The production import-boundary test ensures backend code cannot import the
-  frozen prototype.
+  only from the committed `uv.lock`, then runs Ruff lint and format checks, Mypy, compile
+  checks, Django deploy checks, migration consistency checks, and whole-project
+  PostgreSQL-backed Django test discovery. The production import-boundary test ensures
+  backend code cannot import the frozen prototype.
 
 The final `CI required` job depends on both tracks and succeeds only when both dependency
 results are exactly `success`. This stable aggregate name is the branch-protection check;
@@ -31,7 +31,8 @@ After this workflow is merged and has produced a successful `CI required` check,
 
 Release automation remains prototype-only. There is no production application deployment
 in this issue. `.github/workflows/release.yml` provides a release-only delivery boundary
-for immutable prototype snapshots and is unchanged by the backend scaffold.
+for immutable prototype snapshots; its checkout/runtime action versions are kept current,
+but its release behavior is unchanged by the backend scaffold.
 
 The release workflow runs only when a tag matching `prototype-v*` is pushed. For example:
 

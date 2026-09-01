@@ -70,13 +70,17 @@ class SettingsTests(SimpleTestCase):
         self.assertTrue(settings.SECRET_KEY)
         self.assertTrue({"testserver", "localhost", "127.0.0.1"}.issubset(settings.ALLOWED_HOSTS))
 
-    def test_production_security_settings_are_enabled(self) -> None:
+    def test_production_security_baseline_defers_transport_topology(self) -> None:
         production = _production_settings()
 
         self.assertFalse(production.DEBUG)
-        self.assertTrue(production.SECURE_SSL_REDIRECT)
         self.assertTrue(production.SESSION_COOKIE_SECURE)
         self.assertTrue(production.CSRF_COOKIE_SECURE)
-        self.assertGreater(production.SECURE_HSTS_SECONDS, 0)
-        self.assertTrue(production.SECURE_HSTS_INCLUDE_SUBDOMAINS)
-        self.assertTrue(production.SECURE_HSTS_PRELOAD)
+        self.assertTrue(production.SECURE_CONTENT_TYPE_NOSNIFF)
+        self.assertEqual(production.SECURE_REFERRER_POLICY, "same-origin")
+        self.assertEqual(production.X_FRAME_OPTIONS, "DENY")
+
+        self.assertFalse(production.SECURE_SSL_REDIRECT)
+        self.assertEqual(production.SECURE_HSTS_SECONDS, 0)
+        self.assertFalse(production.SECURE_HSTS_INCLUDE_SUBDOMAINS)
+        self.assertFalse(production.SECURE_HSTS_PRELOAD)

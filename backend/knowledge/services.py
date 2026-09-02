@@ -1,4 +1,4 @@
-"""Transactional operations for catalog relationships."""
+"""Transactional aggregate operations for catalog relationships."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from collections.abc import Iterable
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
+from .aggregate_guard import allow_aggregate_relation_mutation
 from .domain import decode_stored_rule, diagnostic_messages, referenced_fact_keys
 from .models import (
     FactDefinition,
@@ -45,11 +46,12 @@ def set_question_resolved_facts(
     if values and question.fact_id not in {fact.pk for fact in values}:
         raise ValidationError("Explicit resolved Facts must include the primary Fact.")
     # Validation precedes replacement so a rejected proposal cannot destroy current rows.
-    question.resolved_fact_links.all().delete()
-    GoalQuestionResolvedFact.objects.bulk_create(
-        GoalQuestionResolvedFact(question=question, fact=fact, position=index)
-        for index, fact in enumerate(values, start=1)
-    )
+    with allow_aggregate_relation_mutation():
+        question.resolved_fact_links.all().delete()
+        GoalQuestionResolvedFact.objects.bulk_create(
+            GoalQuestionResolvedFact(question=question, fact=fact, position=index)
+            for index, fact in enumerate(values, start=1)
+        )
     question.full_clean(exclude=("resolves_facts",))
     return question
 
@@ -72,11 +74,12 @@ def set_contradiction_facts(
     contradiction.clean_fields(exclude=("facts",))
     contradiction.validate_unique()
     contradiction.validate_constraints()
-    contradiction.fact_links.all().delete()
-    GoalContradictionFact.objects.bulk_create(
-        GoalContradictionFact(contradiction=contradiction, fact=fact, position=index)
-        for index, fact in enumerate(values, start=1)
-    )
+    with allow_aggregate_relation_mutation():
+        contradiction.fact_links.all().delete()
+        GoalContradictionFact.objects.bulk_create(
+            GoalContradictionFact(contradiction=contradiction, fact=fact, position=index)
+            for index, fact in enumerate(values, start=1)
+        )
     contradiction.full_clean(exclude=("facts",))
     return contradiction
 

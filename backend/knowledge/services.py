@@ -85,7 +85,7 @@ def set_contradiction_facts(
 
 
 def validate_core_catalog() -> None:
-    from .models import FactDefinition, Service, Procedure
+    from .models import FactDefinition, Procedure, Service
 
     for model in (
         Service,

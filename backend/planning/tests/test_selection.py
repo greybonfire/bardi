@@ -174,6 +174,14 @@ class SelectionTests(unittest.TestCase):
             ("missing_source_dependencies:derived",),
         )
 
+    def test_prepared_facts_and_selector_document_the_trusted_boundary(self) -> None:
+        prepared_doc = PreparedFacts.__doc__ or ""
+        selector_doc = select_procedure.__doc__ or ""
+        self.assertIn("Trusted internal handoff", prepared_doc)
+        self.assertIn("must not be\n    constructed directly from raw request Facts", prepared_doc)
+        self.assertIn("trusted internal handoff", selector_doc)
+        self.assertIn("issue #38", selector_doc)
+
     def test_inputs_and_public_collections_are_defensively_immutable(self) -> None:
         values = {"a": True}
         dependencies = {"derived": frozenset({"a"})}

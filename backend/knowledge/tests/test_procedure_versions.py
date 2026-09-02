@@ -125,6 +125,48 @@ class ProcedureVersionTests(TestCase):
                 self.assertIsNone(draft.published_at)
                 self.assertFalse(draft.audit_events.exists())
 
+    def test_unpublished_fact_dependency_rejects_publication(self) -> None:
+        fact = FactDefinition.objects.create(
+            key="versions.unpublished_dependency", kind=FactDefinition.Kind.BOOLEAN
+        )
+        draft = self.draft(
+            "versions.unpublished-fact",
+            applicability={"op": "eq", "fact": fact.key, "value": True},
+        )
+
+        with self.assertRaises(PublicationRejected) as caught:
+            publish_procedure_version(draft.pk, actor=self.actor)
+
+        self.assertIn(
+            f"unsupported_rule_fact:{fact.key}",
+            {item.code for item in caught.exception.diagnostics},
+        )
+        draft.refresh_from_db()
+        self.assertEqual(draft.state, ProcedureVersion.State.DRAFT)
+        self.assertIsNone(draft.published_at)
+        self.assertFalse(draft.audit_events.exists())
+
+    def test_published_fact_dependency_allows_publication_and_is_immutable(self) -> None:
+        fact = FactDefinition.objects.create(
+            key="versions.published_dependency", kind=FactDefinition.Kind.BOOLEAN
+        )
+        fact.is_published = True
+        fact.save()
+        draft = self.draft(
+            "versions.published-fact",
+            applicability={"op": "eq", "fact": fact.key, "value": True},
+        )
+
+        published = publish_procedure_version(draft.pk, actor=self.actor)
+
+        self.assertEqual(published.state, ProcedureVersion.State.PUBLISHED)
+        self.assertEqual(published.published_by, self.actor)
+        fact.kind = FactDefinition.Kind.STRING
+        with self.assertRaises(ValidationError):
+            fact.save()
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            FactDefinition.objects.filter(pk=fact.pk).update(kind=FactDefinition.Kind.STRING)
+
     def test_non_user_actor_is_rejected_even_when_its_primary_key_matches_a_user(self) -> None:
         draft = self.draft()
         with self.assertRaises(PublicationRejected) as caught:

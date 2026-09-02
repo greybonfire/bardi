@@ -29,8 +29,8 @@ A transient explanation of predicate results and whether each branch affected th
 _Avoid_: Application log, error stack, public response
 
 **Service**:  
-A stable bilingual grouping of closely related Procedures around a broad administrative objective, such as getting a passport, obtaining a National ID, or handling military paperwork. It is the user entry point and owns the curated Procedure candidate set and Service Questions. It is not a government transaction and does not own Procedure-specific requirements, fees, steps, routing, evidence, or Eligibility Bases.
-_Avoid_: Procedure, government transaction, rule bundle
+A stable bilingual grouping of closely related Procedures around a broad administrative objective, such as passport services, National ID services, or military paperwork. It is the user entry point and owns the curated Procedure candidate set and Service Questions. The preferred Arabic product/domain label is **خدمة**. A Service is not itself a concrete government transaction and does not own Procedure-specific requirements, fees, steps, routing, evidence, or Eligibility Bases.
+_Avoid_: Procedure, government transaction, Service Point, rule bundle
 
 **Procedure**:  
 A stable identity for one concrete administrative transaction and output. First passport issuance, ordinary renewal, lost-passport replacement, and damaged-passport replacement are separate Procedures that may belong to the same Service.

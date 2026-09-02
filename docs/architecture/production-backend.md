@@ -113,7 +113,7 @@ The backend requires:
 
 A production implementation is not considered semantically complete merely because its ORM and endpoints work; it must reproduce the intended planning behavior captured by the authoritative rules contract and acceptance scenarios.
 
-## Explicit non-services for the first backend milestone
+## Explicit exclusions for the first backend milestone
 
 - microservices;
 - event sourcing;

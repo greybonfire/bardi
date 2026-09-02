@@ -70,7 +70,9 @@ class Procedure(models.Model):
         _required(self.text_ar, "text_ar")
         _required(self.text_en, "text_en")
         if self.pk and self.primary_service_id:
-            incompatible = self.service_candidates.exclude(service_id=self.primary_service_id).exists()
+            incompatible = self.service_candidates.exclude(
+                service_id=self.primary_service_id
+            ).exists()
             if incompatible:
                 raise ValidationError(
                     {"primary_service": "Existing candidates belong to a different Service."}
@@ -188,7 +190,9 @@ class FactDefinition(models.Model):
 
 
 class ServiceProcedureCandidate(models.Model):
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="procedure_candidates")
+    service = models.ForeignKey(
+        Service, on_delete=models.CASCADE, related_name="procedure_candidates"
+    )
     procedure = models.ForeignKey(
         Procedure, on_delete=models.CASCADE, related_name="service_candidates"
     )
@@ -203,7 +207,11 @@ class ServiceProcedureCandidate(models.Model):
         indexes = [models.Index(fields=("service", "procedure"), name="candidate_service_proc_idx")]
 
     def clean(self) -> None:
-        if self.service_id and self.procedure_id and self.service_id != self.procedure.primary_service_id:
+        if (
+            self.service_id
+            and self.procedure_id
+            and self.service_id != self.procedure.primary_service_id
+        ):
             raise ValidationError(
                 {"procedure": "Procedure primary Service must match the candidate Service."}
             )
@@ -318,8 +326,10 @@ class ServiceContradiction(models.Model):
     semantic_id = models.CharField(max_length=128, unique=True)
     service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="contradictions")
     condition = models.JSONField()
-    facts: models.ManyToManyField[FactDefinition, ServiceContradictionFact] = models.ManyToManyField(
-        FactDefinition, through="ServiceContradictionFact", related_name="contradictions"
+    facts: models.ManyToManyField[FactDefinition, ServiceContradictionFact] = (
+        models.ManyToManyField(
+            FactDefinition, through="ServiceContradictionFact", related_name="contradictions"
+        )
     )
 
     class Meta:

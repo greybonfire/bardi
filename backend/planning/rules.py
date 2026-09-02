@@ -31,6 +31,29 @@ class Predicate:
     children: tuple[Predicate, ...] = ()
 
 
+def serialize_rule_v1(predicate: Predicate) -> dict[str, object]:
+    """Serialize a decoded predicate to the exact JSON-compatible v1 shape."""
+
+    if predicate.op in BOOLEAN_OPERATORS:
+        return {
+            "op": predicate.op,
+            "children": [serialize_rule_v1(child) for child in predicate.children],
+        }
+    result: dict[str, object] = {"op": predicate.op, "fact": predicate.fact}
+    if predicate.op == "exists":
+        return result
+
+    def encode(value: FactValue) -> object:
+        return {"$date": value.isoformat()} if isinstance(value, date) else value
+
+    if predicate.op == "in":
+        values = cast(tuple[FactValue, ...], predicate.value)
+        result["value"] = [encode(value) for value in values]
+    else:
+        result["value"] = encode(cast(FactValue, predicate.value))
+    return result
+
+
 @dataclass(frozen=True, slots=True)
 class RuleValidationResult:
     predicate: Predicate | None

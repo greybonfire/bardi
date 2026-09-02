@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 from django.db import DatabaseError
 from django.http import HttpRequest
 from knowledge.domain import KnowledgeSnapshotLoadError
@@ -27,14 +25,10 @@ class PrivacySafeParser(Parser):
         try:
             parsed = super().parse_body(request)
         except (ValueError, UnicodeDecodeError) as exc:
-            raise ValidationError(
-                [{"loc": ("body",), "type": "invalid_json", "msg": "invalid_json"}]
-            ) from exc
+            raise HttpError(400, "invalid_body") from exc
         if not isinstance(parsed, dict):
-            raise ValidationError(
-                [{"loc": ("body",), "type": "object_required", "msg": "object_required"}]
-            )
-        return cast(dict[str, object], parsed)
+            raise HttpError(400, "invalid_body")
+        return parsed
 
 
 api = NinjaAPI(
@@ -42,7 +36,12 @@ api = NinjaAPI(
     version="1.0.0",
     urls_namespace="bardi-v1",
     parser=PrivacySafeParser(),
-    description="Stateless planning API. The plan variant is reserved until issue #38.",
+    description=(
+        "Stateless planning API. The plan variant is reserved and remains unreachable until "
+        "later planning work implements Procedure-Version applicability and plan assembly. "
+        "Issue #38 is limited to deterministic Fact derivation, contradiction handling, "
+        "public contradiction diagnostics, and their ordering before Procedure selection."
+    ),
 )
 
 

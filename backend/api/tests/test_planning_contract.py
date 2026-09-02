@@ -59,6 +59,17 @@ class PlanningHttpContractTests(SimpleTestCase):
             )
         )
 
+    def test_non_object_json_uses_sanitized_http_400(self) -> None:
+        response = self.client.post("/v1/planning", data="[]", content_type="application/json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            response.json(),
+            {
+                "type": "invalid",
+                "diagnostics": [{"code": "invalid_body", "path": ["body"]}],
+            },
+        )
+
     def test_malformed_json_uses_the_invalid_discriminator_without_echoing_input(self) -> None:
         secret = "DISTINCTIVE-MALFORMED-SECRET"
         response = self.client.post(
@@ -184,6 +195,51 @@ class ReachableResultFamilyTests(TransactionTestCase):
         self.assertEqual(no_match.json()["reason"], "no_matching_researched_procedure")
         self.assertEqual(self.post(service_id="missing").json()["reason"], "unknown_service")
 
+    def test_unpublished_submitted_fact_is_unsupported_until_published(self) -> None:
+        hidden = FactDefinition.objects.create(
+            key="contract.hidden.submitted", kind=FactDefinition.Kind.BOOLEAN
+        )
+        unpublished = self.post(facts={hidden.key: True})
+        self.assertEqual(unpublished.status_code, 200)
+        self.assertEqual(
+            unpublished.json(),
+            {
+                "type": "invalid",
+                "diagnostics": [{"code": "unsupported_fact_key", "path": ["facts", hidden.key]}],
+            },
+        )
+
+        hidden.is_published = True
+        hidden.save()
+        published = self.post(facts={"is_student": True, hidden.key: True})
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(published.json()["reason"], "no_published_version")
+
+    def test_active_candidate_with_unpublished_fact_fails_closed_until_published(self) -> None:
+        hidden = FactDefinition.objects.create(
+            key="contract.hidden.candidate", kind=FactDefinition.Kind.BOOLEAN
+        )
+        ServiceProcedureCandidate.objects.filter(service=self.service).update(
+            selection_predicate={"op": "eq", "fact": hidden.key, "value": True}
+        )
+
+        unpublished = self.post(facts={hidden.key: True})
+        self.assertEqual(unpublished.status_code, 500)
+        self.assertEqual(
+            unpublished.json(),
+            {
+                "type": "invalid",
+                "diagnostics": [{"code": "knowledge_snapshot_invalid", "path": []}],
+            },
+        )
+        self.assertNotIn(hidden.key, unpublished.content.decode())
+
+        hidden.is_published = True
+        hidden.save()
+        published = self.post(facts={hidden.key: True})
+        self.assertEqual(published.status_code, 200)
+        self.assertEqual(published.json()["reason"], "no_published_version")
+
     def test_unresolved_and_resolved_version_staged_boundaries(self) -> None:
         unresolved = self.post(facts={"is_student": True})
         self.assertEqual(unresolved.json()["reason"], "no_published_version")
@@ -212,7 +268,13 @@ class ReachableResultFamilyTests(TransactionTestCase):
 
         FactDefinition.objects.get_or_create(
             key="age_years_on_evaluation_date",
-            defaults={"kind": "integer", "enum_values": [], "minimum": 0, "derived": True},
+            defaults={
+                "kind": "integer",
+                "enum_values": [],
+                "minimum": 0,
+                "derived": True,
+                "is_published": True,
+            },
         )
         derived_service = Service.objects.create(
             semantic_id="contract.derived",

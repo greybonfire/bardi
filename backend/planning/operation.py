@@ -49,7 +49,7 @@ def _configuration_invalid() -> InvalidResult:
 
 
 def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -> PlanningResult:
-    """Plan deterministically from detached values, stopping at every unfinished #38 seam."""
+    """Plan from detached values, stopping at each not-yet-implemented planning stage."""
 
     service = next(
         (item for item in snapshot.services if item.semantic_id == planning_input.service_id), None
@@ -104,5 +104,6 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     if not isinstance(resolution, ProcedureVersionResolved):
         return InconclusiveResult(resolution.reason_code)
 
-    # Applicability and actual plan assembly are intentionally owned by #38.
+    # Procedure-Version applicability and plan assembly belong to later planning work,
+    # after #38's case-preparation stage.
     return InconclusiveResult("plan_assembly_unavailable")

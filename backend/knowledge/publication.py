@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
+from types import MappingProxyType
 from typing import Protocol, cast
 
 from django.conf import settings
@@ -19,8 +20,8 @@ from django.utils import timezone
 from django.utils.module_loading import import_string
 from planning.facts import FactDefinition as DomainFactDefinition
 
-from .domain import decode_stored_rule, load_fact_definitions
-from .models import Procedure, ProcedureVersion, ProcedureVersionAuditEvent
+from .domain import decode_stored_rule, to_domain_fact
+from .models import FactDefinition, Procedure, ProcedureVersion, ProcedureVersionAuditEvent
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,6 +54,14 @@ class PublicationGate(Protocol):
 
 def _diagnostic(gate: str, code: str, detail: str = "") -> tuple[PublicationDiagnostic, ...]:
     return (PublicationDiagnostic(gate, code, detail),)
+
+
+def _load_published_fact_definitions() -> Mapping[str, DomainFactDefinition]:
+    values = {
+        row.key: to_domain_fact(row)
+        for row in FactDefinition.objects.filter(is_published=True).order_by("key")
+    }
+    return MappingProxyType(values)
 
 
 class StateAndActorGate:
@@ -262,7 +271,7 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .get(pk=version_id)
             )
             Procedure.objects.select_for_update().get(pk=version.procedure_id)
-            context = PublicationContext(version, actor, load_fact_definitions())
+            context = PublicationContext(version, actor, _load_published_fact_definitions())
             diagnostics = _run_policy(context)
             if diagnostics:
                 raise PublicationRejected(diagnostics)

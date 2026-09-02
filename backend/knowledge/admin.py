@@ -18,13 +18,13 @@ from .forms import (
 )
 from .models import (
     FactDefinition,
+    Procedure,
     Service,
     ServiceContradiction,
     ServiceContradictionFact,
     ServiceProcedureCandidate,
     ServiceQuestion,
     ServiceQuestionResolvedFact,
-    Procedure,
 )
 from .services import set_contradiction_facts, set_question_resolved_facts
 

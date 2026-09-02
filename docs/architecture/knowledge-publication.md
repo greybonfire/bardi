@@ -5,6 +5,24 @@
 
 Publication turns researched/editable knowledge into an immutable Procedure Version that the public planner may select. Publication workflow state is intentionally separate from calculated evidence/trust state.
 
+## Implementation status: issue #36
+
+The Procedure-Version persistence, inclusive effective-date resolver, database immutability
+triggers, and canonical atomic publish/withdraw services are implemented. Publication runs a
+non-replaceable set of core structural gates and then every gate in the application-level
+`PROCEDURE_VERSION_PUBLICATION_GATES` registry. Missing, duplicate, malformed, or raising
+configured gates fail closed. Ordinary model and Admin writes cannot perform lifecycle
+transitions or alter published semantics; successful transitions record the actor and an
+immutable audit event in the same transaction.
+
+The default policy is deliberately **core-only**. This issue does not establish production
+public-readiness. Mandatory evidence, scenario, review, and specialist gates remain work for
+#47–#49 and must register through this same publication path; they must not introduce an
+alternate publisher. No researched fixtures, claims, evidence, scenarios, review records,
+specialist classification, feature-readiness policy, service-point versions, or complete plan
+orchestration are added or implied here. Procedure selection remains independent of date and
+version applicability; later orchestration resolves the selected Procedure separately.
+
 ## Lifecycle
 
 The initial Procedure-Version publication states are:

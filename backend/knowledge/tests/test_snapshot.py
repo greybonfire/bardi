@@ -1,24 +1,35 @@
 from __future__ import annotations
 
+from datetime import date
 from unittest.mock import PropertyMock, patch
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
-from planning import PreparedFacts, SelectionQuestion, select_procedure
+from planning import (
+    PreparedFacts,
+    ProcedureVersionUnavailable,
+    SelectionQuestion,
+    resolve_procedure_version,
+    select_procedure,
+)
 
 from knowledge.domain import KnowledgeSnapshotLoadError, load_knowledge_snapshot
 from knowledge.models import (
     FactDefinition,
     Procedure,
+    ProcedureVersion,
     Service,
     ServiceContradiction,
     ServiceProcedureCandidate,
     ServiceQuestion,
 )
+from knowledge.publication import publish_procedure_version, withdraw_procedure_version
 from knowledge.services import set_contradiction_facts, set_question_resolved_facts
 
 
 class KnowledgeSnapshotTests(TestCase):
     def setUp(self) -> None:
+        self.actor = get_user_model().objects.create_user(username="snapshot-publisher")
         self.service = Service.objects.create(
             semantic_id="snapshot.service", text_ar="خدمة", text_en="Service"
         )
@@ -58,6 +69,15 @@ class KnowledgeSnapshotTests(TestCase):
         )
         set_question_resolved_facts(self.explicit_question, (source_b, source_a))
 
+        procedure = Procedure.objects.get(semantic_id="snapshot.procedure.a")
+        self.version = ProcedureVersion.objects.create(
+            semantic_id="snapshot.version.a",
+            procedure=procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability={"op": "eq", "fact": source_a.key, "value": True},
+        )
+
         self.contradiction = ServiceContradiction.objects.create(
             semantic_id="snapshot.contradiction",
             service=self.service,
@@ -72,6 +92,7 @@ class KnowledgeSnapshotTests(TestCase):
         set_contradiction_facts(self.contradiction, (source_b, source_a))
 
     def test_loader_materializes_decodes_and_preserves_declared_order(self) -> None:
+        publish_procedure_version(self.version.pk, actor=self.actor)
         with (
             patch.object(
                 ServiceQuestion,
@@ -114,6 +135,11 @@ class KnowledgeSnapshotTests(TestCase):
         self.assertEqual(
             service.candidates[0].selection_predicate.fact, "age_years_on_evaluation_date"
         )
+        self.assertEqual(
+            tuple(item.semantic_id for item in snapshot.procedure_versions),
+            ("snapshot.version.a",),
+        )
+        self.assertEqual(snapshot.procedure_versions[0].applicability.fact, "is_student")
 
     def test_selection_and_complete_result_traversal_issue_no_queries(self) -> None:
         snapshot = load_knowledge_snapshot()
@@ -138,7 +164,15 @@ class KnowledgeSnapshotTests(TestCase):
                     _ = trace.actual_value
                     stack.extend(trace.children)
 
+    def test_version_resolution_and_traversal_issue_no_queries(self) -> None:
+        snapshot = load_knowledge_snapshot()
+        with self.assertNumQueries(0):
+            outcome = resolve_procedure_version(snapshot, "snapshot.procedure.a", date(2025, 1, 1))
+            self.assertEqual(outcome, ProcedureVersionUnavailable("no_published_version", ()))
+            _ = outcome.upcoming
+
     def test_loaded_snapshot_is_detached_from_later_database_changes(self) -> None:
+        publish_procedure_version(self.version.pk, actor=self.actor)
         snapshot = load_knowledge_snapshot()
         original = next(
             item for item in snapshot.services if item.semantic_id == self.service.semantic_id
@@ -146,6 +180,7 @@ class KnowledgeSnapshotTests(TestCase):
         Service.objects.filter(pk=self.service.pk).update(text_en="Changed")
         set_question_resolved_facts(self.explicit_question, ())
         ServiceProcedureCandidate.objects.filter(service=self.service).delete()
+        withdraw_procedure_version(self.version.pk, actor=self.actor)
 
         self.assertEqual(original.text.en, "Service")
         self.assertEqual(len(original.candidates), 2)
@@ -153,6 +188,13 @@ class KnowledgeSnapshotTests(TestCase):
             original.questions[0].resolved_fact_keys,
             ("has_current_enrollment_certificate", "is_student"),
         )
+        self.assertEqual(snapshot.procedure_versions[0].text.en, "Version")
+        self.assertEqual(snapshot.procedure_versions[0].state, "published")
+
+    def test_incomplete_drafts_are_excluded_from_the_planning_snapshot(self) -> None:
+        ProcedureVersion.objects.filter(pk=self.version.pk).update(applicability={"op": "broken"})
+        snapshot = load_knowledge_snapshot()
+        self.assertEqual(snapshot.procedure_versions, ())
 
     def test_malformed_stored_rule_fails_with_stable_owner_and_diagnostics(self) -> None:
         ServiceProcedureCandidate.objects.filter(

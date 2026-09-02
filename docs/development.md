@@ -64,8 +64,11 @@ python -m unittest discover -s prototype/tests -v
 
 Django test discovery intentionally runs without an app label **from the `backend/`
 directory** so it discovers the current tests and automatically includes future production
-apps. The prototype commands are retained as frozen reference coverage and are intentionally
-not included in the production Ruff or Mypy scope.
+apps. Procedure-Version tests require PostgreSQL: migrations install `btree_gist`, an
+inclusive-range exclusion constraint, and lifecycle immutability triggers. Concurrency tests
+must use separate database connections; SQLite is not a supported substitute. The prototype
+commands are retained as frozen reference coverage and are intentionally not included in the
+production Ruff or Mypy scope.
 
 ## Teardown
 

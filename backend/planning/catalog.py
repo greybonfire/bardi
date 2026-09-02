@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import date, datetime
 from types import MappingProxyType
 
 from .facts import FactDefinition
@@ -64,10 +65,26 @@ class ServiceSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class ProcedureVersionSnapshot:
+    semantic_id: str
+    procedure_semantic_id: str
+    text: LocalizedText
+    applicability: Predicate
+    rules_contract_version: str
+    state: str
+    effective_from: date | None
+    effective_to: date | None
+    published_at: datetime | None = None
+    published_by_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class KnowledgeSnapshot:
     fact_definitions: Mapping[str, FactDefinition]
     services: tuple[ServiceSnapshot, ...]
+    procedure_versions: tuple[ProcedureVersionSnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "fact_definitions", MappingProxyType(dict(self.fact_definitions)))
         object.__setattr__(self, "services", tuple(self.services))
+        object.__setattr__(self, "procedure_versions", tuple(self.procedure_versions))

@@ -159,11 +159,13 @@ class FactValidationResult:
 
 @dataclass(frozen=True, slots=True)
 class PreparedFacts:
-    """Strict input seam after validation, derivation, and contradiction rejection.
+    """Trusted internal handoff after case preparation succeeds.
 
-    This type deliberately does not perform those stages; issue #38 will own their
-    orchestration. ``missing_source_dependencies`` only records unresolved source Facts
-    for a derived Fact and never authorizes Questions to resolve derived Facts directly.
+    This DTO does not validate, derive, or contradiction-check input and must not be
+    constructed directly from raw request Facts. Issue #38 owns the production preparation
+    path that will establish those preconditions before Procedure selection.
+    ``missing_source_dependencies`` records only unresolved source Facts for a derived Fact
+    and never authorizes Questions to resolve derived Facts directly.
     """
 
     values: Mapping[str, FactValue]

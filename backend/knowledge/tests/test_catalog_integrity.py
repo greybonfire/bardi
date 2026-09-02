@@ -118,9 +118,7 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         )
 
         with self.assertRaisesMessage(ValidationError, "set_question_resolved_facts()"):
-            GoalQuestionResolvedFact.objects.create(
-                question=question, fact=self.other, position=1
-            )
+            GoalQuestionResolvedFact.objects.create(question=question, fact=self.other, position=1)
         self.assertFalse(question.resolved_fact_links.exists())
 
         set_question_resolved_facts(question, [self.primary, self.other])

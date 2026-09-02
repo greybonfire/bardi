@@ -77,7 +77,12 @@ def select_procedure(
     service_semantic_id: str,
     prepared_facts: PreparedFacts,
 ) -> SelectionOutcome:
-    """Evaluate every curated candidate once, without scoring or version applicability."""
+    """Evaluate every curated candidate once, without scoring or version applicability.
+
+    ``prepared_facts`` is a trusted internal handoff. The production application path must
+    establish validation, deterministic derivation, and contradiction rejection before
+    calling this selector; issue #38 owns that orchestration.
+    """
 
     service = next(
         (item for item in snapshot.services if item.semantic_id == service_semantic_id), None

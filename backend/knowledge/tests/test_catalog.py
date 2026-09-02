@@ -40,6 +40,12 @@ class CatalogModelTests(TestCase):
         self.assertEqual(load_fact_definitions(), FACT_DEFINITIONS)
         self.assertEqual(compatibility_errors(FactDefinition.objects.all()), ())
 
+    def test_service_activation_is_explicit_and_defaults_inactive(self) -> None:
+        self.assertFalse(self.service.is_active)
+        self.service.is_active = True
+        self.service.save(update_fields=("is_active",))
+        self.assertTrue(Service.objects.get(pk=self.service.pk).is_active)
+
     def test_nonblank_validation(self) -> None:
         with self.assertRaises(ValidationError):
             Service(semantic_id=" ", text_ar=" ", text_en=" ").full_clean()

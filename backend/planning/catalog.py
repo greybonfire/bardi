@@ -57,6 +57,7 @@ class ServiceSnapshot:
     candidates: tuple[ProcedureCandidateSnapshot, ...]
     questions: tuple[QuestionSnapshot, ...]
     contradictions: tuple[ContradictionSnapshot, ...]
+    is_active: bool = False
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "candidates", tuple(self.candidates))

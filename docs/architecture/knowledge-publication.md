@@ -23,6 +23,12 @@ specialist classification, feature-readiness policy, service-point versions, or 
 orchestration are added or implied here. Procedure selection remains independent of date and
 version applicability; later orchestration resolves the selected Procedure separately.
 
+Issue #37's request snapshot materializes all Fact definitions, Services (including inactive
+ones), candidates, Questions, contradictions, and published/withdrawn Procedure Versions in
+one coherent read-only transaction. Draft versions remain excluded. Public DTO projection is
+a separate whitelist boundary: availability in the internal snapshot does not make rule ASTs,
+raw Facts, traces, Evidence Links, discrepancy rationale, or publication actors public.
+
 ## Lifecycle
 
 The initial Procedure-Version publication states are:

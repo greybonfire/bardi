@@ -22,6 +22,7 @@ class Service(models.Model):
     semantic_id = models.CharField(max_length=128, unique=True)
     text_ar = models.TextField()
     text_en = models.TextField()
+    is_active = models.BooleanField(default=False)
 
     class Meta:
         ordering = ("semantic_id",)

@@ -89,6 +89,8 @@ def select_procedure(
     )
     if service is None:
         return SelectionUnsupported("unknown_service", ())
+    if not service.is_active:
+        return SelectionUnsupported("inactive_service", ())
 
     evaluations = tuple(
         CandidateEvaluation(

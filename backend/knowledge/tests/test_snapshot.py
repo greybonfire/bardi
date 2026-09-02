@@ -13,7 +13,11 @@ from planning import (
     select_procedure,
 )
 
-from knowledge.domain import KnowledgeSnapshotLoadError, load_knowledge_snapshot
+from knowledge.domain import (
+    KnowledgeSnapshotLoadError,
+    load_consistent_knowledge_snapshot,
+    load_knowledge_snapshot,
+)
 from knowledge.models import (
     FactDefinition,
     Procedure,
@@ -31,7 +35,7 @@ class KnowledgeSnapshotTests(TestCase):
     def setUp(self) -> None:
         self.actor = get_user_model().objects.create_user(username="snapshot-publisher")
         self.service = Service.objects.create(
-            semantic_id="snapshot.service", text_ar="خدمة", text_en="Service"
+            semantic_id="snapshot.service", text_ar="خدمة", text_en="Service", is_active=True
         )
         source_a = FactDefinition.objects.get(key="is_student")
         source_b = FactDefinition.objects.get(key="has_current_enrollment_certificate")
@@ -112,6 +116,7 @@ class KnowledgeSnapshotTests(TestCase):
         service = next(
             item for item in snapshot.services if item.semantic_id == self.service.semantic_id
         )
+        self.assertTrue(service.is_active)
         self.assertEqual(
             tuple(item.procedure_semantic_id for item in service.candidates),
             ("snapshot.procedure.a", "snapshot.procedure.z"),
@@ -190,6 +195,10 @@ class KnowledgeSnapshotTests(TestCase):
         )
         self.assertEqual(snapshot.procedure_versions[0].text.en, "Version")
         self.assertEqual(snapshot.procedure_versions[0].state, "published")
+
+    def test_consistent_loader_rejects_an_already_active_transaction(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "outermost transaction"):
+            load_consistent_knowledge_snapshot()
 
     def test_incomplete_drafts_are_excluded_from_the_planning_snapshot(self) -> None:
         ProcedureVersion.objects.filter(pk=self.version.pk).update(applicability={"op": "broken"})

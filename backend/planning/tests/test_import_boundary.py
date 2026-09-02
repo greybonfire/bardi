@@ -31,6 +31,13 @@ class PureDomainImportBoundaryTests(unittest.TestCase):
         self.assertIsNotNone(SelectionOutcome)
         self.assertTrue(callable(select_procedure))
 
+    def test_public_stateless_contract_is_framework_independent(self) -> None:
+        from planning import PlanningInput, PlanningResult, plan_stateless
+
+        self.assertEqual(PlanningInput.__module__, "planning.public")
+        self.assertIsNotNone(PlanningResult)
+        self.assertTrue(callable(plan_stateless))
+
     def test_production_modules_have_no_framework_or_io_dependencies(self) -> None:
         package = Path(__file__).resolve().parents[1]
         prohibited = {

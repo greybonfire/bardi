@@ -106,7 +106,7 @@ class KnowledgeSnapshotLoadError(Exception):
         super().__init__(", ".join(self.owner_ids))
 
 
-def load_knowledge_snapshot() -> KnowledgeSnapshot:
+def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
     """Fully evaluate ORM reads, then return an immutable, ORM-free catalog graph."""
 
     from .models import (
@@ -124,7 +124,9 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
     # work below uses only plain values and planning-domain objects.
     fact_rows = list(FactDefinition.objects.order_by("key"))
     service_rows = list(
-        Service.objects.order_by("semantic_id").values("semantic_id", "text_ar", "text_en")
+        Service.objects.order_by("semantic_id").values(
+            "semantic_id", "text_ar", "text_en", "is_active"
+        )
     )
     candidate_rows = list(
         ServiceProcedureCandidate.objects.order_by(
@@ -286,7 +288,27 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
             tuple(candidates[service_row["semantic_id"]]),
             tuple(questions[service_row["semantic_id"]]),
             tuple(contradictions[service_row["semantic_id"]]),
+            is_active=service_row["is_active"],
         )
         for service_row in service_rows
     )
     return KnowledgeSnapshot(definitions, services, tuple(versions))
+
+
+def load_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Load a detached snapshot without imposing a transaction policy."""
+
+    return _materialize_knowledge_snapshot()
+
+
+def load_consistent_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Load all published knowledge in one outermost read-only repeatable-read transaction."""
+
+    from django.db import connection, transaction
+
+    if connection.in_atomic_block:
+        raise RuntimeError("a consistent knowledge snapshot requires an outermost transaction")
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        return _materialize_knowledge_snapshot()

@@ -1,6 +1,7 @@
 """Public framework-independent planning validation domain."""
 
 from .diagnostics import DiagnosticPath, DiagnosticPathSegment, ValidationDiagnostic
+from .evaluator import Evaluation, EvaluationTrace, TruthValue, evaluate
 from .facts import (
     FACT_DEFINITIONS,
     FactDefinition,
@@ -34,6 +35,8 @@ __all__ = (
     "BooleanOperator",
     "DiagnosticPath",
     "DiagnosticPathSegment",
+    "Evaluation",
+    "EvaluationTrace",
     "FactDefinition",
     "FactKind",
     "FactValidationResult",
@@ -42,7 +45,9 @@ __all__ = (
     "Predicate",
     "RuleOperator",
     "RuleValidationResult",
+    "TruthValue",
     "ValidationDiagnostic",
+    "evaluate",
     "validate_rule_v1",
     "validate_submitted_facts",
     "value_matches_definition",

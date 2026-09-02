@@ -5,6 +5,7 @@ from .catalog import (
     KnowledgeSnapshot,
     LocalizedText,
     ProcedureCandidateSnapshot,
+    ProcedureVersionSnapshot,
     QuestionSnapshot,
     ServiceSnapshot,
 )
@@ -44,6 +45,14 @@ from .selection import (
     SelectionUnsupported,
     select_procedure,
 )
+from .versions import (
+    ProcedureVersionConfigurationDefect,
+    ProcedureVersionResolution,
+    ProcedureVersionResolutionOutcome,
+    ProcedureVersionResolved,
+    ProcedureVersionUnavailable,
+    resolve_procedure_version,
+)
 
 __all__ = (
     "BOOLEAN_OPERATORS",
@@ -69,6 +78,12 @@ __all__ = (
     "PreparedFacts",
     "ProcedureCandidateSnapshot",
     "ProcedureSelected",
+    "ProcedureVersionConfigurationDefect",
+    "ProcedureVersionResolution",
+    "ProcedureVersionResolutionOutcome",
+    "ProcedureVersionResolved",
+    "ProcedureVersionSnapshot",
+    "ProcedureVersionUnavailable",
     "QuestionSnapshot",
     "Predicate",
     "RuleOperator",
@@ -82,6 +97,7 @@ __all__ = (
     "TruthValue",
     "ValidationDiagnostic",
     "evaluate",
+    "resolve_procedure_version",
     "select_procedure",
     "serialize_rule_v1",
     "validate_rule_v1",

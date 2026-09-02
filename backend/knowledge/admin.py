@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.db import models
 from django.forms import ModelForm, Textarea
 from django.forms.models import BaseInlineFormSet
@@ -19,12 +19,19 @@ from .forms import (
 from .models import (
     FactDefinition,
     Procedure,
+    ProcedureVersion,
+    ProcedureVersionAuditEvent,
     Service,
     ServiceContradiction,
     ServiceContradictionFact,
     ServiceProcedureCandidate,
     ServiceQuestion,
     ServiceQuestionResolvedFact,
+)
+from .publication import (
+    PublicationRejected,
+    publish_procedure_version,
+    withdraw_procedure_version,
 )
 from .services import set_contradiction_facts, set_question_resolved_facts
 
@@ -90,6 +97,18 @@ class ServiceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     inlines = (CandidateInline, QuestionOwnerInline, ContradictionOwnerInline)
 
 
+class ProcedureVersionHistoryInline(admin.TabularInline):  # type: ignore[type-arg]
+    model = ProcedureVersion
+    fields = ("semantic_id", "state", "effective_from", "effective_to", "published_at")
+    readonly_fields = fields
+    extra = 0
+    can_delete = False
+    show_change_link = True
+
+    def has_add_permission(self, request: HttpRequest, obj: Procedure | None = None) -> bool:
+        return False
+
+
 @admin.register(Procedure)
 class ProcedureAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     list_display = ("semantic_id", "primary_service", "text_en")
@@ -97,6 +116,121 @@ class ProcedureAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     search_fields = ("semantic_id", "primary_service__semantic_id", "text_en", "text_ar")
     autocomplete_fields = ("primary_service",)
     ordering = ("semantic_id",)
+    inlines = (ProcedureVersionHistoryInline,)
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Procedure | None = None
+    ) -> tuple[str, ...]:
+        if obj is not None and obj.versions.exclude(state=ProcedureVersion.State.DRAFT).exists():
+            return ("semantic_id", "primary_service")
+        return ()
+
+
+@admin.register(ProcedureVersion)
+class ProcedureVersionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = (
+        "semantic_id",
+        "procedure",
+        "state",
+        "effective_from",
+        "effective_to",
+        "published_at",
+    )
+    list_filter = ("state", "procedure", "effective_from", "effective_to")
+    search_fields = (
+        "semantic_id",
+        "procedure__semantic_id",
+        "text_ar",
+        "text_en",
+    )
+    autocomplete_fields = ("procedure",)
+    ordering = ("procedure__semantic_id", "effective_from", "semantic_id")
+    actions = ("publish_selected", "withdraw_selected")
+    lifecycle_fields = (
+        "state",
+        "published_at",
+        "published_by",
+        "withdrawn_at",
+        "withdrawn_by",
+    )
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: ProcedureVersion | None = None
+    ) -> tuple[str, ...]:
+        if obj is not None and obj.state != ProcedureVersion.State.DRAFT:
+            return tuple(field.name for field in self.model._meta.fields)
+        return self.lifecycle_fields
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ProcedureVersion | None = None
+    ) -> bool:
+        if obj is not None and obj.state != ProcedureVersion.State.DRAFT:
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def has_publish_procedureversion_permission(self, request: HttpRequest) -> bool:
+        return request.user.has_perm("knowledge.publish_procedureversion")
+
+    def has_withdraw_procedureversion_permission(self, request: HttpRequest) -> bool:
+        return request.user.has_perm("knowledge.withdraw_procedureversion")
+
+    def _report_rejection(self, request: HttpRequest, exc: PublicationRejected) -> None:
+        rendered = "; ".join(
+            f"{item.gate}: {item.code}" + (f" ({item.detail})" if item.detail else "")
+            for item in exc.diagnostics
+        )
+        self.message_user(request, rendered, level=messages.ERROR)
+
+    @admin.action(description="Publish selected drafts", permissions=["publish_procedureversion"])
+    def publish_selected(
+        self, request: HttpRequest, queryset: models.QuerySet[ProcedureVersion]
+    ) -> None:
+        for version_id in queryset.order_by("semantic_id").values_list("pk", flat=True):
+            try:
+                publish_procedure_version(version_id, actor=cast(models.Model, request.user))
+            except PublicationRejected as exc:
+                self._report_rejection(request, exc)
+
+    @admin.action(
+        description="Withdraw selected published versions",
+        permissions=["withdraw_procedureversion"],
+    )
+    def withdraw_selected(
+        self, request: HttpRequest, queryset: models.QuerySet[ProcedureVersion]
+    ) -> None:
+        for version_id in queryset.order_by("semantic_id").values_list("pk", flat=True):
+            try:
+                withdraw_procedure_version(version_id, actor=cast(models.Model, request.user))
+            except PublicationRejected as exc:
+                self._report_rejection(request, exc)
+
+
+@admin.register(ProcedureVersionAuditEvent)
+class ProcedureVersionAuditEventAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = ("version", "event_type", "actor", "occurred_at", "from_state", "to_state")
+    list_filter = ("event_type", "actor", "occurred_at", "version")
+    search_fields = ("version__semantic_id", "actor__username")
+    readonly_fields = (
+        "version",
+        "event_type",
+        "actor",
+        "occurred_at",
+        "from_state",
+        "to_state",
+    )
+
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        return False
+
+    def has_change_permission(
+        self, request: HttpRequest, obj: ProcedureVersionAuditEvent | None = None
+    ) -> bool:
+        return False
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ProcedureVersionAuditEvent | None = None
+    ) -> bool:
+        return False
 
 
 @admin.register(ServiceProcedureCandidate)

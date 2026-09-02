@@ -13,6 +13,7 @@ from planning.catalog import (
     KnowledgeSnapshot,
     LocalizedText,
     ProcedureCandidateSnapshot,
+    ProcedureVersionSnapshot,
     QuestionSnapshot,
     ServiceSnapshot,
 )
@@ -110,6 +111,7 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
 
     from .models import (
         FactDefinition,
+        ProcedureVersion,
         Service,
         ServiceContradiction,
         ServiceContradictionFact,
@@ -133,6 +135,25 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
             "procedure__text_ar",
             "procedure__text_en",
             "selection_predicate",
+        )
+    )
+    version_rows = list(
+        ProcedureVersion.objects.filter(
+            state__in=(ProcedureVersion.State.PUBLISHED, ProcedureVersion.State.WITHDRAWN)
+        )
+        .order_by("procedure__semantic_id", "semantic_id")
+        .values(
+            "semantic_id",
+            "procedure__semantic_id",
+            "text_ar",
+            "text_en",
+            "applicability",
+            "rules_contract_version",
+            "state",
+            "effective_from",
+            "effective_to",
+            "published_at",
+            "published_by_id",
         )
     )
     question_rows = list(
@@ -175,6 +196,7 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
 
     candidates: dict[str, list[ProcedureCandidateSnapshot]] = defaultdict(list)
     contradictions: dict[str, list[ContradictionSnapshot]] = defaultdict(list)
+    versions: list[ProcedureVersionSnapshot] = []
     failures: list[StoredRuleLoadDiagnostic] = []
     for candidate_row in candidate_rows:
         service_id = candidate_row["service__semantic_id"]
@@ -195,6 +217,28 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
                     candidate_row["procedure__text_en"],
                 ),
                 decoded.predicate,
+            )
+        )
+    for version_row in version_rows:
+        semantic_id = version_row["semantic_id"]
+        decoded = decode_stored_rule(version_row["applicability"], definitions)
+        if decoded.predicate is None:
+            failures.append(
+                StoredRuleLoadDiagnostic(f"procedure_version:{semantic_id}", decoded.diagnostics)
+            )
+            continue
+        versions.append(
+            ProcedureVersionSnapshot(
+                semantic_id,
+                version_row["procedure__semantic_id"],
+                LocalizedText(version_row["text_ar"], version_row["text_en"]),
+                decoded.predicate,
+                version_row["rules_contract_version"],
+                version_row["state"],
+                version_row["effective_from"],
+                version_row["effective_to"],
+                version_row["published_at"],
+                version_row["published_by_id"],
             )
         )
     for contradiction_row in contradiction_rows:
@@ -242,4 +286,4 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
         )
         for service_row in service_rows
     )
-    return KnowledgeSnapshot(definitions, services)
+    return KnowledgeSnapshot(definitions, services, tuple(versions))

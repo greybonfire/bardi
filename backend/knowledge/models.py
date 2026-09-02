@@ -2,9 +2,12 @@ from __future__ import annotations
 
 from typing import Any
 
+from django.conf import settings
+from django.contrib.postgres.constraints import ExclusionConstraint
+from django.contrib.postgres.fields import DateRangeField, RangeOperators
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import F, Q, Value
 from django.db.models.lookups import Exact
 
 NONBLANK_PATTERN = r".*[^[:space:]].*"
@@ -85,6 +88,183 @@ class Procedure(models.Model):
 
     def __str__(self) -> str:
         return self.semantic_id
+
+
+class ProcedureVersion(models.Model):
+    class State(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        PUBLISHED = "published", "Published"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    semantic_id = models.CharField(max_length=128, unique=True)
+    procedure = models.ForeignKey(Procedure, on_delete=models.PROTECT, related_name="versions")
+    state = models.CharField(max_length=16, choices=State.choices, default=State.DRAFT)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    text_ar = models.TextField(blank=True)
+    text_en = models.TextField(blank=True)
+    applicability = models.JSONField(default=dict, blank=True)
+    rules_contract_version = models.CharField(max_length=16, default="v1")
+    published_at = models.DateTimeField(null=True, blank=True, editable=False)
+    published_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="published_procedure_versions",
+    )
+    withdrawn_at = models.DateTimeField(null=True, blank=True, editable=False)
+    withdrawn_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        editable=False,
+        on_delete=models.PROTECT,
+        related_name="withdrawn_procedure_versions",
+    )
+
+    class Meta:
+        ordering = ("procedure__semantic_id", "effective_from", "semantic_id")
+        permissions = [
+            ("publish_procedureversion", "Can publish Procedure Version"),
+            ("withdraw_procedureversion", "Can withdraw Procedure Version"),
+        ]
+        indexes = [
+            models.Index(fields=("procedure", "state"), name="proc_version_state_idx"),
+            models.Index(fields=("state", "effective_from"), name="proc_version_effective_idx"),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="proc_version_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(state__in=["draft", "published", "withdrawn"]),
+                name="proc_version_state_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(rules_contract_version="v1"), name="proc_version_contract_supported"
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="proc_version_dates_ordered",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(
+                        state="draft",
+                        published_at__isnull=True,
+                        published_by__isnull=True,
+                        withdrawn_at__isnull=True,
+                        withdrawn_by__isnull=True,
+                    )
+                    | Q(
+                        state="published",
+                        published_at__isnull=False,
+                        published_by__isnull=False,
+                        withdrawn_at__isnull=True,
+                        withdrawn_by__isnull=True,
+                    )
+                    | Q(
+                        state="withdrawn",
+                        published_at__isnull=False,
+                        published_by__isnull=False,
+                        withdrawn_at__isnull=False,
+                        withdrawn_by__isnull=False,
+                    )
+                ),
+                name="proc_version_lifecycle_metadata",
+            ),
+            ExclusionConstraint(
+                name="exclude_published_proc_version_overlap",
+                expressions=(
+                    ("procedure", RangeOperators.EQUAL),
+                    (
+                        models.Func(
+                            F("effective_from"),
+                            F("effective_to"),
+                            Value("[]"),
+                            function="DATERANGE",
+                            output_field=DateRangeField(),
+                        ),
+                        RangeOperators.OVERLAPS,
+                    ),
+                ),
+                condition=Q(state="published"),
+            ),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        stored = type(self).objects.filter(pk=self.pk).only("state").first() if self.pk else None
+        if stored is None:
+            if self.state != self.State.DRAFT or any(
+                value is not None
+                for value in (
+                    self.published_at,
+                    self.published_by_id,
+                    self.withdrawn_at,
+                    self.withdrawn_by_id,
+                )
+            ):
+                raise ValidationError("Procedure Versions may only be created as drafts.")
+        elif stored.state != self.State.DRAFT:
+            raise ValidationError("Published and withdrawn Procedure Versions are immutable.")
+        elif self.state != self.State.DRAFT:
+            raise ValidationError("Use the canonical lifecycle service to publish a draft.")
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        state = type(self).objects.filter(pk=self.pk).values_list("state", flat=True).first()
+        if state in {self.State.PUBLISHED, self.State.WITHDRAWN}:
+            raise ValidationError("Published and withdrawn Procedure Versions cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.semantic_id
+
+
+class ProcedureVersionAuditEvent(models.Model):
+    class EventType(models.TextChoices):
+        PUBLISHED = "published", "Published"
+        WITHDRAWN = "withdrawn", "Withdrawn"
+
+    version = models.ForeignKey(
+        ProcedureVersion, on_delete=models.PROTECT, related_name="audit_events"
+    )
+    event_type = models.CharField(max_length=16, choices=EventType.choices)
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="procedure_version_audit_events",
+    )
+    occurred_at = models.DateTimeField()
+    from_state = models.CharField(max_length=16, choices=ProcedureVersion.State.choices)
+    to_state = models.CharField(max_length=16, choices=ProcedureVersion.State.choices)
+
+    class Meta:
+        ordering = ("occurred_at", "id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("version",),
+                condition=Q(event_type="published"),
+                name="one_publication_event_per_version",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    Q(event_type="published", from_state="draft", to_state="published")
+                    | Q(event_type="withdrawn", from_state="published", to_state="withdrawn")
+                ),
+                name="proc_version_audit_transition",
+            ),
+        ]
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        raise ValidationError("Audit events may only be created by the lifecycle service.")
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        raise ValidationError("Procedure Version audit events are immutable.")
 
 
 class FactDefinition(models.Model):

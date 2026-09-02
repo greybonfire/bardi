@@ -12,12 +12,12 @@ from knowledge.domain import compatibility_errors, load_fact_definitions
 from knowledge.forms import QuestionResolvedFactFormSet
 from knowledge.models import (
     FactDefinition,
+    Procedure,
     Service,
     ServiceContradiction,
     ServiceProcedureCandidate,
     ServiceQuestion,
     ServiceQuestionResolvedFact,
-    Procedure,
 )
 from knowledge.services import set_contradiction_facts, set_question_resolved_facts
 
@@ -28,9 +28,11 @@ class CatalogModelTests(TestCase):
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.service = Service.objects.create(semantic_id="service.one", text_ar="هدف", text_en="Service")
+        cls.service = Service.objects.create(
+            semantic_id="service.one", text_ar="خدمة", text_en="Service"
+        )
         cls.other_service = Service.objects.create(
-            semantic_id="service_two", text_ar="هدف ثان", text_en="Other"
+            semantic_id="service_two", text_ar="خدمة أخرى", text_en="Other"
         )
 
     def test_seed_exactly_matches_pure_registry(self) -> None:

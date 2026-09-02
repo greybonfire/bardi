@@ -1,6 +1,5 @@
 """Immutable, framework-free snapshots of the persisted planning catalog.
 
-The persisted ``Service`` is the production equivalent of the issue's Goal terminology.
 Snapshots contain decoded planning-domain values only; loading and all ORM access belong
 in the knowledge adapter.
 """

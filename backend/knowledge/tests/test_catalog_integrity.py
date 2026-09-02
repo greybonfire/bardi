@@ -5,6 +5,7 @@ from typing import Any, cast
 
 from django.contrib.admin.sites import AdminSite
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.forms.models import inlineformset_factory
 from django.test import RequestFactory, TestCase
 
@@ -124,7 +125,8 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         set_question_resolved_facts(question, [self.primary, self.other])
         primary_link = question.resolved_fact_links.get(fact=self.primary)
         with self.assertRaisesMessage(ValidationError, "set_question_resolved_facts()"):
-            primary_link.delete()
+            with transaction.atomic():
+                primary_link.delete()
         self.assertEqual(question.resolved_fact_keys, (self.primary.key, self.other.key))
 
         set_question_resolved_facts(question, [])
@@ -152,7 +154,8 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         set_contradiction_facts(contradiction, [self.other, self.second])
         first_link = contradiction.fact_links.get(fact=self.other)
         with self.assertRaisesMessage(ValidationError, "set_contradiction_facts()"):
-            first_link.delete()
+            with transaction.atomic():
+                first_link.delete()
         self.assertEqual(contradiction.fact_keys, (self.other.key, self.second.key))
 
         set_contradiction_facts(contradiction, [self.second, self.other])

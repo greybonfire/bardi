@@ -91,15 +91,15 @@ Transient editor/test traces preserve every evaluated subtree, including dominat
 
 ## Procedure selection
 
-Planning begins from a Goal and current Facts.
+Planning begins from a Service and current Facts.
 
-1. Evaluate the Goal's curated stable Procedure-candidate predicates.
-2. If a missing source Fact is consequential to choosing among candidate Procedures, ask its Goal-owned Question.
+1. Evaluate the Service's curated stable Procedure-candidate predicates.
+2. If a missing source Fact is consequential to choosing among candidate Procedures, ask its Service-owned Question.
 3. Resolve one concrete Procedure or return an explicit unsupported/inconclusive result; never choose a closest match.
 4. Resolve the published Procedure Version applicable on the evaluation date.
 5. Evaluate that version's own applicability and rules.
 
-Goal-level selection predicates are version-independent. A current Procedure Version's applicability must not be copied into the stable Goal selector.
+Service-level selection predicates are version-independent. A current Procedure Version's applicability must not be copied into the stable Service selector.
 
 ## Procedure Version selection
 
@@ -134,7 +134,7 @@ Trust is applied after factual matching: an untrusted matched Basis can be shown
 
 The system asks only source Facts that are consequential to a still-resolvable planning decision.
 
-A Question is selected deterministically by authored priority and then stable Question identifier. If a consequential missing source Fact has no authored Question for the Goal, knowledge is defective; the evaluator must not invent wording or silently assume a value.
+A Question is selected deterministically by authored priority and then stable Question identifier. If a consequential missing source Fact has no authored Question for the Service, knowledge is defective; the evaluator must not invent wording or silently assume a value.
 
 Non-consequential UNKNOWNs remain unresolved. Routing UNKNOWN is explicitly local and does not block unrelated reliable plan material.
 

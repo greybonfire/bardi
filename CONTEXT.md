@@ -13,11 +13,11 @@ A typed value calculated deterministically from other Facts by the pinned rules-
 _Avoid_: User assertion, editor-authored script
 
 **Question**:  
-A bilingual prompt authored under a Goal that resolves one source Fact (or an explicitly declared small set representing the same submitted information). Questions are available before or after Procedure selection. They provide wording and priority; they do not duplicate business-rule visibility logic.
+A bilingual prompt authored under a Service that resolves one source Fact (or an explicitly declared small set representing the same submitted information). Questions are available before or after Procedure selection. They provide wording and priority; they do not duplicate business-rule visibility logic.
 _Avoid_: Procedure-Version-owned rule, eligibility conclusion, custom mapper
 
 **Missing-Fact Picker**:  
-The deterministic mechanism that asks the highest-priority Goal Question needed to resolve a consequential UNKNOWN rule. If no authored Question covers a consequential source Fact, the knowledge configuration is defective.
+The deterministic mechanism that asks the highest-priority Service Question needed to resolve a consequential UNKNOWN rule. If no authored Question covers a consequential source Fact, the knowledge configuration is defective.
 _Avoid_: AI interviewer, optimal-question planner
 
 **Applicability Rule**:  
@@ -28,16 +28,16 @@ _Avoid_: Script, workflow action, questionnaire logic
 A transient explanation of predicate results and whether each branch affected the final result. It may record non-consequential unknowns, but only consequential unknowns drive Questions. It is not persisted as a general application log or returned in the public plan.
 _Avoid_: Application log, error stack, public response
 
-**Goal**:  
-A stable bilingual grouping of closely related Procedures around a broad administrative objective, such as getting a passport, obtaining a National ID, or handling military paperwork. It is the user entry point and owns the curated Procedure candidate set and Goal Questions. It is not a government transaction and does not own Procedure-specific requirements, fees, steps, routing, evidence, or Eligibility Bases.
-_Avoid_: Procedure, government transaction, rule bundle
+**Service**:  
+A stable bilingual grouping of closely related Procedures around a broad administrative objective, such as passport services, National ID services, or military paperwork. It is the user entry point and owns the curated Procedure candidate set and Service Questions. The preferred Arabic product/domain label is **خدمة**. A Service is not itself a concrete government transaction and does not own Procedure-specific requirements, fees, steps, routing, evidence, or Eligibility Bases.
+_Avoid_: Procedure, government transaction, Service Point, rule bundle
 
 **Procedure**:  
-A stable identity for one concrete administrative transaction and output. First passport issuance, ordinary renewal, lost-passport replacement, and damaged-passport replacement are separate Procedures that may belong to the same Goal.
-_Avoid_: Goal, broad paperwork category, status
+A stable identity for one concrete administrative transaction and output. First passport issuance, ordinary renewal, lost-passport replacement, and damaged-passport replacement are separate Procedures that may belong to the same Service.
+_Avoid_: Service, broad paperwork category, status
 
-**Goal–Procedure Candidate**:  
-The stable membership from a Goal to a Procedure plus the typed selection predicate used before a Procedure Version is chosen. It is authored independently from any current Procedure Version so historical or future versions remain reachable.
+**Service–Procedure Candidate**:  
+The stable membership from a Service to a Procedure plus the typed selection predicate used before a Procedure Version is chosen. It is authored independently from any current Procedure Version so historical or future versions remain reachable.
 _Avoid_: Copy of current version applicability
 
 **Procedure Version**:  
@@ -73,7 +73,7 @@ A combination of circumstances for which a published Procedure Version can produ
 _Avoid_: Every possible case, approximation
 
 **Personalized Plan**:  
-A deterministic result assembled for a person's stated Goal and current Facts, including the applicable Procedure, prerequisites, checklist, next steps, known limits, and local unresolved information. It identifies its Procedure Version/evaluation freshness and warns the person to regenerate immediately before acting.
+A deterministic result assembled for a person's stated Service and current Facts, including the applicable Procedure, prerequisites, checklist, next steps, known limits, and local unresolved information. It identifies its Procedure Version/evaluation freshness and warns the person to regenerate immediately before acting.
 _Avoid_: Definitive ruling, canonical database record, generic guide
 
 **Procedural Claim**:  

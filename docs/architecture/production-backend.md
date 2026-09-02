@@ -33,7 +33,7 @@ The exact Python package layout may evolve, but these ownership boundaries are a
 
 ### Knowledge
 
-Owns persisted domain knowledge: Goals, Procedures, Procedure Versions, Fact definitions, authored Questions, claims, Eligibility Bases, Sources/Evidence Links, Service Points, dependencies, and related stable identities.
+Owns persisted domain knowledge: Services, Procedures, Procedure Versions, Fact definitions, authored Questions, claims, Eligibility Bases, Sources/Evidence Links, Service Points, dependencies, and related stable identities.
 
 ### Publication
 
@@ -51,7 +51,7 @@ Owns authentication/authorization boundaries for public and staff endpoints, req
 
 1. Validate source Facts against immutable Fact definitions; null and invalid types are errors, not UNKNOWN.
 2. Derive deterministic Facts using the rules-contract implementation.
-3. Select a concrete Procedure from the requested Goal's curated candidate set.
+3. Select a concrete Procedure from the requested Service's curated candidate set.
 4. Resolve the applicable immutable published Procedure Version for the evaluation date.
 5. Evaluate the Procedure Version and its Eligibility Bases using the rules contract.
 6. Ask the deterministic next consequential Question, or assemble the reliable portions of the Personalized Plan.
@@ -75,7 +75,7 @@ The production schema must be designed from the domain model rather than copied 
 
 ## Public application interface
 
-Version 1 exposes one stateless planning operation that advances a Goal from the caller's current Facts and locale. Read-only catalog endpoints may expose Goals or other navigation metadata, but clients do not receive rule ASTs, raw Evidence Links, internal discrepancies, or full Evaluation Traces.
+Version 1 exposes one stateless planning operation that advances a Service from the caller's current Facts and locale. Read-only catalog endpoints may expose Services or other navigation metadata, but clients do not receive rule ASTs, raw Evidence Links, internal discrepancies, or full Evaluation Traces.
 
 The web client keeps in-progress answers client-side and resubmits the current Fact set. A future saved-profile feature requires a separate privacy/product decision; it is not part of the initial backend contract.
 
@@ -113,7 +113,7 @@ The backend requires:
 
 A production implementation is not considered semantically complete merely because its ORM and endpoints work; it must reproduce the intended planning behavior captured by the authoritative rules contract and acceptance scenarios.
 
-## Explicit non-goals for the first backend milestone
+## Explicit exclusions for the first backend milestone
 
 - microservices;
 - event sourcing;

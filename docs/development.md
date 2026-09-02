@@ -1,7 +1,12 @@
 # Local development
 
-The production backend scaffold uses Python 3.13 or newer, [uv](https://docs.astral.sh/uv/),
+The production backend scaffold uses Python 3.14 or newer, [uv](https://docs.astral.sh/uv/),
 Docker, and Docker Compose. PostgreSQL is required; there is no SQLite fallback.
+
+Python 3.14 is the supported production-development baseline: local development, production
+CI, and the eventual deployed backend should use the same runtime family. The frozen
+prototype keeps its historical 3.11–3.13 CI matrix and does not define the production
+runtime.
 
 ## Setup
 

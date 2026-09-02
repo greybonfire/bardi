@@ -22,6 +22,7 @@ from .rules import (
     Predicate,
     RuleOperator,
     RuleValidationResult,
+    serialize_rule_v1,
     validate_rule_v1,
 )
 
@@ -48,6 +49,7 @@ __all__ = (
     "TruthValue",
     "ValidationDiagnostic",
     "evaluate",
+    "serialize_rule_v1",
     "validate_rule_v1",
     "validate_submitted_facts",
     "value_matches_definition",

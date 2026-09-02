@@ -9,6 +9,7 @@ from planning import (
     MAX_RULE_NODES,
     Predicate,
     ValidationDiagnostic,
+    serialize_rule_v1,
     validate_rule_v1,
 )
 
@@ -67,6 +68,20 @@ class SuccessfulRuleTests(unittest.TestCase):
             predicate = self.assert_valid({"op": op, "children": [eq()]})
             self.assertIs(type(predicate.children), tuple)
         self.assert_valid({"op": "not", "children": [eq()]})
+
+    def test_serialization_round_trip_preserves_dates_and_child_order(self) -> None:
+        raw = {
+            "op": "all",
+            "children": [
+                {"op": "eq", "fact": "birth_date", "value": {"$date": "2024-01-02"}},
+                {"op": "exists", "fact": "is_student"},
+                {"op": "in", "fact": "citizenship", "value": ["other", "egyptian"]},
+            ],
+        }
+        predicate = self.assert_valid(raw)
+        serialized = serialize_rule_v1(predicate)
+        self.assertEqual(serialized, raw)
+        self.assertEqual(validate_rule_v1(serialized).predicate, predicate)
 
     def test_nested_tree_is_deeply_immutable(self) -> None:
         predicate = self.assert_valid(

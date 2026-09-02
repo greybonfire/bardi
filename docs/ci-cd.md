@@ -10,11 +10,15 @@ delivery of the framework-independent prototype.
 
 - The frozen prototype matrix remains unchanged on Python 3.11, 3.12, and 3.13. Each
   version byte-compiles `prototype/` and runs the complete unittest suite.
-- A separate Python 3.13 production-backend job runs against PostgreSQL 17. It installs
+- A separate Python 3.14 production-backend job runs against PostgreSQL 17. It installs
   only from the committed `uv.lock`, then runs Ruff lint and format checks, Mypy, compile
   checks, Django deploy checks, migration consistency checks, and whole-project
   PostgreSQL-backed Django test discovery. The production import-boundary test ensures
   backend code cannot import the frozen prototype.
+
+Production CI intentionally uses the same Python runtime family as local production
+backend development. The prototype matrix is historical reference coverage and does not
+expand the supported production runtime surface.
 
 The final `CI required` job depends on both tracks and succeeds only when both dependency
 results are exactly `success`. This stable aggregate name is the branch-protection check;

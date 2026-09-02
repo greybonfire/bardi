@@ -157,6 +157,31 @@ class FactValidationResult:
         return tuple(item.code for item in self.diagnostics)
 
 
+@dataclass(frozen=True, slots=True)
+class PreparedFacts:
+    """Trusted internal handoff after case preparation succeeds.
+
+    This DTO does not validate, derive, or contradiction-check input and must not be
+    constructed directly from raw request Facts. Issue #38 owns the production preparation
+    path that will establish those preconditions before Procedure selection.
+    ``missing_source_dependencies`` records only unresolved source Facts for a derived Fact
+    and never authorizes Questions to resolve derived Facts directly.
+    """
+
+    values: Mapping[str, FactValue]
+    submitted_keys: frozenset[str]
+    missing_source_dependencies: Mapping[str, frozenset[str]]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "values", MappingProxyType(dict(self.values)))
+        object.__setattr__(self, "submitted_keys", frozenset(self.submitted_keys))
+        dependencies = {
+            key: frozenset(source_keys)
+            for key, source_keys in self.missing_source_dependencies.items()
+        }
+        object.__setattr__(self, "missing_source_dependencies", MappingProxyType(dependencies))
+
+
 def validate_submitted_facts(
     facts: Mapping[str, object], definitions: Mapping[str, FactDefinition] = FACT_DEFINITIONS
 ) -> FactValidationResult:

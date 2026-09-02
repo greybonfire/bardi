@@ -13,13 +13,13 @@ from knowledge.admin import ContradictionAdmin, QuestionAdmin
 from knowledge.forms import ContradictionFactFormSet, QuestionResolvedFactFormSet
 from knowledge.models import (
     FactDefinition,
+    Procedure,
     Service,
     ServiceContradiction,
     ServiceContradictionFact,
     ServiceProcedureCandidate,
     ServiceQuestion,
     ServiceQuestionResolvedFact,
-    Procedure,
 )
 from knowledge.services import set_contradiction_facts, set_question_resolved_facts
 
@@ -27,10 +27,10 @@ from knowledge.services import set_contradiction_facts, set_question_resolved_fa
 class CatalogAcceptanceIntegrityTests(TestCase):
     def setUp(self) -> None:
         self.service = Service.objects.create(
-            semantic_id="service.integrity", text_ar="هدف", text_en="Integrity Service"
+            semantic_id="service.integrity", text_ar="خدمة", text_en="Integrity Service"
         )
         self.other_service = Service.objects.create(
-            semantic_id="service.integrity.other", text_ar="هدف آخر", text_en="Other Service"
+            semantic_id="service.integrity.other", text_ar="خدمة أخرى", text_en="Other Service"
         )
         self.primary = FactDefinition.objects.get(key="national_id_expiry_date")
         self.other = FactDefinition.objects.get(key="is_student")
@@ -40,7 +40,7 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         with self.assertRaises(ValidationError):
             Service(
                 semantic_id=self.service.semantic_id,
-                text_ar="هدف مكرر",
+                text_ar="خدمة مكررة",
                 text_en="Duplicate Service",
             ).full_clean()
 

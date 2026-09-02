@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
+from planning.catalog import (
+    ContradictionSnapshot,
+    KnowledgeSnapshot,
+    LocalizedText,
+    ProcedureCandidateSnapshot,
+    QuestionSnapshot,
+    ServiceSnapshot,
+)
+from planning.diagnostics import ValidationDiagnostic
 from planning.facts import FACT_DEFINITIONS, FactKind
 from planning.facts import FactDefinition as DomainFactDefinition
 from planning.rules import Predicate, RuleValidationResult, validate_rule_v1
@@ -73,3 +84,162 @@ def diagnostic_messages(result: RuleValidationResult) -> list[str]:
         f"{diagnostic.code} at {'.'.join(str(part) for part in diagnostic.path)}"
         for diagnostic in result.diagnostics
     ]
+
+
+@dataclass(frozen=True, slots=True)
+class StoredRuleLoadDiagnostic:
+    owner_id: str
+    diagnostics: tuple[ValidationDiagnostic, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
+
+
+class KnowledgeSnapshotLoadError(Exception):
+    """A deterministic failure to decode one or more persisted catalog rules."""
+
+    def __init__(self, rule_diagnostics: Iterable[StoredRuleLoadDiagnostic]) -> None:
+        ordered = tuple(sorted(rule_diagnostics, key=lambda item: item.owner_id))
+        self.rule_diagnostics = ordered
+        self.owner_ids = tuple(item.owner_id for item in ordered)
+        super().__init__(", ".join(self.owner_ids))
+
+
+def load_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Fully evaluate ORM reads, then return an immutable, ORM-free catalog graph."""
+
+    from .models import (
+        FactDefinition,
+        Service,
+        ServiceContradiction,
+        ServiceContradictionFact,
+        ServiceProcedureCandidate,
+        ServiceQuestion,
+        ServiceQuestionResolvedFact,
+    )
+
+    # Every queryset is explicitly ordered and immediately materialized.  The remaining
+    # work below uses only plain values and planning-domain objects.
+    fact_rows = list(FactDefinition.objects.order_by("key"))
+    service_rows = list(
+        Service.objects.order_by("semantic_id").values("semantic_id", "text_ar", "text_en")
+    )
+    candidate_rows = list(
+        ServiceProcedureCandidate.objects.order_by(
+            "service__semantic_id", "procedure__semantic_id"
+        ).values(
+            "service__semantic_id",
+            "procedure__semantic_id",
+            "procedure__text_ar",
+            "procedure__text_en",
+            "selection_predicate",
+        )
+    )
+    question_rows = list(
+        ServiceQuestion.objects.order_by("service__semantic_id", "semantic_id").values(
+            "service__semantic_id",
+            "semantic_id",
+            "text_ar",
+            "text_en",
+            "priority",
+            "fact__key",
+        )
+    )
+    question_link_rows = list(
+        ServiceQuestionResolvedFact.objects.order_by(
+            "question__semantic_id", "position", "fact__key"
+        ).values("question__semantic_id", "fact__key")
+    )
+    contradiction_rows = list(
+        ServiceContradiction.objects.order_by("service__semantic_id", "semantic_id").values(
+            "service__semantic_id", "semantic_id", "condition"
+        )
+    )
+    contradiction_link_rows = list(
+        ServiceContradictionFact.objects.order_by(
+            "contradiction__semantic_id", "position", "fact__key"
+        ).values("contradiction__semantic_id", "fact__key")
+    )
+
+    definitions = MappingProxyType({row.key: to_domain_fact(row) for row in fact_rows})
+    question_links: dict[str, list[str]] = defaultdict(list)
+    for question_link_row in question_link_rows:
+        question_links[question_link_row["question__semantic_id"]].append(
+            question_link_row["fact__key"]
+        )
+    contradiction_links: dict[str, list[str]] = defaultdict(list)
+    for contradiction_link_row in contradiction_link_rows:
+        contradiction_links[contradiction_link_row["contradiction__semantic_id"]].append(
+            contradiction_link_row["fact__key"]
+        )
+
+    candidates: dict[str, list[ProcedureCandidateSnapshot]] = defaultdict(list)
+    contradictions: dict[str, list[ContradictionSnapshot]] = defaultdict(list)
+    failures: list[StoredRuleLoadDiagnostic] = []
+    for candidate_row in candidate_rows:
+        service_id = candidate_row["service__semantic_id"]
+        procedure_id = candidate_row["procedure__semantic_id"]
+        decoded = decode_stored_rule(candidate_row["selection_predicate"], definitions)
+        if decoded.predicate is None:
+            failures.append(
+                StoredRuleLoadDiagnostic(
+                    f"candidate:{service_id}:{procedure_id}", decoded.diagnostics
+                )
+            )
+            continue
+        candidates[service_id].append(
+            ProcedureCandidateSnapshot(
+                procedure_id,
+                LocalizedText(
+                    candidate_row["procedure__text_ar"],
+                    candidate_row["procedure__text_en"],
+                ),
+                decoded.predicate,
+            )
+        )
+    for contradiction_row in contradiction_rows:
+        service_id = contradiction_row["service__semantic_id"]
+        semantic_id = contradiction_row["semantic_id"]
+        decoded = decode_stored_rule(contradiction_row["condition"], definitions)
+        if decoded.predicate is None:
+            failures.append(
+                StoredRuleLoadDiagnostic(f"contradiction:{semantic_id}", decoded.diagnostics)
+            )
+            continue
+        contradictions[service_id].append(
+            ContradictionSnapshot(
+                semantic_id,
+                decoded.predicate,
+                tuple(contradiction_links[semantic_id]),
+            )
+        )
+    if failures:
+        raise KnowledgeSnapshotLoadError(failures)
+
+    questions: dict[str, list[QuestionSnapshot]] = defaultdict(list)
+    for question_row in question_rows:
+        service_id = question_row["service__semantic_id"]
+        semantic_id = question_row["semantic_id"]
+        primary_key = question_row["fact__key"]
+        explicit_keys = question_links.get(semantic_id)
+        questions[service_id].append(
+            QuestionSnapshot(
+                semantic_id,
+                LocalizedText(question_row["text_ar"], question_row["text_en"]),
+                question_row["priority"],
+                primary_key,
+                tuple(explicit_keys) if explicit_keys else (primary_key,),
+            )
+        )
+
+    services = tuple(
+        ServiceSnapshot(
+            service_row["semantic_id"],
+            LocalizedText(service_row["text_ar"], service_row["text_en"]),
+            tuple(candidates[service_row["semantic_id"]]),
+            tuple(questions[service_row["semantic_id"]]),
+            tuple(contradictions[service_row["semantic_id"]]),
+        )
+        for service_row in service_rows
+    )
+    return KnowledgeSnapshot(definitions, services)

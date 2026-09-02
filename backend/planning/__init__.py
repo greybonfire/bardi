@@ -1,5 +1,13 @@
-"""Public framework-independent planning validation domain."""
+"""Public framework-independent planning domain."""
 
+from .catalog import (
+    ContradictionSnapshot,
+    KnowledgeSnapshot,
+    LocalizedText,
+    ProcedureCandidateSnapshot,
+    QuestionSnapshot,
+    ServiceSnapshot,
+)
 from .diagnostics import DiagnosticPath, DiagnosticPathSegment, ValidationDiagnostic
 from .evaluator import Evaluation, EvaluationTrace, TruthValue, evaluate
 from .facts import (
@@ -8,6 +16,7 @@ from .facts import (
     FactKind,
     FactValidationResult,
     FactValue,
+    PreparedFacts,
     validate_submitted_facts,
     value_matches_definition,
 )
@@ -25,6 +34,16 @@ from .rules import (
     serialize_rule_v1,
     validate_rule_v1,
 )
+from .selection import (
+    CandidateEvaluation,
+    ProcedureSelected,
+    SelectionConfigurationDefect,
+    SelectionInconclusive,
+    SelectionOutcome,
+    SelectionQuestion,
+    SelectionUnsupported,
+    select_procedure,
+)
 
 __all__ = (
     "BOOLEAN_OPERATORS",
@@ -34,6 +53,8 @@ __all__ = (
     "MAX_RULE_NODES",
     "SUPPORTED_OPERATORS",
     "BooleanOperator",
+    "CandidateEvaluation",
+    "ContradictionSnapshot",
     "DiagnosticPath",
     "DiagnosticPathSegment",
     "Evaluation",
@@ -42,13 +63,26 @@ __all__ = (
     "FactKind",
     "FactValidationResult",
     "FactValue",
+    "KnowledgeSnapshot",
     "LeafOperator",
+    "LocalizedText",
+    "PreparedFacts",
+    "ProcedureCandidateSnapshot",
+    "ProcedureSelected",
+    "QuestionSnapshot",
     "Predicate",
     "RuleOperator",
     "RuleValidationResult",
+    "SelectionConfigurationDefect",
+    "SelectionInconclusive",
+    "SelectionOutcome",
+    "SelectionQuestion",
+    "SelectionUnsupported",
+    "ServiceSnapshot",
     "TruthValue",
     "ValidationDiagnostic",
     "evaluate",
+    "select_procedure",
     "serialize_rule_v1",
     "validate_rule_v1",
     "validate_submitted_facts",

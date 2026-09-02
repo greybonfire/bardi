@@ -12,25 +12,25 @@ from knowledge.domain import compatibility_errors, load_fact_definitions
 from knowledge.forms import QuestionResolvedFactFormSet
 from knowledge.models import (
     FactDefinition,
-    Goal,
-    GoalContradiction,
-    GoalProcedureCandidate,
-    GoalQuestion,
-    GoalQuestionResolvedFact,
+    Service,
+    ServiceContradiction,
+    ServiceProcedureCandidate,
+    ServiceQuestion,
+    ServiceQuestionResolvedFact,
     Procedure,
 )
 from knowledge.services import set_contradiction_facts, set_question_resolved_facts
 
 
 class CatalogModelTests(TestCase):
-    goal: ClassVar[Goal]
-    other_goal: ClassVar[Goal]
+    service: ClassVar[Service]
+    other_service: ClassVar[Service]
 
     @classmethod
     def setUpTestData(cls) -> None:
-        cls.goal = Goal.objects.create(semantic_id="goal.one", text_ar="هدف", text_en="Goal")
-        cls.other_goal = Goal.objects.create(
-            semantic_id="goal_two", text_ar="هدف ثان", text_en="Other"
+        cls.service = Service.objects.create(semantic_id="service.one", text_ar="هدف", text_en="Service")
+        cls.other_service = Service.objects.create(
+            semantic_id="service_two", text_ar="هدف ثان", text_en="Other"
         )
 
     def test_seed_exactly_matches_pure_registry(self) -> None:
@@ -40,41 +40,41 @@ class CatalogModelTests(TestCase):
 
     def test_nonblank_validation(self) -> None:
         with self.assertRaises(ValidationError):
-            Goal(semantic_id=" ", text_ar=" ", text_en=" ").full_clean()
+            Service(semantic_id=" ", text_ar=" ", text_en=" ").full_clean()
 
     def test_candidate_requires_procedure_owner_and_database_rule(self) -> None:
         procedure = Procedure.objects.create(
             semantic_id="procedure.one",
             text_ar="إجراء",
             text_en="Procedure",
-            primary_goal=self.goal,
+            primary_service=self.service,
         )
-        candidate = GoalProcedureCandidate(
-            goal=self.other_goal,
+        candidate = ServiceProcedureCandidate(
+            service=self.other_service,
             procedure=procedure,
             selection_predicate={"op": "eq", "fact": "is_student", "value": True},
         )
         with self.assertRaises(ValidationError):
             candidate.full_clean()
-        candidate.goal = self.goal
+        candidate.service = self.service
         candidate.selection_predicate = {"op": "eq", "fact": "missing", "value": True}
         with self.assertRaises(ValidationError) as caught:
             candidate.full_clean()
         self.assertIn("unsupported_rule_fact:missing", str(caught.exception))
 
-    def test_procedure_cannot_be_reassigned_away_from_candidate_goal(self) -> None:
+    def test_procedure_cannot_be_reassigned_away_from_candidate_service(self) -> None:
         procedure = Procedure.objects.create(
             semantic_id="procedure.owner",
             text_ar="إجراء",
             text_en="Procedure",
-            primary_goal=self.goal,
+            primary_service=self.service,
         )
-        GoalProcedureCandidate.objects.create(
-            goal=self.goal,
+        ServiceProcedureCandidate.objects.create(
+            service=self.service,
             procedure=procedure,
             selection_predicate={"op": "exists", "fact": "is_student"},
         )
-        procedure.primary_goal = self.other_goal
+        procedure.primary_service = self.other_service
         with self.assertRaises(ValidationError):
             procedure.save()
 
@@ -82,9 +82,9 @@ class CatalogModelTests(TestCase):
         primary = FactDefinition.objects.get(key="national_id_expiry_date")
         equivalent = FactDefinition.objects.get(key="is_student")
         derived = FactDefinition.objects.get(key="card_expired_before_evaluation_date")
-        question = GoalQuestion.objects.create(
+        question = ServiceQuestion.objects.create(
             semantic_id="question.expiry",
-            goal=self.goal,
+            service=self.service,
             fact=primary,
             text_ar="تاريخ؟",
             text_en="Date?",
@@ -100,17 +100,17 @@ class CatalogModelTests(TestCase):
     def test_question_resolved_fact_admin_formset_rejects_derived_fact(self) -> None:
         primary = FactDefinition.objects.get(key="national_id_expiry_date")
         derived = FactDefinition.objects.get(key="card_expired_before_evaluation_date")
-        question = GoalQuestion.objects.create(
+        question = ServiceQuestion.objects.create(
             semantic_id="question.admin",
-            goal=self.goal,
+            service=self.service,
             fact=primary,
             text_ar="تاريخ؟",
             text_en="Date?",
             priority=1,
         )
         formset_class: Any = inlineformset_factory(
-            GoalQuestion,
-            GoalQuestionResolvedFact,
+            ServiceQuestion,
+            ServiceQuestionResolvedFact,
             formset=QuestionResolvedFactFormSet,
             fields=("fact", "position"),
             extra=0,
@@ -133,7 +133,7 @@ class CatalogModelTests(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn("source Facts only", str(formset.errors) + str(formset.non_form_errors()))
         with self.assertRaises(ValidationError):
-            GoalQuestionResolvedFact.objects.create(question=question, fact=derived, position=1)
+            ServiceQuestionResolvedFact.objects.create(question=question, fact=derived, position=1)
         self.assertFalse(question.resolved_fact_links.exists())
 
     def test_ordinary_orm_paths_run_catalog_validation(self) -> None:
@@ -141,26 +141,26 @@ class CatalogModelTests(TestCase):
             semantic_id="procedure.orm-validation",
             text_ar="إجراء",
             text_en="Procedure",
-            primary_goal=self.goal,
+            primary_service=self.service,
         )
         with self.assertRaises(ValidationError):
-            GoalProcedureCandidate.objects.create(
-                goal=self.other_goal,
+            ServiceProcedureCandidate.objects.create(
+                service=self.other_service,
                 procedure=procedure,
                 selection_predicate={"op": "exists", "fact": "is_student"},
             )
         with self.assertRaises(ValidationError):
-            GoalProcedureCandidate.objects.create(
-                goal=self.goal,
+            ServiceProcedureCandidate.objects.create(
+                service=self.service,
                 procedure=procedure,
                 selection_predicate={"op": "unsupported"},
             )
 
         derived = FactDefinition.objects.get(key="card_expired_before_evaluation_date")
         with self.assertRaises(ValidationError):
-            GoalQuestion.objects.create(
+            ServiceQuestion.objects.create(
                 semantic_id="question.derived",
-                goal=self.goal,
+                service=self.service,
                 fact=derived,
                 text_ar="سؤال؟",
                 text_en="Question?",
@@ -168,24 +168,24 @@ class CatalogModelTests(TestCase):
             )
 
         with self.assertRaises(ValidationError):
-            GoalContradiction.objects.create(
+            ServiceContradiction.objects.create(
                 semantic_id="contradiction.malformed",
-                goal=self.goal,
+                service=self.service,
                 condition={"op": "unsupported"},
             )
 
-        self.assertFalse(GoalProcedureCandidate.objects.filter(procedure=procedure).exists())
-        self.assertFalse(GoalQuestion.objects.filter(semantic_id="question.derived").exists())
+        self.assertFalse(ServiceProcedureCandidate.objects.filter(procedure=procedure).exists())
+        self.assertFalse(ServiceQuestion.objects.filter(semantic_id="question.derived").exists())
         self.assertFalse(
-            GoalContradiction.objects.filter(semantic_id="contradiction.malformed").exists()
+            ServiceContradiction.objects.filter(semantic_id="contradiction.malformed").exists()
         )
 
     def test_contradiction_exact_source_fact_set(self) -> None:
         first = FactDefinition.objects.get(key="is_student")
         second = FactDefinition.objects.get(key="has_current_enrollment_certificate")
-        contradiction = GoalContradiction.objects.create(
+        contradiction = ServiceContradiction.objects.create(
             semantic_id="contradiction.student",
-            goal=self.goal,
+            service=self.service,
             condition={
                 "op": "all",
                 "children": [

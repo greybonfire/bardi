@@ -13,12 +13,12 @@ from knowledge.admin import ContradictionAdmin, QuestionAdmin
 from knowledge.forms import ContradictionFactFormSet, QuestionResolvedFactFormSet
 from knowledge.models import (
     FactDefinition,
-    Goal,
-    GoalContradiction,
-    GoalContradictionFact,
-    GoalProcedureCandidate,
-    GoalQuestion,
-    GoalQuestionResolvedFact,
+    Service,
+    ServiceContradiction,
+    ServiceContradictionFact,
+    ServiceProcedureCandidate,
+    ServiceQuestion,
+    ServiceQuestionResolvedFact,
     Procedure,
 )
 from knowledge.services import set_contradiction_facts, set_question_resolved_facts
@@ -26,11 +26,11 @@ from knowledge.services import set_contradiction_facts, set_question_resolved_fa
 
 class CatalogAcceptanceIntegrityTests(TestCase):
     def setUp(self) -> None:
-        self.goal = Goal.objects.create(
-            semantic_id="goal.integrity", text_ar="هدف", text_en="Integrity Goal"
+        self.service = Service.objects.create(
+            semantic_id="service.integrity", text_ar="هدف", text_en="Integrity Service"
         )
-        self.other_goal = Goal.objects.create(
-            semantic_id="goal.integrity.other", text_ar="هدف آخر", text_en="Other Goal"
+        self.other_service = Service.objects.create(
+            semantic_id="service.integrity.other", text_ar="هدف آخر", text_en="Other Service"
         )
         self.primary = FactDefinition.objects.get(key="national_id_expiry_date")
         self.other = FactDefinition.objects.get(key="is_student")
@@ -38,47 +38,47 @@ class CatalogAcceptanceIntegrityTests(TestCase):
 
     def test_duplicate_stable_identities_and_candidate_membership_are_rejected(self) -> None:
         with self.assertRaises(ValidationError):
-            Goal(
-                semantic_id=self.goal.semantic_id,
+            Service(
+                semantic_id=self.service.semantic_id,
                 text_ar="هدف مكرر",
-                text_en="Duplicate Goal",
+                text_en="Duplicate Service",
             ).full_clean()
 
         procedure = Procedure.objects.create(
             semantic_id="procedure.integrity",
             text_ar="إجراء",
             text_en="Procedure",
-            primary_goal=self.goal,
+            primary_service=self.service,
         )
         with self.assertRaises(ValidationError):
             Procedure(
                 semantic_id=procedure.semantic_id,
                 text_ar="إجراء آخر",
                 text_en="Duplicate Procedure",
-                primary_goal=self.goal,
+                primary_service=self.service,
             ).full_clean()
 
-        question = GoalQuestion.objects.create(
+        question = ServiceQuestion.objects.create(
             semantic_id="question.integrity",
-            goal=self.goal,
+            service=self.service,
             fact=self.primary,
             text_ar="سؤال؟",
             text_en="Question?",
             priority=10,
         )
         with self.assertRaises(ValidationError):
-            GoalQuestion(
+            ServiceQuestion(
                 semantic_id=question.semantic_id,
-                goal=self.goal,
+                service=self.service,
                 fact=self.primary,
                 text_ar="سؤال آخر؟",
                 text_en="Duplicate Question?",
                 priority=20,
             ).full_clean()
 
-        contradiction = GoalContradiction.objects.create(
+        contradiction = ServiceContradiction.objects.create(
             semantic_id="contradiction.integrity",
-            goal=self.goal,
+            service=self.service,
             condition={
                 "op": "all",
                 "children": [
@@ -89,29 +89,29 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         )
         set_contradiction_facts(contradiction, [self.other, self.second])
         with self.assertRaises(ValidationError):
-            GoalContradiction(
+            ServiceContradiction(
                 semantic_id=contradiction.semantic_id,
-                goal=self.goal,
+                service=self.service,
                 condition={"op": "exists", "fact": self.other.key},
             ).full_clean()
 
-        candidate = GoalProcedureCandidate.objects.create(
-            goal=self.goal,
+        candidate = ServiceProcedureCandidate.objects.create(
+            service=self.service,
             procedure=procedure,
             selection_predicate={"op": "exists", "fact": self.other.key},
         )
         self.assertIsNotNone(candidate.pk)
         with self.assertRaises(ValidationError):
-            GoalProcedureCandidate(
-                goal=self.goal,
+            ServiceProcedureCandidate(
+                service=self.service,
                 procedure=procedure,
                 selection_predicate={"op": "eq", "fact": self.other.key, "value": True},
             ).full_clean()
 
     def test_question_fact_set_rejects_direct_row_writes_and_deletes(self) -> None:
-        question = GoalQuestion.objects.create(
+        question = ServiceQuestion.objects.create(
             semantic_id="question.boundary",
-            goal=self.goal,
+            service=self.service,
             fact=self.primary,
             text_ar="تاريخ؟",
             text_en="Date?",
@@ -119,7 +119,7 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         )
 
         with self.assertRaisesMessage(ValidationError, "set_question_resolved_facts()"):
-            GoalQuestionResolvedFact.objects.create(question=question, fact=self.other, position=1)
+            ServiceQuestionResolvedFact.objects.create(question=question, fact=self.other, position=1)
         self.assertFalse(question.resolved_fact_links.exists())
 
         set_question_resolved_facts(question, [self.primary, self.other])
@@ -133,9 +133,9 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         self.assertEqual(question.resolved_fact_keys, (self.primary.key,))
 
     def test_contradiction_fact_set_rejects_direct_row_writes_and_deletes(self) -> None:
-        contradiction = GoalContradiction.objects.create(
+        contradiction = ServiceContradiction.objects.create(
             semantic_id="contradiction.boundary",
-            goal=self.goal,
+            service=self.service,
             condition={
                 "op": "all",
                 "children": [
@@ -146,7 +146,7 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         )
 
         with self.assertRaisesMessage(ValidationError, "set_contradiction_facts()"):
-            GoalContradictionFact.objects.create(
+            ServiceContradictionFact.objects.create(
                 contradiction=contradiction, fact=self.other, position=1
             )
         self.assertFalse(contradiction.fact_links.exists())
@@ -162,17 +162,17 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         self.assertEqual(contradiction.fact_keys, (self.second.key, self.other.key))
 
     def test_admin_question_inline_persists_through_transactional_service(self) -> None:
-        question = GoalQuestion.objects.create(
+        question = ServiceQuestion.objects.create(
             semantic_id="question.admin-boundary",
-            goal=self.goal,
+            service=self.service,
             fact=self.primary,
             text_ar="تاريخ؟",
             text_en="Date?",
             priority=1,
         )
         formset_class: Any = inlineformset_factory(
-            GoalQuestion,
-            GoalQuestionResolvedFact,
+            ServiceQuestion,
+            ServiceQuestionResolvedFact,
             formset=QuestionResolvedFactFormSet,
             fields=("fact", "position"),
             extra=0,
@@ -194,17 +194,17 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         )
         self.assertTrue(formset.is_valid(), formset.errors)
 
-        model_admin = QuestionAdmin(GoalQuestion, AdminSite())
-        request = RequestFactory().post("/admin/knowledge/goalquestion/")
+        model_admin = QuestionAdmin(ServiceQuestion, AdminSite())
+        request = RequestFactory().post("/admin/knowledge/servicequestion/")
         fake_form = cast(Any, SimpleNamespace(instance=question))
         model_admin.save_formset(request, fake_form, formset, False)
 
         self.assertEqual(question.resolved_fact_keys, (self.primary.key, self.other.key))
 
     def test_admin_contradiction_inline_persists_through_transactional_service(self) -> None:
-        contradiction = GoalContradiction.objects.create(
+        contradiction = ServiceContradiction.objects.create(
             semantic_id="contradiction.admin-boundary",
-            goal=self.goal,
+            service=self.service,
             condition={
                 "op": "all",
                 "children": [
@@ -214,8 +214,8 @@ class CatalogAcceptanceIntegrityTests(TestCase):
             },
         )
         formset_class: Any = inlineformset_factory(
-            GoalContradiction,
-            GoalContradictionFact,
+            ServiceContradiction,
+            ServiceContradictionFact,
             formset=ContradictionFactFormSet,
             fields=("fact", "position"),
             extra=0,
@@ -237,8 +237,8 @@ class CatalogAcceptanceIntegrityTests(TestCase):
         )
         self.assertTrue(formset.is_valid(), formset.errors)
 
-        model_admin = ContradictionAdmin(GoalContradiction, AdminSite())
-        request = RequestFactory().post("/admin/knowledge/goalcontradiction/")
+        model_admin = ContradictionAdmin(ServiceContradiction, AdminSite())
+        request = RequestFactory().post("/admin/knowledge/servicecontradiction/")
         fake_form = cast(Any, SimpleNamespace(instance=contradiction))
         model_admin.save_formset(request, fake_form, formset, False)
 

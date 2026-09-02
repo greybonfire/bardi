@@ -15,7 +15,7 @@ def _required(value: str, field: str) -> None:
         raise ValidationError({field: "This field must contain non-whitespace text."})
 
 
-class Goal(models.Model):
+class Service(models.Model):
     semantic_id = models.CharField(max_length=128, unique=True)
     text_ar = models.TextField()
     text_en = models.TextField()
@@ -24,13 +24,13 @@ class Goal(models.Model):
         ordering = ("semantic_id",)
         constraints = [
             models.CheckConstraint(
-                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="goal_id_nonblank"
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="service_id_nonblank"
             ),
             models.CheckConstraint(
-                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="goal_ar_nonblank"
+                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="service_ar_nonblank"
             ),
             models.CheckConstraint(
-                condition=Q(text_en__regex=NONBLANK_PATTERN), name="goal_en_nonblank"
+                condition=Q(text_en__regex=NONBLANK_PATTERN), name="service_en_nonblank"
             ),
         ]
 
@@ -47,8 +47,8 @@ class Procedure(models.Model):
     semantic_id = models.CharField(max_length=128, unique=True)
     text_ar = models.TextField()
     text_en = models.TextField()
-    primary_goal = models.ForeignKey(
-        Goal, on_delete=models.PROTECT, related_name="primary_procedures"
+    primary_service = models.ForeignKey(
+        Service, on_delete=models.PROTECT, related_name="primary_procedures"
     )
 
     class Meta:
@@ -69,11 +69,11 @@ class Procedure(models.Model):
         _required(self.semantic_id, "semantic_id")
         _required(self.text_ar, "text_ar")
         _required(self.text_en, "text_en")
-        if self.pk and self.primary_goal_id:
-            incompatible = self.goal_candidates.exclude(goal_id=self.primary_goal_id).exists()
+        if self.pk and self.primary_service_id:
+            incompatible = self.service_candidates.exclude(service_id=self.primary_service_id).exists()
             if incompatible:
                 raise ValidationError(
-                    {"primary_goal": "Existing candidates belong to a different Goal."}
+                    {"primary_service": "Existing candidates belong to a different Service."}
                 )
 
     def save(self, *args: Any, **kwargs: Any) -> None:
@@ -187,25 +187,25 @@ class FactDefinition(models.Model):
         return self.key
 
 
-class GoalProcedureCandidate(models.Model):
-    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="procedure_candidates")
+class ServiceProcedureCandidate(models.Model):
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="procedure_candidates")
     procedure = models.ForeignKey(
-        Procedure, on_delete=models.CASCADE, related_name="goal_candidates"
+        Procedure, on_delete=models.CASCADE, related_name="service_candidates"
     )
     selection_predicate = models.JSONField()
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=("goal", "procedure"), name="unique_goal_procedure_candidate"
+                fields=("service", "procedure"), name="unique_service_procedure_candidate"
             )
         ]
-        indexes = [models.Index(fields=("goal", "procedure"), name="candidate_goal_proc_idx")]
+        indexes = [models.Index(fields=("service", "procedure"), name="candidate_service_proc_idx")]
 
     def clean(self) -> None:
-        if self.goal_id and self.procedure_id and self.goal_id != self.procedure.primary_goal_id:
+        if self.service_id and self.procedure_id and self.service_id != self.procedure.primary_service_id:
             raise ValidationError(
-                {"procedure": "Procedure primary Goal must match the candidate Goal."}
+                {"procedure": "Procedure primary Service must match the candidate Service."}
             )
         from .domain import decode_stored_rule, diagnostic_messages
 
@@ -218,30 +218,30 @@ class GoalProcedureCandidate(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"{self.goal.semantic_id}:{self.procedure.semantic_id}"
+        return f"{self.service.semantic_id}:{self.procedure.semantic_id}"
 
 
-class GoalQuestion(models.Model):
+class ServiceQuestion(models.Model):
     semantic_id = models.CharField(max_length=128, unique=True)
-    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="questions")
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="questions")
     fact = models.ForeignKey(
         FactDefinition, on_delete=models.PROTECT, related_name="primary_questions"
     )
     text_ar = models.TextField()
     text_en = models.TextField()
     priority = models.PositiveIntegerField()
-    resolves_facts: models.ManyToManyField[FactDefinition, GoalQuestionResolvedFact] = (
+    resolves_facts: models.ManyToManyField[FactDefinition, ServiceQuestionResolvedFact] = (
         models.ManyToManyField(
             FactDefinition,
-            through="GoalQuestionResolvedFact",
+            through="ServiceQuestionResolvedFact",
             related_name="resolving_questions",
         )
     )
 
     class Meta:
-        ordering = ("goal_id", "priority", "semantic_id")
+        ordering = ("service_id", "priority", "semantic_id")
         indexes = [
-            models.Index(fields=("goal", "priority", "semantic_id"), name="question_order_idx")
+            models.Index(fields=("service", "priority", "semantic_id"), name="question_order_idx")
         ]
         constraints = [
             models.CheckConstraint(
@@ -285,9 +285,9 @@ class GoalQuestion(models.Model):
         return self.semantic_id
 
 
-class GoalQuestionResolvedFact(models.Model):
+class ServiceQuestionResolvedFact(models.Model):
     question = models.ForeignKey(
-        GoalQuestion, on_delete=models.CASCADE, related_name="resolved_fact_links"
+        ServiceQuestion, on_delete=models.CASCADE, related_name="resolved_fact_links"
     )
     fact = models.ForeignKey(
         FactDefinition, on_delete=models.PROTECT, related_name="question_resolution_links"
@@ -314,17 +314,17 @@ class GoalQuestionResolvedFact(models.Model):
         super().save(*args, **kwargs)
 
 
-class GoalContradiction(models.Model):
+class ServiceContradiction(models.Model):
     semantic_id = models.CharField(max_length=128, unique=True)
-    goal = models.ForeignKey(Goal, on_delete=models.CASCADE, related_name="contradictions")
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="contradictions")
     condition = models.JSONField()
-    facts: models.ManyToManyField[FactDefinition, GoalContradictionFact] = models.ManyToManyField(
-        FactDefinition, through="GoalContradictionFact", related_name="contradictions"
+    facts: models.ManyToManyField[FactDefinition, ServiceContradictionFact] = models.ManyToManyField(
+        FactDefinition, through="ServiceContradictionFact", related_name="contradictions"
     )
 
     class Meta:
-        ordering = ("goal_id", "semantic_id")
-        indexes = [models.Index(fields=("goal", "semantic_id"), name="contradiction_order_idx")]
+        ordering = ("service_id", "semantic_id")
+        indexes = [models.Index(fields=("service", "semantic_id"), name="contradiction_order_idx")]
         constraints = [
             models.CheckConstraint(
                 condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="contradiction_id_nonblank"
@@ -364,9 +364,9 @@ class GoalContradiction(models.Model):
         return self.semantic_id
 
 
-class GoalContradictionFact(models.Model):
+class ServiceContradictionFact(models.Model):
     contradiction = models.ForeignKey(
-        GoalContradiction, on_delete=models.CASCADE, related_name="fact_links"
+        ServiceContradiction, on_delete=models.CASCADE, related_name="fact_links"
     )
     fact = models.ForeignKey(
         FactDefinition, on_delete=models.PROTECT, related_name="contradiction_links"

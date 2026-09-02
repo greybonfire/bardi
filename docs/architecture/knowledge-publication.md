@@ -21,7 +21,7 @@ Editors work on drafts through Django Admin initially.
 
 A draft may be created from scratch or cloned from an existing published version. Cloning copies the coherent version-owned records into new editable draft records; it does not reopen the published version for mutation.
 
-Stable identities such as Goal, Procedure, Fact key, Document Type, Authority, Service Point, and Source remain shared where semantically appropriate.
+Stable identities such as Service, Procedure, Fact key, Document Type, Authority, Service Point, and Source remain shared where semantically appropriate.
 
 ## Publication is an explicit service operation
 
@@ -45,7 +45,7 @@ The production validator must cover at least the invariants proven or required b
 
 ### Identity and ownership
 
-- valid Goal/Procedure ownership and curated Goal–Procedure membership;
+- valid Service/Procedure ownership and curated Service–Procedure membership;
 - stable/unique semantic identifiers within their scopes;
 - Procedure-Version-owned material points to the containing version;
 - basis-scoped claims/steps point to an existing Basis;
@@ -56,7 +56,7 @@ The production validator must cover at least the invariants proven or required b
 - every authored rule validates against the pinned rules-contract version;
 - referenced Fact keys exist and have valid literal types;
 - Eligibility Bases have explicit qualification and valid reachability rules;
-- every consequential source Fact required by a Basis stage has an authored Goal Question;
+- every consequential source Fact required by a Basis stage has an authored Service Question;
 - blocking dependency cycles are rejected;
 - overlapping published Procedure-Version or conflicting Service Point intervals are rejected.
 

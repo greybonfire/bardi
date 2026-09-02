@@ -9,9 +9,9 @@ from django.forms.models import BaseInlineFormSet
 from .domain import decode_stored_rule, diagnostic_messages, referenced_fact_keys
 from .models import (
     FactDefinition,
-    GoalContradiction,
-    GoalProcedureCandidate,
-    GoalQuestion,
+    ServiceContradiction,
+    ServiceProcedureCandidate,
+    ServiceQuestion,
 )
 
 
@@ -21,19 +21,19 @@ class ValidatingModelForm(forms.ModelForm):  # type: ignore[type-arg]
 
 class CandidateForm(ValidatingModelForm):
     class Meta:
-        model = GoalProcedureCandidate
+        model = ServiceProcedureCandidate
         fields = "__all__"
 
 
 class QuestionForm(ValidatingModelForm):
     class Meta:
-        model = GoalQuestion
+        model = ServiceQuestion
         fields = "__all__"
 
 
 class ContradictionForm(ValidatingModelForm):
     class Meta:
-        model = GoalContradiction
+        model = ServiceContradiction
         fields = "__all__"
 
 

@@ -269,7 +269,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name="Goal",
+            name="Service",
             fields=[
                 (
                     "id",
@@ -286,21 +286,21 @@ class Migration(migrations.Migration):
                 "constraints": [
                     models.CheckConstraint(
                         condition=models.Q(("semantic_id__regex", ".*[^[:space:]].*")),
-                        name="goal_id_nonblank",
+                        name="service_id_nonblank",
                     ),
                     models.CheckConstraint(
                         condition=models.Q(("text_ar__regex", ".*[^[:space:]].*")),
-                        name="goal_ar_nonblank",
+                        name="service_ar_nonblank",
                     ),
                     models.CheckConstraint(
                         condition=models.Q(("text_en__regex", ".*[^[:space:]].*")),
-                        name="goal_en_nonblank",
+                        name="service_en_nonblank",
                     ),
                 ],
             },
         ),
         migrations.CreateModel(
-            name="GoalContradiction",
+            name="ServiceContradiction",
             fields=[
                 (
                     "id",
@@ -311,20 +311,20 @@ class Migration(migrations.Migration):
                 ("semantic_id", models.CharField(max_length=128, unique=True)),
                 ("condition", models.JSONField()),
                 (
-                    "goal",
+                    "service",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="contradictions",
-                        to="knowledge.goal",
+                        to="knowledge.service",
                     ),
                 ),
             ],
             options={
-                "ordering": ("goal_id", "semantic_id"),
+                "ordering": ("service_id", "semantic_id"),
             },
         ),
         migrations.CreateModel(
-            name="GoalContradictionFact",
+            name="ServiceContradictionFact",
             fields=[
                 (
                     "id",
@@ -338,7 +338,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="fact_links",
-                        to="knowledge.goalcontradiction",
+                        to="knowledge.servicecontradiction",
                     ),
                 ),
                 (
@@ -355,16 +355,16 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AddField(
-            model_name="goalcontradiction",
+            model_name="servicecontradiction",
             name="facts",
             field=models.ManyToManyField(
                 related_name="contradictions",
-                through="knowledge.GoalContradictionFact",
+                through="knowledge.ServiceContradictionFact",
                 to="knowledge.factdefinition",
             ),
         ),
         migrations.CreateModel(
-            name="GoalQuestion",
+            name="ServiceQuestion",
             fields=[
                 (
                     "id",
@@ -385,20 +385,20 @@ class Migration(migrations.Migration):
                     ),
                 ),
                 (
-                    "goal",
+                    "service",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="questions",
-                        to="knowledge.goal",
+                        to="knowledge.service",
                     ),
                 ),
             ],
             options={
-                "ordering": ("goal_id", "priority", "semantic_id"),
+                "ordering": ("service_id", "priority", "semantic_id"),
             },
         ),
         migrations.CreateModel(
-            name="GoalQuestionResolvedFact",
+            name="ServiceQuestionResolvedFact",
             fields=[
                 (
                     "id",
@@ -420,7 +420,7 @@ class Migration(migrations.Migration):
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="resolved_fact_links",
-                        to="knowledge.goalquestion",
+                        to="knowledge.servicequestion",
                     ),
                 ),
             ],
@@ -429,11 +429,11 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.AddField(
-            model_name="goalquestion",
+            model_name="servicequestion",
             name="resolves_facts",
             field=models.ManyToManyField(
                 related_name="resolving_questions",
-                through="knowledge.GoalQuestionResolvedFact",
+                through="knowledge.ServiceQuestionResolvedFact",
                 to="knowledge.factdefinition",
             ),
         ),
@@ -450,11 +450,11 @@ class Migration(migrations.Migration):
                 ("text_ar", models.TextField()),
                 ("text_en", models.TextField()),
                 (
-                    "primary_goal",
+                    "primary_service",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.PROTECT,
                         related_name="primary_procedures",
-                        to="knowledge.goal",
+                        to="knowledge.service",
                     ),
                 ),
             ],
@@ -463,7 +463,7 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.CreateModel(
-            name="GoalProcedureCandidate",
+            name="ServiceProcedureCandidate",
             fields=[
                 (
                     "id",
@@ -473,80 +473,80 @@ class Migration(migrations.Migration):
                 ),
                 ("selection_predicate", models.JSONField()),
                 (
-                    "goal",
+                    "service",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
                         related_name="procedure_candidates",
-                        to="knowledge.goal",
+                        to="knowledge.service",
                     ),
                 ),
                 (
                     "procedure",
                     models.ForeignKey(
                         on_delete=django.db.models.deletion.CASCADE,
-                        related_name="goal_candidates",
+                        related_name="service_candidates",
                         to="knowledge.procedure",
                     ),
                 ),
             ],
         ),
         migrations.AddConstraint(
-            model_name="goalcontradictionfact",
+            model_name="servicecontradictionfact",
             constraint=models.UniqueConstraint(
                 fields=("contradiction", "fact"), name="unique_contradiction_fact"
             ),
         ),
         migrations.AddConstraint(
-            model_name="goalcontradictionfact",
+            model_name="servicecontradictionfact",
             constraint=models.UniqueConstraint(
                 fields=("contradiction", "position"), name="unique_contradiction_position"
             ),
         ),
         migrations.AddIndex(
-            model_name="goalcontradiction",
-            index=models.Index(fields=["goal", "semantic_id"], name="contradiction_order_idx"),
+            model_name="servicecontradiction",
+            index=models.Index(fields=["service", "semantic_id"], name="contradiction_order_idx"),
         ),
         migrations.AddConstraint(
-            model_name="goalcontradiction",
+            model_name="servicecontradiction",
             constraint=models.CheckConstraint(
                 condition=models.Q(("semantic_id__regex", ".*[^[:space:]].*")),
                 name="contradiction_id_nonblank",
             ),
         ),
         migrations.AddConstraint(
-            model_name="goalquestionresolvedfact",
+            model_name="servicequestionresolvedfact",
             constraint=models.UniqueConstraint(
                 fields=("question", "fact"), name="unique_question_resolved_fact"
             ),
         ),
         migrations.AddConstraint(
-            model_name="goalquestionresolvedfact",
+            model_name="servicequestionresolvedfact",
             constraint=models.UniqueConstraint(
                 fields=("question", "position"), name="unique_question_resolved_position"
             ),
         ),
         migrations.AddIndex(
-            model_name="goalquestion",
+            model_name="servicequestion",
             index=models.Index(
-                fields=["goal", "priority", "semantic_id"], name="question_order_idx"
+                fields=["service", "priority", "semantic_id"], name="question_order_idx"
             ),
         ),
         migrations.AddConstraint(
-            model_name="goalquestion",
+            model_name="servicequestion",
             constraint=models.CheckConstraint(
                 condition=models.Q(("semantic_id__regex", ".*[^[:space:]].*")),
                 name="question_id_nonblank",
             ),
         ),
         migrations.AddConstraint(
-            model_name="goalquestion",
+            model_name="servicequestion",
             constraint=models.CheckConstraint(
                 condition=models.Q(("text_ar__regex", ".*[^[:space:]].*")),
                 name="question_ar_nonblank",
             ),
         ),
         migrations.AddConstraint(
-            model_name="goalquestion",
+            model_name="servicequestion",
             constraint=models.CheckConstraint(
                 condition=models.Q(("text_en__regex", ".*[^[:space:]].*")),
                 name="question_en_nonblank",
@@ -574,13 +574,13 @@ class Migration(migrations.Migration):
             ),
         ),
         migrations.AddIndex(
-            model_name="goalprocedurecandidate",
-            index=models.Index(fields=["goal", "procedure"], name="candidate_goal_proc_idx"),
+            model_name="serviceprocedurecandidate",
+            index=models.Index(fields=["service", "procedure"], name="candidate_service_proc_idx"),
         ),
         migrations.AddConstraint(
-            model_name="goalprocedurecandidate",
+            model_name="serviceprocedurecandidate",
             constraint=models.UniqueConstraint(
-                fields=("goal", "procedure"), name="unique_goal_procedure_candidate"
+                fields=("service", "procedure"), name="unique_service_procedure_candidate"
             ),
         ),
         migrations.AddConstraint(

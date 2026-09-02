@@ -18,12 +18,12 @@ from .forms import (
 )
 from .models import (
     FactDefinition,
-    Goal,
-    GoalContradiction,
-    GoalContradictionFact,
-    GoalProcedureCandidate,
-    GoalQuestion,
-    GoalQuestionResolvedFact,
+    Service,
+    ServiceContradiction,
+    ServiceContradictionFact,
+    ServiceProcedureCandidate,
+    ServiceQuestion,
+    ServiceQuestionResolvedFact,
     Procedure,
 )
 from .services import set_contradiction_facts, set_question_resolved_facts
@@ -47,23 +47,23 @@ def _ordered_formset_facts(
 
 
 class CandidateInline(admin.TabularInline):  # type: ignore[type-arg]
-    model = GoalProcedureCandidate
+    model = ServiceProcedureCandidate
     form = CandidateForm
     extra = 0
     autocomplete_fields = ("procedure",)
 
     def get_formset(
-        self, request: HttpRequest, obj: Goal | None = None, **kwargs: object
+        self, request: HttpRequest, obj: Service | None = None, **kwargs: object
     ) -> type[BaseInlineFormSet[Any, Any, ModelForm[Any]]]:
         formset = super().get_formset(request, obj, **kwargs)
         procedure_field = formset.form.base_fields.get("procedure")
         if procedure_field is not None and hasattr(procedure_field, "queryset"):
-            procedure_field.queryset = Procedure.objects.filter(primary_goal=obj)
+            procedure_field.queryset = Procedure.objects.filter(primary_service=obj)
         return formset
 
 
 class QuestionOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
-    model = GoalQuestion
+    model = ServiceQuestion
     form = QuestionForm
     extra = 0
     autocomplete_fields = ("fact",)
@@ -71,19 +71,19 @@ class QuestionOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
 
 
 class ContradictionOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
-    model = GoalContradiction
+    model = ServiceContradiction
     extra = 0
     fields = ("semantic_id", "condition")
     readonly_fields = ("semantic_id", "condition")
     can_delete = False
     show_change_link = True
 
-    def has_add_permission(self, request: HttpRequest, obj: Goal | None = None) -> bool:
+    def has_add_permission(self, request: HttpRequest, obj: Service | None = None) -> bool:
         return False
 
 
-@admin.register(Goal)
-class GoalAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+@admin.register(Service)
+class ServiceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     list_display = ("semantic_id", "text_en")
     search_fields = ("semantic_id", "text_en", "text_ar")
     ordering = ("semantic_id",)
@@ -92,20 +92,20 @@ class GoalAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
 
 @admin.register(Procedure)
 class ProcedureAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
-    list_display = ("semantic_id", "primary_goal", "text_en")
-    list_filter = ("primary_goal",)
-    search_fields = ("semantic_id", "primary_goal__semantic_id", "text_en", "text_ar")
-    autocomplete_fields = ("primary_goal",)
+    list_display = ("semantic_id", "primary_service", "text_en")
+    list_filter = ("primary_service",)
+    search_fields = ("semantic_id", "primary_service__semantic_id", "text_en", "text_ar")
+    autocomplete_fields = ("primary_service",)
     ordering = ("semantic_id",)
 
 
-@admin.register(GoalProcedureCandidate)
+@admin.register(ServiceProcedureCandidate)
 class CandidateAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = CandidateForm
-    list_display = ("goal", "procedure")
-    list_filter = ("goal",)
-    search_fields = ("goal__semantic_id", "procedure__semantic_id")
-    autocomplete_fields = ("goal", "procedure")
+    list_display = ("service", "procedure")
+    list_filter = ("service",)
+    search_fields = ("service__semantic_id", "procedure__semantic_id")
+    autocomplete_fields = ("service", "procedure")
     formfield_overrides = {models.JSONField: {"widget": Textarea(attrs={"rows": 8, "cols": 80})}}
 
 
@@ -135,20 +135,20 @@ class FactDefinitionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
 
 
 class ResolvedFactInline(admin.TabularInline):  # type: ignore[type-arg]
-    model = GoalQuestionResolvedFact
+    model = ServiceQuestionResolvedFact
     formset = QuestionResolvedFactFormSet
     extra = 1
     autocomplete_fields = ("fact",)
 
 
-@admin.register(GoalQuestion)
+@admin.register(ServiceQuestion)
 class QuestionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = QuestionForm
-    list_display = ("semantic_id", "goal", "fact", "priority")
-    list_filter = ("goal",)
-    search_fields = ("semantic_id", "goal__semantic_id", "fact__key")
-    autocomplete_fields = ("goal", "fact")
-    ordering = ("goal_id", "priority", "semantic_id")
+    list_display = ("semantic_id", "service", "fact", "priority")
+    list_filter = ("service",)
+    search_fields = ("semantic_id", "service__semantic_id", "fact__key")
+    autocomplete_fields = ("service", "fact")
+    ordering = ("service_id", "priority", "semantic_id")
     inlines = (ResolvedFactInline,)
 
     def save_formset(
@@ -158,29 +158,29 @@ class QuestionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         formset: BaseInlineFormSet[Any, Any, ModelForm[Any]],
         change: bool,
     ) -> None:
-        if formset.model is GoalQuestionResolvedFact:
+        if formset.model is ServiceQuestionResolvedFact:
             set_question_resolved_facts(
-                cast(GoalQuestion, form.instance), _ordered_formset_facts(formset)
+                cast(ServiceQuestion, form.instance), _ordered_formset_facts(formset)
             )
             return
         super().save_formset(request, form, formset, change)
 
 
 class ContradictionFactInline(admin.TabularInline):  # type: ignore[type-arg]
-    model = GoalContradictionFact
+    model = ServiceContradictionFact
     formset = ContradictionFactFormSet
     extra = 2
     autocomplete_fields = ("fact",)
 
 
-@admin.register(GoalContradiction)
+@admin.register(ServiceContradiction)
 class ContradictionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = ContradictionForm
-    list_display = ("semantic_id", "goal", "ordered_fact_keys")
-    list_filter = ("goal",)
-    search_fields = ("semantic_id", "goal__semantic_id", "fact_links__fact__key")
-    autocomplete_fields = ("goal",)
-    ordering = ("goal_id", "semantic_id")
+    list_display = ("semantic_id", "service", "ordered_fact_keys")
+    list_filter = ("service",)
+    search_fields = ("semantic_id", "service__semantic_id", "fact_links__fact__key")
+    autocomplete_fields = ("service",)
+    ordering = ("service_id", "semantic_id")
     inlines = (ContradictionFactInline,)
     formfield_overrides = {models.JSONField: {"widget": Textarea(attrs={"rows": 8, "cols": 80})}}
 
@@ -191,13 +191,13 @@ class ContradictionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         formset: BaseInlineFormSet[Any, Any, ModelForm[Any]],
         change: bool,
     ) -> None:
-        if formset.model is GoalContradictionFact:
+        if formset.model is ServiceContradictionFact:
             set_contradiction_facts(
-                cast(GoalContradiction, form.instance), _ordered_formset_facts(formset)
+                cast(ServiceContradiction, form.instance), _ordered_formset_facts(formset)
             )
             return
         super().save_formset(request, form, formset, change)
 
     @admin.display(description="Facts")
-    def ordered_fact_keys(self, obj: GoalContradiction) -> str:
+    def ordered_fact_keys(self, obj: ServiceContradiction) -> str:
         return ", ".join(obj.fact_keys)

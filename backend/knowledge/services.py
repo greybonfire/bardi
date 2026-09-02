@@ -11,16 +11,16 @@ from .aggregate_guard import allow_aggregate_relation_mutation
 from .domain import decode_stored_rule, diagnostic_messages, referenced_fact_keys
 from .models import (
     FactDefinition,
-    GoalContradiction,
-    GoalContradictionFact,
-    GoalProcedureCandidate,
-    GoalQuestion,
-    GoalQuestionResolvedFact,
+    ServiceContradiction,
+    ServiceContradictionFact,
+    ServiceProcedureCandidate,
+    ServiceQuestion,
+    ServiceQuestionResolvedFact,
 )
 
 
 @transaction.atomic
-def save_candidate(candidate: GoalProcedureCandidate) -> GoalProcedureCandidate:
+def save_candidate(candidate: ServiceProcedureCandidate) -> ServiceProcedureCandidate:
     candidate.full_clean()
     candidate.save()
     return candidate
@@ -37,8 +37,8 @@ def _materialize_facts(facts: Iterable[FactDefinition]) -> tuple[FactDefinition,
 
 @transaction.atomic
 def set_question_resolved_facts(
-    question: GoalQuestion, facts: Iterable[FactDefinition]
-) -> GoalQuestion:
+    question: ServiceQuestion, facts: Iterable[FactDefinition]
+) -> ServiceQuestion:
     values = _materialize_facts(facts)
     question.full_clean(exclude=("resolves_facts",))
     if any(fact.derived for fact in values):
@@ -48,8 +48,8 @@ def set_question_resolved_facts(
     # Validation precedes replacement so a rejected proposal cannot destroy current rows.
     with allow_aggregate_relation_mutation():
         question.resolved_fact_links.all().delete()
-        GoalQuestionResolvedFact.objects.bulk_create(
-            GoalQuestionResolvedFact(question=question, fact=fact, position=index)
+        ServiceQuestionResolvedFact.objects.bulk_create(
+            ServiceQuestionResolvedFact(question=question, fact=fact, position=index)
             for index, fact in enumerate(values, start=1)
         )
     question.full_clean(exclude=("resolves_facts",))
@@ -58,8 +58,8 @@ def set_question_resolved_facts(
 
 @transaction.atomic
 def set_contradiction_facts(
-    contradiction: GoalContradiction, facts: Iterable[FactDefinition]
-) -> GoalContradiction:
+    contradiction: ServiceContradiction, facts: Iterable[FactDefinition]
+) -> ServiceContradiction:
     values = _materialize_facts(facts)
     if len(values) < 2:
         raise ValidationError("A contradiction requires at least two declared Facts.")
@@ -76,8 +76,8 @@ def set_contradiction_facts(
     contradiction.validate_constraints()
     with allow_aggregate_relation_mutation():
         contradiction.fact_links.all().delete()
-        GoalContradictionFact.objects.bulk_create(
-            GoalContradictionFact(contradiction=contradiction, fact=fact, position=index)
+        ServiceContradictionFact.objects.bulk_create(
+            ServiceContradictionFact(contradiction=contradiction, fact=fact, position=index)
             for index, fact in enumerate(values, start=1)
         )
     contradiction.full_clean(exclude=("facts",))
@@ -85,15 +85,15 @@ def set_contradiction_facts(
 
 
 def validate_core_catalog() -> None:
-    from .models import FactDefinition, Goal, Procedure
+    from .models import FactDefinition, Service, Procedure
 
     for model in (
-        Goal,
+        Service,
         Procedure,
         FactDefinition,
-        GoalProcedureCandidate,
-        GoalQuestion,
-        GoalContradiction,
+        ServiceProcedureCandidate,
+        ServiceQuestion,
+        ServiceContradiction,
     ):
         for instance in model.objects.all():
             instance.full_clean()

@@ -183,6 +183,9 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
     )
 
     definitions = MappingProxyType({row.key: to_domain_fact(row) for row in fact_rows})
+    published_definitions = MappingProxyType(
+        {row.key: to_domain_fact(row) for row in fact_rows if row.is_published}
+    )
     question_links: dict[str, list[str]] = defaultdict(list)
     for question_link_row in question_link_rows:
         question_links[question_link_row["question__semantic_id"]].append(
@@ -221,7 +224,7 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
         )
     for version_row in version_rows:
         semantic_id = version_row["semantic_id"]
-        decoded = decode_stored_rule(version_row["applicability"], definitions)
+        decoded = decode_stored_rule(version_row["applicability"], published_definitions)
         if decoded.predicate is None:
             failures.append(
                 StoredRuleLoadDiagnostic(f"procedure_version:{semantic_id}", decoded.diagnostics)

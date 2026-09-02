@@ -48,15 +48,46 @@ Version 1 accepts at most **128 predicate nodes**, including the root, and at mo
 
 Validation diagnostics have the structured shape `{"code": <string>, "path": <segments>}`. In Python the path is an immutable tuple of string or integer segments. Fact paths begin `("facts", key)`. Rule paths begin `("rule",)`, child paths append `("children", index)`, and field or operand paths append the field name and, for an individual `in` value, its index. Diagnostics are deterministic, retain equal codes at distinct paths, and are deduplicated only when both code and path are identical.
 
-Malformed serialized ASTs never produce a typed `Predicate`. This milestone validates and decodes rules only; it does not evaluate rules, derive Facts, or produce truth values.
+Malformed serialized ASTs never produce a typed `Predicate`. Validation remains a distinct, mandatory stage; successful rule and Fact validation may feed the pure production evaluator. `None` is malformed serialized rule input. It never produces a predicate and is never interpreted by the evaluator as an always-true rule.
 
 ## Three-valued evaluation
 
-Valid predicates evaluate under strong Kleene logic to exactly `TRUE`, `FALSE`, or `UNKNOWN`.
+The framework-independent production seam is exactly:
 
-Malformed rules and invalid Fact values are diagnostics outside the truth-value domain.
+```python
+def evaluate(
+    predicate: Predicate,
+    facts: Mapping[str, FactValue],
+    *,
+    submitted_keys: frozenset[str],
+) -> Evaluation: ...
+```
 
-For editor/test inspection, pure child predicates are evaluated completely so traces can show dominated branches. `affected_result`/equivalent metadata distinguishes an UNKNOWN that mattered from one dominated by another branch.
+`predicate` is a non-optional result of successful `validate_rule_v1`; `facts` is a typed immutable mapping produced by successful Fact validation and any later derivation. Callers must explicitly capture `submitted_keys` from validated source Facts before derivation. It is not inferred from `facts`, because that mapping may contain derived Facts. Malformed rules and invalid Fact values produce structured validation diagnostics outside the truth-value domain and must not be evaluated.
+
+Valid predicates evaluate under Strong Kleene logic to exactly `TRUE`, `FALSE`, or `UNKNOWN`. Comparisons against omitted Facts are `UNKNOWN`; `exists` is `TRUE` exactly when its source key is in `submitted_keys` and is otherwise `FALSE`.
+
+`all` has the following exhaustive binary table (rows are left operands):
+
+| `all` | TRUE | FALSE | UNKNOWN |
+|---|---|---|---|
+| **TRUE** | TRUE | FALSE | UNKNOWN |
+| **FALSE** | FALSE | FALSE | FALSE |
+| **UNKNOWN** | UNKNOWN | FALSE | UNKNOWN |
+
+`any` has the following exhaustive binary table:
+
+| `any` | TRUE | FALSE | UNKNOWN |
+|---|---|---|---|
+| **TRUE** | TRUE | TRUE | TRUE |
+| **FALSE** | TRUE | FALSE | UNKNOWN |
+| **UNKNOWN** | TRUE | UNKNOWN | UNKNOWN |
+
+`not` maps TRUE to FALSE, FALSE to TRUE, and UNKNOWN to UNKNOWN. N-ary `all` is FALSE if any child is FALSE, TRUE if all are TRUE, and UNKNOWN otherwise. N-ary `any` is TRUE if any child is TRUE, FALSE if all are FALSE, and UNKNOWN otherwise.
+
+Every authored boolean child is evaluated in tuple order without short-circuiting. Parent missing-Fact sets contain only missing Facts from UNKNOWN children that determine an UNKNOWN parent: `FALSE AND UNKNOWN` and `TRUE OR UNKNOWN` have empty parent sets, while `TRUE AND UNKNOWN` and `FALSE OR UNKNOWN` retain the consequential UNKNOWN sets. Sets are immutable and ordering is never derived from them.
+
+Transient editor/test traces preserve every evaluated subtree, including dominated UNKNOWN nodes and their local missing sets and values. `affected_result=True` on an UNKNOWN marks a consequential unresolved branch; `False` marks an evaluated branch dominated by the enclosing result, and applies recursively to that entire subtree. Traces are not persisted, logged, sent to observability, or included in public planning/API DTOs. Evaluation itself performs no decoding, validation, derivation, orchestration, selection, persistence, framework, database, network, or filesystem work.
 
 ## Procedure selection
 

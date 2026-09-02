@@ -6,6 +6,14 @@ from pathlib import Path
 
 
 class PureDomainImportBoundaryTests(unittest.TestCase):
+    def test_evaluator_api_is_public(self) -> None:
+        from planning import Evaluation, EvaluationTrace, TruthValue, evaluate
+
+        self.assertEqual(TruthValue.UNKNOWN.value, "UNKNOWN")
+        self.assertTrue(callable(evaluate))
+        self.assertEqual(Evaluation.__module__, "planning.evaluator")
+        self.assertEqual(EvaluationTrace.__module__, "planning.evaluator")
+
     def test_production_modules_have_no_framework_or_io_dependencies(self) -> None:
         package = Path(__file__).resolve().parents[1]
         prohibited = {

@@ -13,7 +13,12 @@ from planning import (
     select_procedure,
 )
 
-from knowledge.domain import KnowledgeSnapshotLoadError, load_knowledge_snapshot
+from knowledge.domain import (
+    KnowledgeSnapshotLoadError,
+    decode_stored_rule,
+    load_consistent_knowledge_snapshot,
+    load_knowledge_snapshot,
+)
 from knowledge.models import (
     FactDefinition,
     Procedure,
@@ -31,7 +36,7 @@ class KnowledgeSnapshotTests(TestCase):
     def setUp(self) -> None:
         self.actor = get_user_model().objects.create_user(username="snapshot-publisher")
         self.service = Service.objects.create(
-            semantic_id="snapshot.service", text_ar="خدمة", text_en="Service"
+            semantic_id="snapshot.service", text_ar="خدمة", text_en="Service", is_active=True
         )
         source_a = FactDefinition.objects.get(key="is_student")
         source_b = FactDefinition.objects.get(key="has_current_enrollment_certificate")
@@ -112,6 +117,7 @@ class KnowledgeSnapshotTests(TestCase):
         service = next(
             item for item in snapshot.services if item.semantic_id == self.service.semantic_id
         )
+        self.assertTrue(service.is_active)
         self.assertEqual(
             tuple(item.procedure_semantic_id for item in service.candidates),
             ("snapshot.procedure.a", "snapshot.procedure.z"),
@@ -191,10 +197,79 @@ class KnowledgeSnapshotTests(TestCase):
         self.assertEqual(snapshot.procedure_versions[0].text.en, "Version")
         self.assertEqual(snapshot.procedure_versions[0].state, "published")
 
+    def test_consistent_loader_rejects_an_already_active_transaction(self) -> None:
+        with self.assertRaisesRegex(RuntimeError, "outermost transaction"):
+            load_consistent_knowledge_snapshot()
+
     def test_incomplete_drafts_are_excluded_from_the_planning_snapshot(self) -> None:
         ProcedureVersion.objects.filter(pk=self.version.pk).update(applicability={"op": "broken"})
         snapshot = load_knowledge_snapshot()
         self.assertEqual(snapshot.procedure_versions, ())
+
+    def test_active_question_with_unpublished_fact_fails_until_fact_is_published(self) -> None:
+        hidden = FactDefinition.objects.create(
+            key="snapshot.hidden.question", kind=FactDefinition.Kind.BOOLEAN
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="snapshot.question.hidden",
+            service=self.service,
+            fact=hidden,
+            text_ar="سؤال مخفي",
+            text_en="Hidden question",
+            priority=4,
+        )
+
+        with self.assertRaises(KnowledgeSnapshotLoadError) as caught:
+            load_knowledge_snapshot()
+        self.assertEqual(caught.exception.owner_ids, ("question:snapshot.question.hidden",))
+
+        hidden.is_published = True
+        hidden.save()
+        snapshot = load_knowledge_snapshot()
+        self.assertIn(hidden.key, snapshot.fact_definitions)
+
+    def test_active_contradiction_with_unpublished_fact_fails_until_fact_is_published(
+        self,
+    ) -> None:
+        hidden = FactDefinition.objects.create(
+            key="snapshot.hidden.contradiction", kind=FactDefinition.Kind.BOOLEAN
+        )
+        published = FactDefinition.objects.get(key="is_student")
+        contradiction = ServiceContradiction.objects.create(
+            semantic_id="snapshot.contradiction.hidden",
+            service=self.service,
+            condition={
+                "op": "all",
+                "children": [
+                    {"op": "eq", "fact": published.key, "value": True},
+                    {"op": "eq", "fact": hidden.key, "value": False},
+                ],
+            },
+        )
+        set_contradiction_facts(contradiction, (published, hidden))
+
+        with self.assertRaises(KnowledgeSnapshotLoadError) as caught:
+            load_knowledge_snapshot()
+        self.assertEqual(
+            caught.exception.owner_ids, ("contradiction:snapshot.contradiction.hidden",)
+        )
+
+        hidden.is_published = True
+        hidden.save()
+        snapshot = load_knowledge_snapshot()
+        self.assertIn(hidden.key, snapshot.fact_definitions)
+
+    def test_public_snapshot_excludes_unpublished_fact_without_active_dependencies(self) -> None:
+        hidden = FactDefinition.objects.create(
+            key="snapshot.hidden.unused", kind=FactDefinition.Kind.BOOLEAN
+        )
+        snapshot = load_knowledge_snapshot()
+        self.assertNotIn(hidden.key, snapshot.fact_definitions)
+
+        # Draft authoring still decodes against the complete internal Fact registry.
+        authored = decode_stored_rule({"op": "eq", "fact": hidden.key, "value": True})
+        self.assertIsNotNone(authored.predicate)
+        self.assertEqual(authored.diagnostics, ())
 
     def test_malformed_stored_rule_fails_with_stable_owner_and_diagnostics(self) -> None:
         ServiceProcedureCandidate.objects.filter(

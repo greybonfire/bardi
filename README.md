@@ -12,7 +12,7 @@ checks. See [`docs/development.md`](docs/development.md) for local setup and val
 
 The authoritative production design starts at [`docs/architecture/README.md`](docs/architecture/README.md). Accepted architectural decisions are recorded in [`docs/adr/`](docs/adr/).
 
-Production will be a Django/PostgreSQL modular monolith with a small Django Ninja application interface and a separate Next.js web application. The planning engine remains a pure domain component behind the Django application layer.
+Production will be a Django/PostgreSQL modular monolith with a small Django Ninja application interface and a separate Next.js web application. The planning engine remains a pure domain component behind the Django application layer. The first public endpoint contract is documented in [`docs/api/v1.md`](docs/api/v1.md).
 
 ## Frozen prototype
 

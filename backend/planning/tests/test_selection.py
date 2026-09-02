@@ -38,7 +38,9 @@ def catalog(
         "b": FactDefinition("b", "boolean"),
         "derived": FactDefinition("derived", "boolean", derived=True),
     }
-    service = ServiceSnapshot("service", LocalizedText("ع", "Service"), candidates, questions, ())
+    service = ServiceSnapshot(
+        "service", LocalizedText("ع", "Service"), candidates, questions, (), is_active=True
+    )
     return KnowledgeSnapshot(definitions, (service,))
 
 
@@ -91,6 +93,27 @@ class SelectionTests(unittest.TestCase):
             select_procedure(catalog(()), "absent", prepared()),
             SelectionUnsupported("unknown_service", ()),
         )
+
+    def test_inactive_service_is_rejected_before_evaluation(self) -> None:
+        active = catalog((candidate("p", Predicate("eq", "a", True)),))
+        service = active.services[0]
+        inactive = KnowledgeSnapshot(
+            active.fact_definitions,
+            (
+                ServiceSnapshot(
+                    service.semantic_id,
+                    service.text,
+                    service.candidates,
+                    service.questions,
+                    service.contradictions,
+                    is_active=False,
+                ),
+            ),
+        )
+        with patch("planning.selection.evaluate") as evaluate:
+            outcome = select_procedure(inactive, "service", prepared({"a": True}))
+        self.assertEqual(outcome, SelectionUnsupported("inactive_service", ()))
+        evaluate.assert_not_called()
 
     def test_multiple_true_is_inconclusive_even_with_unknown(self) -> None:
         outcome = select_procedure(

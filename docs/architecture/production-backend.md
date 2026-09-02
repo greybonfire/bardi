@@ -75,9 +75,11 @@ The production schema must be designed from the domain model rather than copied 
 
 ## Public application interface
 
-Version 1 exposes one stateless planning operation that advances a Service from the caller's current Facts and locale. Read-only catalog endpoints may expose Services or other navigation metadata, but clients do not receive rule ASTs, raw Evidence Links, internal discrepancies, or full Evaluation Traces.
+Version 1 exposes `GET /v1/services` and `POST /v1/planning`; the exact contract is in [`../api/v1.md`](../api/v1.md). Navigation includes only explicitly active Services (`Service.is_active` is the sole activation criterion) and bilingual titles. Planning consumes the caller's current source Facts, exact locale, and calendar evaluation date without a persisted Case. One complete read-only, repeatable-read PostgreSQL snapshot is materialized before pure planning starts.
 
-The web client keeps in-progress answers client-side and resubmits the current Fact set. A future saved-profile feature requires a separate privacy/product decision; it is not part of the initial backend contract.
+The four public discriminators are `next_question`, `plan`, `inconclusive`, and `invalid`. In #37, question, inconclusive, and invalid are reachable. Plan is reserved and intentionally unreachable. Issue #38 owns only case preparation: deterministic Fact derivation, contradiction handling, public contradiction diagnostics, and the ordering of those steps before Procedure selection. Procedure-Version applicability and plan assembly are deferred to later planning work; the current boundary reports stable unavailable reasons rather than inventing semantics. Clients receive no rule ASTs, raw Facts, Evidence Links, internal discrepancies or rationale, publication actors, or Evaluation Traces.
+
+The web client keeps in-progress answers client-side and resubmits the current Fact set. A future saved-profile feature requires a separate privacy/product decision; it is not part of the initial backend contract. The first deployment assumes same-origin or reverse-proxied Next.js; cross-origin CORS policy is a separate deployment decision.
 
 ## Privacy and observability
 

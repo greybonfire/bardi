@@ -91,7 +91,8 @@ class ContradictionOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
-    list_display = ("semantic_id", "text_en")
+    list_display = ("semantic_id", "text_en", "is_active")
+    list_filter = ("is_active",)
     search_fields = ("semantic_id", "text_en", "text_ar")
     ordering = ("semantic_id",)
     inlines = (CandidateInline, QuestionOwnerInline, ContradictionOwnerInline)

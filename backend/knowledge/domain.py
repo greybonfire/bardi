@@ -106,7 +106,7 @@ class KnowledgeSnapshotLoadError(Exception):
         super().__init__(", ".join(self.owner_ids))
 
 
-def load_knowledge_snapshot() -> KnowledgeSnapshot:
+def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
     """Fully evaluate ORM reads, then return an immutable, ORM-free catalog graph."""
 
     from .models import (
@@ -124,7 +124,9 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
     # work below uses only plain values and planning-domain objects.
     fact_rows = list(FactDefinition.objects.order_by("key"))
     service_rows = list(
-        Service.objects.order_by("semantic_id").values("semantic_id", "text_ar", "text_en")
+        Service.objects.order_by("semantic_id").values(
+            "semantic_id", "text_ar", "text_en", "is_active"
+        )
     )
     candidate_rows = list(
         ServiceProcedureCandidate.objects.order_by(
@@ -182,10 +184,14 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
         ).values("contradiction__semantic_id", "fact__key")
     )
 
+    # Authoring adapters decode against every definition, but request-time planning crosses
+    # a stricter publication boundary.  Unpublished definitions must neither validate caller
+    # input nor make active public knowledge appear usable.
     definitions = MappingProxyType({row.key: to_domain_fact(row) for row in fact_rows})
     published_definitions = MappingProxyType(
         {row.key: to_domain_fact(row) for row in fact_rows if row.is_published}
     )
+    active_service_ids = {row["semantic_id"] for row in service_rows if row["is_active"]}
     question_links: dict[str, list[str]] = defaultdict(list)
     for question_link_row in question_link_rows:
         question_links[question_link_row["question__semantic_id"]].append(
@@ -204,7 +210,10 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
     for candidate_row in candidate_rows:
         service_id = candidate_row["service__semantic_id"]
         procedure_id = candidate_row["procedure__semantic_id"]
-        decoded = decode_stored_rule(candidate_row["selection_predicate"], definitions)
+        owner_definitions = (
+            published_definitions if service_id in active_service_ids else definitions
+        )
+        decoded = decode_stored_rule(candidate_row["selection_predicate"], owner_definitions)
         if decoded.predicate is None:
             failures.append(
                 StoredRuleLoadDiagnostic(
@@ -247,21 +256,32 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
     for contradiction_row in contradiction_rows:
         service_id = contradiction_row["service__semantic_id"]
         semantic_id = contradiction_row["semantic_id"]
-        decoded = decode_stored_rule(contradiction_row["condition"], definitions)
+        owner_definitions = (
+            published_definitions if service_id in active_service_ids else definitions
+        )
+        decoded = decode_stored_rule(contradiction_row["condition"], owner_definitions)
         if decoded.predicate is None:
             failures.append(
                 StoredRuleLoadDiagnostic(f"contradiction:{semantic_id}", decoded.diagnostics)
             )
             continue
+        declared_keys = tuple(contradiction_links[semantic_id])
+        if service_id in active_service_ids:
+            unpublished_keys = sorted(set(declared_keys) - published_definitions.keys())
+            if unpublished_keys:
+                failures.append(
+                    StoredRuleLoadDiagnostic(
+                        f"contradiction:{semantic_id}",
+                        tuple(
+                            ValidationDiagnostic("unpublished_fact", ("facts", key))
+                            for key in unpublished_keys
+                        ),
+                    )
+                )
+                continue
         contradictions[service_id].append(
-            ContradictionSnapshot(
-                semantic_id,
-                decoded.predicate,
-                tuple(contradiction_links[semantic_id]),
-            )
+            ContradictionSnapshot(semantic_id, decoded.predicate, declared_keys)
         )
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
 
     questions: dict[str, list[QuestionSnapshot]] = defaultdict(list)
     for question_row in question_rows:
@@ -269,15 +289,32 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
         semantic_id = question_row["semantic_id"]
         primary_key = question_row["fact__key"]
         explicit_keys = question_links.get(semantic_id)
+        resolved_keys = tuple(explicit_keys) if explicit_keys else (primary_key,)
+        if service_id in active_service_ids:
+            unpublished_keys = sorted({primary_key, *resolved_keys} - published_definitions.keys())
+            if unpublished_keys:
+                failures.append(
+                    StoredRuleLoadDiagnostic(
+                        f"question:{semantic_id}",
+                        tuple(
+                            ValidationDiagnostic("unpublished_fact", ("facts", key))
+                            for key in unpublished_keys
+                        ),
+                    )
+                )
+                continue
         questions[service_id].append(
             QuestionSnapshot(
                 semantic_id,
                 LocalizedText(question_row["text_ar"], question_row["text_en"]),
                 question_row["priority"],
                 primary_key,
-                tuple(explicit_keys) if explicit_keys else (primary_key,),
+                resolved_keys,
             )
         )
+
+    if failures:
+        raise KnowledgeSnapshotLoadError(failures)
 
     services = tuple(
         ServiceSnapshot(
@@ -286,7 +323,27 @@ def load_knowledge_snapshot() -> KnowledgeSnapshot:
             tuple(candidates[service_row["semantic_id"]]),
             tuple(questions[service_row["semantic_id"]]),
             tuple(contradictions[service_row["semantic_id"]]),
+            is_active=service_row["is_active"],
         )
         for service_row in service_rows
     )
-    return KnowledgeSnapshot(definitions, services, tuple(versions))
+    return KnowledgeSnapshot(published_definitions, services, tuple(versions))
+
+
+def load_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Load a detached snapshot without imposing a transaction policy."""
+
+    return _materialize_knowledge_snapshot()
+
+
+def load_consistent_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Load all published knowledge in one outermost read-only repeatable-read transaction."""
+
+    from django.db import connection, transaction
+
+    if connection.in_atomic_block:
+        raise RuntimeError("a consistent knowledge snapshot requires an outermost transaction")
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        return _materialize_knowledge_snapshot()

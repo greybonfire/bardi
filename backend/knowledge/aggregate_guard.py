@@ -11,9 +11,9 @@ protects the ordinary ORM and Admin paths where accidental partial writes are mo
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
 from contextvars import ContextVar
-from collections.abc import Iterator
 from typing import Any
 
 from django.core.exceptions import ValidationError

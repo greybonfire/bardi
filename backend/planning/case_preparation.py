@@ -10,7 +10,7 @@ from types import MappingProxyType
 
 from .catalog import ServiceSnapshot
 from .diagnostics import ValidationDiagnostic
-from .evaluator import TruthValue, evaluate
+from .evaluator import EvaluationTrace, TruthValue, evaluate
 from .facts import (
     FACT_DEFINITIONS,
     FactDefinition,
@@ -99,6 +99,21 @@ def _referenced_fact_keys(predicate: Predicate) -> frozenset[str]:
         current = stack.pop()
         if current.fact is not None:
             result.add(current.fact)
+        stack.extend(current.children)
+    return frozenset(result)
+
+
+def _influential_submitted_fact_keys(trace: EvaluationTrace) -> frozenset[str]:
+    """Collect submitted Fact leaves that actually influenced this evaluation result."""
+
+    result: set[str] = set()
+    stack = [trace]
+    while stack:
+        current = stack.pop()
+        if not current.affected_result:
+            continue
+        if current.fact_key is not None and current.submitted is True:
+            result.add(current.fact_key)
         stack.extend(current.children)
     return frozenset(result)
 
@@ -225,7 +240,7 @@ def prepare_case(
             submitted_keys=prepared.submitted_keys,
         )
         if result.value is TruthValue.TRUE:
-            contradictory_keys.update(declared)
+            contradictory_keys.update(_influential_submitted_fact_keys(result.trace))
 
     if contradictory_keys:
         return CasePreparationInvalid(

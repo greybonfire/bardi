@@ -86,9 +86,20 @@ The web client keeps in-progress answers client-side and resubmits the current F
 
 - Do not persist raw Anonymous Case Facts in version 1.
 - Do not log request bodies containing raw Facts.
-- Do not expose raw Facts in traces, error reporting, analytics payloads, or third-party observability by default.
-- Product analytics should use minimized event data and coarse non-sensitive metadata.
+- The application logging boundary recognizes the planning route across API and Django
+  request/server/security logging. It removes request objects, exceptions, stacks, and custom
+  record attributes before configured output. The only permitted fields are HTTP method, the
+  fixed `/v1/planning` route, HTTP status, and a coarse error code.
+- Do not expose raw Facts, Fact keys, bodies, planning DTOs, prepared Facts, predicates,
+  Evaluation Traces, selection results, or exception details in logs, traces, error reporting,
+  analytics payloads, APM, or any third-party observability integration.
+- No planning analytics or metrics are currently emitted. A future integration must build
+  events only from the same explicit coarse allow-list; merely redacting known sensitive keys
+  from a richer object is not sufficient.
 - Evaluation Traces are transient editor/test diagnostics, not public responses or general application logs.
+- Deployment ingress, reverse-proxy, platform access logging, and tracing are outside the
+  application boundary and must be configured not to capture planning request bodies. The
+  application filter is not a substitute for that deployment control.
 - No document upload or implied document verification is required by the core planning flow.
 
 ## Initial infrastructure constraints

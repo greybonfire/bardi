@@ -81,7 +81,7 @@ def select_procedure(
 
     ``prepared_facts`` is a trusted internal handoff. The production application path must
     establish validation, deterministic derivation, and contradiction rejection before
-    calling this selector; issue #38 owns that orchestration.
+    calling this selector.
     """
 
     service = next(

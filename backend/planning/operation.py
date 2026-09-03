@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
-from .catalog import KnowledgeSnapshot, ServiceSnapshot
-from .facts import PreparedFacts, validate_submitted_facts
+from .case_preparation import (
+    CasePreparationConfigurationDefect,
+    CasePreparationInvalid,
+    CasePreparationSuccess,
+    prepare_case,
+)
+from .catalog import KnowledgeSnapshot
+from .facts import validate_submitted_facts
 from .public import (
     AnswerDefinition,
     InconclusiveResult,
@@ -27,21 +33,6 @@ from .versions import (
     ProcedureVersionResolved,
     resolve_procedure_version,
 )
-
-
-def _requires_case_preparation(snapshot: KnowledgeSnapshot, service: ServiceSnapshot) -> bool:
-    if service.contradictions:
-        return True
-    for candidate in service.candidates:
-        stack = [candidate.selection_predicate]
-        while stack:
-            predicate = stack.pop()
-            if predicate.fact is not None:
-                definition = snapshot.fact_definitions.get(predicate.fact)
-                if definition is not None and definition.derived:
-                    return True
-            stack.extend(predicate.children)
-    return False
 
 
 def _configuration_invalid() -> InvalidResult:
@@ -68,11 +59,24 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
             )
         )
 
-    if _requires_case_preparation(snapshot, service):
-        return InconclusiveResult("case_preparation_unavailable")
+    preparation = prepare_case(
+        snapshot.fact_definitions,
+        service,
+        validation.facts,
+        planning_input.evaluation_date,
+    )
+    if isinstance(preparation, CasePreparationConfigurationDefect):
+        return _configuration_invalid()
+    if isinstance(preparation, CasePreparationInvalid):
+        return InvalidResult(
+            tuple(
+                PublicDiagnostic(item.code.partition(":")[0], item.path)
+                for item in preparation.diagnostics
+            )
+        )
+    assert isinstance(preparation, CasePreparationSuccess)
 
-    prepared = PreparedFacts(validation.facts, frozenset(validation.facts), {})
-    selection = select_procedure(snapshot, service.semantic_id, prepared)
+    selection = select_procedure(snapshot, service.semantic_id, preparation.prepared_facts)
     if isinstance(selection, SelectionQuestion):
         answers = tuple(
             AnswerDefinition(
@@ -105,5 +109,5 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         return InconclusiveResult(resolution.reason_code)
 
     # Procedure-Version applicability and plan assembly belong to later planning work,
-    # after #38's case-preparation stage.
+    # after the implemented case-preparation stage.
     return InconclusiveResult("plan_assembly_unavailable")

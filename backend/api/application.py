@@ -26,10 +26,6 @@ _MESSAGES: Mapping[str, Mapping[str, str]] = {
     "unknown_service": {"ar": "الخدمة غير متاحة.", "en": "The service is unavailable."},
     "inactive_service": {"ar": "الخدمة غير نشطة.", "en": "The service is inactive."},
     "knowledge_unavailable": {"ar": "المعرفة غير متاحة حالياً.", "en": "Knowledge is unavailable."},
-    "case_preparation_unavailable": {
-        "ar": "لا يمكن إكمال التخطيط حالياً.",
-        "en": "Planning cannot currently be completed.",
-    },
     "plan_assembly_unavailable": {
         "ar": "لا يمكن إعداد الخطة حالياً.",
         "en": "Plan assembly is not yet available.",

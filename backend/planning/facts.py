@@ -161,9 +161,9 @@ class FactValidationResult:
 class PreparedFacts:
     """Trusted internal handoff after case preparation succeeds.
 
-    This DTO does not validate, derive, or contradiction-check input and must not be
-    constructed directly from raw request Facts. Issue #38 owns the production preparation
-    path that will establish those preconditions before Procedure selection.
+    This DTO does not itself validate, derive, or contradiction-check input and must not be
+    constructed directly from raw request Facts. The production case-preparation path
+    establishes those preconditions before Procedure selection.
     ``missing_source_dependencies`` records only unresolved source Facts for a derived Fact
     and never authorizes Questions to resolve derived Facts directly.
     """

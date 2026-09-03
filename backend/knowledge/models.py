@@ -338,6 +338,19 @@ class FactDefinition(models.Model):
                 errors["minimum"] = "Minimum is allowed only for integer Facts."
             elif self.minimum < 0:
                 errors["minimum"] = "Minimum must be nonnegative."
+        if self.derived:
+            from planning.case_preparation import derived_definition_is_compatible
+            from planning.facts import FactDefinition as DomainFactDefinition
+
+            definition = DomainFactDefinition(
+                self.key,
+                self.kind,  # type: ignore[arg-type]
+                tuple(self.enum_values) if type(self.enum_values) is list else (),
+                self.minimum,
+                True,
+            )
+            if not derived_definition_is_compatible(definition):
+                errors["derived"] = "Derived Facts must exactly match a pinned implementation."
         if errors:
             raise ValidationError(errors)
 

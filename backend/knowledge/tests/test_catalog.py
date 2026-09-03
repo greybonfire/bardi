@@ -40,6 +40,23 @@ class CatalogModelTests(TestCase):
         self.assertEqual(load_fact_definitions(), FACT_DEFINITIONS)
         self.assertEqual(compatibility_errors(FactDefinition.objects.all()), ())
 
+    def test_only_exact_pinned_derived_definitions_can_be_authored(self) -> None:
+        source = FactDefinition.objects.create(
+            key="custom.source", kind=FactDefinition.Kind.BOOLEAN
+        )
+        self.assertFalse(source.derived)
+        with self.assertRaises(ValidationError):
+            FactDefinition.objects.create(
+                key="custom.derived", kind=FactDefinition.Kind.BOOLEAN, derived=True
+            )
+        with self.assertRaises(ValidationError):
+            FactDefinition.objects.create(
+                key="age_years_on_evaluation_date.incompatible",
+                kind=FactDefinition.Kind.INTEGER,
+                minimum=0,
+                derived=True,
+            )
+
     def test_service_activation_is_explicit_and_defaults_inactive(self) -> None:
         self.assertFalse(self.service.is_active)
         self.service.is_active = True

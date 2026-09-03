@@ -207,6 +207,20 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
     contradictions: dict[str, list[ContradictionSnapshot]] = defaultdict(list)
     versions: list[ProcedureVersionSnapshot] = []
     failures: list[StoredRuleLoadDiagnostic] = []
+    # Database bypasses must not turn catalog-authored metadata into executable derivation.
+    # Only exact, production-pinned derived definitions may cross the public snapshot boundary.
+    for row in fact_rows:
+        if not row.is_published or not row.derived:
+            continue
+        expected = FACT_DEFINITIONS.get(row.key)
+        if expected is None or not expected.derived or compatibility_errors((row,)):
+            failures.append(
+                StoredRuleLoadDiagnostic(
+                    f"fact:{row.key}",
+                    (ValidationDiagnostic("unsupported_derived_fact", ("facts", row.key)),),
+                )
+            )
+
     for candidate_row in candidate_rows:
         service_id = candidate_row["service__semantic_id"]
         procedure_id = candidate_row["procedure__semantic_id"]

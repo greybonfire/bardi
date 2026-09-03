@@ -259,6 +259,19 @@ class KnowledgeSnapshotTests(TestCase):
         snapshot = load_knowledge_snapshot()
         self.assertIn(hidden.key, snapshot.fact_definitions)
 
+    def test_database_bypassed_published_derived_definition_fails_closed(self) -> None:
+        bypassed = FactDefinition.objects.create(
+            key="snapshot.editor.derived", kind=FactDefinition.Kind.BOOLEAN
+        )
+        FactDefinition.objects.filter(pk=bypassed.pk).update(derived=True, is_published=True)
+        with self.assertRaises(KnowledgeSnapshotLoadError) as caught:
+            load_knowledge_snapshot()
+        self.assertEqual(caught.exception.owner_ids, ("fact:snapshot.editor.derived",))
+        self.assertEqual(
+            caught.exception.rule_diagnostics[0].diagnostics[0].code,
+            "unsupported_derived_fact",
+        )
+
     def test_public_snapshot_excludes_unpublished_fact_without_active_dependencies(self) -> None:
         hidden = FactDefinition.objects.create(
             key="snapshot.hidden.unused", kind=FactDefinition.Kind.BOOLEAN

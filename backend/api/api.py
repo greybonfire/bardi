@@ -39,8 +39,8 @@ api = NinjaAPI(
     description=(
         "Stateless planning API. The plan variant is reserved and remains unreachable until "
         "later planning work implements Procedure-Version applicability and plan assembly. "
-        "Issue #38 is limited to deterministic Fact derivation, contradiction handling, "
-        "public contradiction diagnostics, and their ordering before Procedure selection."
+        "Pinned Fact derivation and redacted contradiction handling run before Procedure "
+        "selection."
     ),
 )
 

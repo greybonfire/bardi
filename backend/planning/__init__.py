@@ -1,5 +1,14 @@
 """Public framework-independent planning domain."""
 
+from .case_preparation import (
+    DERIVED_FACT_DEPENDENCIES,
+    CasePreparationConfigurationDefect,
+    CasePreparationInvalid,
+    CasePreparationOutcome,
+    CasePreparationSuccess,
+    derived_definition_is_compatible,
+    prepare_case,
+)
 from .catalog import (
     ContradictionSnapshot,
     KnowledgeSnapshot,
@@ -77,7 +86,12 @@ __all__ = (
     "AnswerDefinition",
     "BooleanOperator",
     "CandidateEvaluation",
+    "CasePreparationConfigurationDefect",
+    "CasePreparationInvalid",
+    "CasePreparationOutcome",
+    "CasePreparationSuccess",
     "ContradictionSnapshot",
+    "DERIVED_FACT_DEPENDENCIES",
     "DiagnosticPath",
     "DiagnosticPathSegment",
     "Evaluation",
@@ -119,8 +133,10 @@ __all__ = (
     "ServiceSnapshot",
     "TruthValue",
     "ValidationDiagnostic",
+    "derived_definition_is_compatible",
     "evaluate",
     "plan_stateless",
+    "prepare_case",
     "resolve_procedure_version",
     "select_procedure",
     "serialize_rule_v1",

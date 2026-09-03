@@ -10,10 +10,12 @@ from knowledge.models import (
     Procedure,
     ProcedureVersion,
     Service,
+    ServiceContradiction,
     ServiceProcedureCandidate,
     ServiceQuestion,
 )
 from knowledge.publication import publish_procedure_version
+from knowledge.services import set_contradiction_facts
 
 
 class PlanningHttpContractTests(SimpleTestCase):
@@ -258,7 +260,7 @@ class ReachableResultFamilyTests(TransactionTestCase):
         self.assertEqual(resolved.json()["type"], "inconclusive")
         self.assertEqual(resolved.json()["reason"], "plan_assembly_unavailable")
 
-    def test_inactive_and_case_preparation_boundaries_do_not_evaluate(self) -> None:
+    def test_inactive_and_derived_case_preparation_flow(self) -> None:
         inactive = Service.objects.create(
             semantic_id="contract.inactive", text_ar="غير نشطة", text_en="Inactive"
         )
@@ -266,6 +268,10 @@ class ReachableResultFamilyTests(TransactionTestCase):
             self.post(service_id=inactive.semantic_id).json()["reason"], "inactive_service"
         )
 
+        birth_date, _ = FactDefinition.objects.get_or_create(
+            key="birth_date",
+            defaults={"kind": "date", "enum_values": [], "is_published": True},
+        )
         FactDefinition.objects.get_or_create(
             key="age_years_on_evaluation_date",
             defaults={
@@ -297,10 +303,66 @@ class ReachableResultFamilyTests(TransactionTestCase):
                 "value": 18,
             },
         )
-        self.assertEqual(
-            self.post(service_id=derived_service.semantic_id).json()["reason"],
-            "case_preparation_unavailable",
+        ServiceQuestion.objects.create(
+            semantic_id="contract.derived.birth-date",
+            service=derived_service,
+            fact=birth_date,
+            text_ar="تاريخ الميلاد؟",
+            text_en="Birth date?",
+            priority=1,
         )
+        omitted = self.post(service_id=derived_service.semantic_id)
+        self.assertEqual(omitted.json()["type"], "next_question")
+        self.assertEqual(omitted.json()["question"]["answers"][0]["key"], "birth_date")
+        supplied = self.post(
+            service_id=derived_service.semantic_id,
+            facts={"birth_date": "2000-09-01"},
+        )
+        self.assertEqual(supplied.json()["reason"], "no_published_version")
+        malformed = self.post(
+            service_id=derived_service.semantic_id,
+            facts={"birth_date": "2000-9-1"},
+        )
+        self.assertEqual(malformed.json()["type"], "invalid")
+        self.assertEqual(malformed.json()["diagnostics"][0]["code"], "invalid_fact_value")
+
+    def test_true_contradiction_returns_only_redacted_source_fact_paths(self) -> None:
+        other, _ = FactDefinition.objects.get_or_create(
+            key="has_current_enrollment_certificate",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
+        contradiction = ServiceContradiction.objects.create(
+            semantic_id="contract.secret.contradiction",
+            service=self.service,
+            condition={
+                "op": "all",
+                "children": [
+                    {"op": "eq", "fact": self.fact.key, "value": True},
+                    {"op": "eq", "fact": other.key, "value": False},
+                ],
+            },
+        )
+        set_contradiction_facts(contradiction, (other, self.fact))
+        response = self.post(
+            facts={self.fact.key: True, other.key: False},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {
+                "type": "invalid",
+                "diagnostics": [
+                    {
+                        "code": "contradictory_facts",
+                        "path": ["facts", "has_current_enrollment_certificate"],
+                    },
+                    {"code": "contradictory_facts", "path": ["facts", "is_student"]},
+                ],
+            },
+        )
+        rendered = response.content.decode()
+        self.assertNotIn("contract.secret.contradiction", rendered)
+        self.assertNotIn("trace", rendered)
 
     def test_malformed_stored_knowledge_is_redacted(self) -> None:
         ServiceProcedureCandidate.objects.filter(service=self.service).update(

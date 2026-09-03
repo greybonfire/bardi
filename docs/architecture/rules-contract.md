@@ -20,7 +20,17 @@ Rules are exact and deterministic:
 - no string-to-number, truthy/falsy, date-string, locale, or fuzzy coercion;
 - administrative dates are calendar dates, not timezone-shifted timestamps.
 
-Derived Facts are calculated before rule evaluation by the pinned rules-contract implementation. Rules consume Derived Facts but never define arbitrary formulas.
+Derived Facts are calculated before rule evaluation by the pinned rules-contract implementation. Rules consume Derived Facts but never define arbitrary formulas. Editors may publish only definitions compatible with this registry; formulas and dependency metadata are not persisted or scripted.
+
+The exact `v1` derivations are:
+
+- `age_years_on_evaluation_date` from `birth_date`: completed Gregorian calendar years. The year increments when the evaluation month/day reaches the birth month/day; consequently a February 29 birth reaches its next year on March 1 in a non-leap year. A birth date after the evaluation date is invalid at `facts.birth_date`.
+- `card_expired_before_evaluation_date` from `national_id_expiry_date`: `evaluation_date > national_id_expiry_date`.
+- `renewal_deadline_date` from `national_id_expiry_date`: add three calendar months, clamping the day to the destination month's last day (for example January 31 becomes April 30).
+- `renewal_deadline_passed` from `national_id_expiry_date`: `evaluation_date > renewal_deadline_date`.
+- `only_son_candidate` from `father_alive` and `other_living_sons_of_father_count`: true exactly when the father is alive and the other-living-sons count is zero.
+
+All operands are already validated Python calendar `date`, exact booleans, or exact integers. Derivation does no parsing, timestamp/timezone conversion, or implicit coercion. Equality at expiry and deadline boundaries is false because both comparisons are strict. Calendar overflow is safely reported against `facts.national_id_expiry_date`, without leaking an exception. If a derivation is unavailable, its prepared dependency set contains only omitted source keys; derived keys never enter the original `submitted_keys` set and Questions may resolve only those source dependencies.
 
 ## Typed predicate AST
 

@@ -189,8 +189,9 @@ class PrivacyLoggingTests(SimpleTestCase):
 class StatelessPlanningTests(TransactionTestCase):
     def setUp(self) -> None:
         self.secret = "DISTINCTIVE-PERSISTENCE-SECRET"
-        self.fact = FactDefinition.objects.create(
-            key="privacy.transient_string", kind=FactDefinition.Kind.STRING
+        self.fact, _ = FactDefinition.objects.get_or_create(
+            key="privacy.transient_string",
+            defaults={"kind": FactDefinition.Kind.STRING, "is_published": True},
         )
         FactDefinition.objects.filter(pk=self.fact.pk).update(is_published=True)
         self.fact.refresh_from_db()
@@ -212,7 +213,12 @@ class StatelessPlanningTests(TransactionTestCase):
                 "value": "PUBLIC-NONMATCHING-VALUE",
             },
         )
-        question_fact = FactDefinition.objects.get(key="has_current_enrollment_certificate")
+        question_fact, _ = FactDefinition.objects.get_or_create(
+            key="has_current_enrollment_certificate",
+            defaults={"kind": FactDefinition.Kind.BOOLEAN, "is_published": True},
+        )
+        FactDefinition.objects.filter(pk=question_fact.pk).update(is_published=True)
+        question_fact.refresh_from_db()
         ServiceQuestion.objects.create(
             semantic_id="privacy.question",
             service=self.service,
@@ -221,13 +227,24 @@ class StatelessPlanningTests(TransactionTestCase):
             text_en="Question",
             priority=1,
         )
-        contradiction_fact = FactDefinition.objects.get(key="is_student")
+        contradiction_fact, _ = FactDefinition.objects.get_or_create(
+            key="is_student",
+            defaults={"kind": FactDefinition.Kind.BOOLEAN, "is_published": True},
+        )
+        FactDefinition.objects.filter(pk=contradiction_fact.pk).update(is_published=True)
+        contradiction_fact.refresh_from_db()
         contradiction = ServiceContradiction.objects.create(
             semantic_id="privacy.contradiction",
             service=self.service,
-            condition={"op": "eq", "fact": contradiction_fact.key, "value": True},
+            condition={
+                "op": "all",
+                "children": [
+                    {"op": "eq", "fact": contradiction_fact.key, "value": True},
+                    {"op": "eq", "fact": question_fact.key, "value": False},
+                ],
+            },
         )
-        set_contradiction_facts(contradiction, (contradiction_fact,))
+        set_contradiction_facts(contradiction, (contradiction_fact, question_fact))
 
     def _counts(self) -> dict[type[Any], int]:
         return {

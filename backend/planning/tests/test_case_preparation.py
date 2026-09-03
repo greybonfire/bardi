@@ -178,6 +178,59 @@ class CasePreparationTests(unittest.TestCase):
         assert isinstance(unknown, CasePreparationSuccess)
         self.assertEqual(unknown.prepared_facts.missing_source_dependencies, {})
 
+    def test_true_contradiction_reports_only_influential_submitted_facts(self) -> None:
+        defs = {
+            "father_alive": FACT_DEFINITIONS["father_alive"],
+            "is_student": FACT_DEFINITIONS["is_student"],
+        }
+        contradiction = ContradictionSnapshot(
+            "secret-id",
+            Predicate(
+                "any",
+                children=(
+                    Predicate("eq", "father_alive", True),
+                    Predicate("eq", "is_student", True),
+                ),
+            ),
+            ("father_alive", "is_student"),
+        )
+
+        omitted_unknown = prepare_case(
+            defs, service(contradiction), {"father_alive": True}, date(2026, 1, 1)
+        )
+        self.assertIsInstance(omitted_unknown, CasePreparationInvalid)
+        assert isinstance(omitted_unknown, CasePreparationInvalid)
+        self.assertEqual(
+            tuple(item.path for item in omitted_unknown.diagnostics),
+            (("facts", "father_alive"),),
+        )
+
+        dominated_false = prepare_case(
+            defs,
+            service(contradiction),
+            {"father_alive": True, "is_student": False},
+            date(2026, 1, 1),
+        )
+        self.assertIsInstance(dominated_false, CasePreparationInvalid)
+        assert isinstance(dominated_false, CasePreparationInvalid)
+        self.assertEqual(
+            tuple(item.path for item in dominated_false.diagnostics),
+            (("facts", "father_alive"),),
+        )
+
+        both_true = prepare_case(
+            defs,
+            service(contradiction),
+            {"father_alive": True, "is_student": True},
+            date(2026, 1, 1),
+        )
+        self.assertIsInstance(both_true, CasePreparationInvalid)
+        assert isinstance(both_true, CasePreparationInvalid)
+        self.assertEqual(
+            tuple(item.path for item in both_true.diagnostics),
+            (("facts", "father_alive"), ("facts", "is_student")),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

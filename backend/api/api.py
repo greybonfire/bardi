@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from django.db import DatabaseError
 from django.http import HttpRequest
 from knowledge.domain import KnowledgeSnapshotLoadError
@@ -11,6 +13,7 @@ from ninja.parser import Parser
 from planning import InconclusiveResult, InvalidResult, PlanningInput, PublicDiagnostic
 
 from .application import execute_planning, list_active_services, project_result
+from .privacy import planning_observability_metadata
 from .schemas import (
     InconclusiveResponse,
     InvalidResponse,
@@ -29,6 +32,9 @@ class PrivacySafeParser(Parser):
         if not isinstance(parsed, dict):
             raise HttpError(400, "invalid_body")
         return parsed
+
+
+logger = logging.getLogger("bardi.api")
 
 
 api = NinjaAPI(
@@ -92,13 +98,13 @@ def services(request: HttpRequest):  # type: ignore[no-untyped-def]
     },
 )
 def planning(request: HttpRequest, payload: PlanningRequest):  # type: ignore[no-untyped-def]
-    planning_input = PlanningInput(
-        payload.service_id,
-        dict(payload.facts),
-        payload.locale,
-        payload.evaluation_context.evaluation_date,
-    )
     try:
+        planning_input = PlanningInput(
+            payload.service_id,
+            dict(payload.facts),
+            payload.locale,
+            payload.evaluation_context.evaluation_date,
+        )
         return 200, execute_planning(planning_input)
     except KnowledgeSnapshotLoadError:
         return 500, project_result(
@@ -106,3 +112,18 @@ def planning(request: HttpRequest, payload: PlanningRequest):  # type: ignore[no
         )
     except DatabaseError:
         return 503, project_result(InconclusiveResult("knowledge_unavailable"), payload.locale)
+    except Exception:
+        # This is the outer privacy boundary. In particular, never delegate this failure
+        # to Ninja's DEBUG exception rendering, which can serialize traceback locals.
+        logger.error(
+            "planning request failed",
+            extra=planning_observability_metadata(
+                method=request.method,
+                status_code=500,
+                error_code="internal_error",
+            ),
+        )
+        return 500, {
+            "type": "invalid",
+            "diagnostics": [{"code": "internal_error", "path": []}],
+        }

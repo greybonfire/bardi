@@ -7,6 +7,12 @@ from django.conf import settings
 from django.test import SimpleTestCase
 
 
+def _development_settings() -> Any:
+    with patch.dict(os.environ, {"DJANGO_DEBUG": "true"}):
+        module = importlib.import_module("bardi.settings.development")
+        return importlib.reload(module)
+
+
 def _production_settings() -> Any:
     """Load production settings with explicit test values, independent of the local .env."""
     values = {
@@ -69,6 +75,28 @@ class SettingsTests(SimpleTestCase):
         self.assertFalse(settings.DEBUG)
         self.assertTrue(settings.SECRET_KEY)
         self.assertTrue({"testserver", "localhost", "127.0.0.1"}.issubset(settings.ALLOWED_HOSTS))
+
+    def test_development_and_production_share_fail_closed_planning_logging(self) -> None:
+        relevant = {"django", "django.request", "django.server", "django.security", "bardi.api"}
+        for configured in (_development_settings(), _production_settings()):
+            with self.subTest(settings_module=configured.__name__):
+                logging_config = configured.LOGGING
+                self.assertEqual(
+                    logging_config["filters"]["planning_privacy"]["()"],
+                    "api.privacy.PlanningPrivacyFilter",
+                )
+                self.assertEqual(
+                    logging_config["handlers"]["console"]["filters"], ["planning_privacy"]
+                )
+                self.assertEqual(logging_config["root"]["handlers"], ["console"])
+                for logger_name in relevant:
+                    logger = logging_config["loggers"][logger_name]
+                    self.assertEqual(logger["handlers"], ["console"])
+                    self.assertEqual(logger["filters"], ["planning_privacy"])
+                    self.assertFalse(logger["propagate"])
+
+        self.assertTrue(_development_settings().DEBUG)
+        self.assertFalse(_production_settings().DEBUG)
 
     def test_production_security_baseline_defers_transport_topology(self) -> None:
         production = _production_settings()

@@ -167,7 +167,36 @@ LOGGING = {
         },
     },
     "loggers": {
-        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
-        "bardi.api": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "django": {
+            "handlers": ["console"],
+            "filters": ["planning_privacy"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console"],
+            "filters": ["planning_privacy"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "django.server": {
+            "handlers": ["console"],
+            "filters": ["planning_privacy"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console"],
+            "filters": ["planning_privacy"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "bardi.api": {
+            "handlers": ["console"],
+            "filters": ["planning_privacy"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
+    "root": {"handlers": ["console"], "level": "WARNING"},
 }

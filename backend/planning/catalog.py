@@ -13,6 +13,7 @@ from types import MappingProxyType
 
 from .facts import FactDefinition
 from .rules import Predicate
+from .trust import VerificationState
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +67,70 @@ class ServiceSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class AuthoritySnapshot:
+    semantic_id: str
+    name: LocalizedText
+
+
+@dataclass(frozen=True, slots=True)
+class SourceSnapshot:
+    semantic_id: str
+    authority: AuthoritySnapshot
+    title: str
+    locator: str
+    classification: str
+    retrieved_on: date
+    published_on: date | None = None
+    effective_from: date | None = None
+    effective_to: date | None = None
+    reverify_on: date | None = None
+    observation_date: date | None = None
+    observation_context: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceLinkSnapshot:
+    passage: str
+    location: str
+    applicability_context: str
+    support_status: str
+    verification_state: VerificationState
+    sources: tuple[SourceSnapshot, ...]
+    effective_from: date | None = None
+    effective_to: date | None = None
+    retrieved_on: date | None = None
+    verified_on: date | None = None
+    reverify_on: date | None = None
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
+class ChecklistItemSnapshot:
+    semantic_id: str
+    text: LocalizedText
+    classification: str
+    document_type_id: str | None
+    quantity: int
+    original_quantity: int
+    copy_quantity: int
+    display_order: int
+    applicability: Predicate | None
+    scope: str
+    scope_reference: str
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
 class ProcedureVersionSnapshot:
     semantic_id: str
     procedure_semantic_id: str
@@ -77,6 +142,10 @@ class ProcedureVersionSnapshot:
     effective_to: date | None
     published_at: datetime | None = None
     published_by_id: int | None = None
+    checklist_items: tuple[ChecklistItemSnapshot, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
 
 
 @dataclass(frozen=True, slots=True)

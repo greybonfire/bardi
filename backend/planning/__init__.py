@@ -10,13 +10,17 @@ from .case_preparation import (
     prepare_case,
 )
 from .catalog import (
+    AuthoritySnapshot,
+    ChecklistItemSnapshot,
     ContradictionSnapshot,
+    EvidenceLinkSnapshot,
     KnowledgeSnapshot,
     LocalizedText,
     ProcedureCandidateSnapshot,
     ProcedureVersionSnapshot,
     QuestionSnapshot,
     ServiceSnapshot,
+    SourceSnapshot,
 )
 from .diagnostics import DiagnosticPath, DiagnosticPathSegment, ValidationDiagnostic
 from .evaluator import Evaluation, EvaluationTrace, TruthValue, evaluate
@@ -40,8 +44,10 @@ from .public import (
     PlanningInput,
     PlanningResult,
     PlanResult,
+    PublicChecklistItem,
     PublicDiagnostic,
     PublicQuestion,
+    PublicSource,
 )
 from .rules import (
     BOOLEAN_OPERATORS,
@@ -67,6 +73,14 @@ from .selection import (
     SelectionUnsupported,
     select_procedure,
 )
+from .trust import (
+    VERIFICATION_CHOICES,
+    Freshness,
+    TrustAssessment,
+    TrustDisposition,
+    VerificationState,
+    assess_trust,
+)
 from .versions import (
     ProcedureVersionConfigurationDefect,
     ProcedureVersionResolution,
@@ -84,6 +98,8 @@ __all__ = (
     "MAX_RULE_NODES",
     "SUPPORTED_OPERATORS",
     "AnswerDefinition",
+    "AuthoritySnapshot",
+    "ChecklistItemSnapshot",
     "BooleanOperator",
     "CandidateEvaluation",
     "CasePreparationConfigurationDefect",
@@ -95,6 +111,7 @@ __all__ = (
     "DiagnosticPath",
     "DiagnosticPathSegment",
     "Evaluation",
+    "EvidenceLinkSnapshot",
     "EvaluationTrace",
     "FactDefinition",
     "FactKind",
@@ -119,7 +136,9 @@ __all__ = (
     "ProcedureVersionResolved",
     "ProcedureVersionSnapshot",
     "ProcedureVersionUnavailable",
+    "PublicChecklistItem",
     "PublicDiagnostic",
+    "PublicSource",
     "PublicQuestion",
     "QuestionSnapshot",
     "Predicate",
@@ -131,8 +150,15 @@ __all__ = (
     "SelectionQuestion",
     "SelectionUnsupported",
     "ServiceSnapshot",
+    "SourceSnapshot",
     "TruthValue",
+    "TrustAssessment",
+    "TrustDisposition",
+    "VERIFICATION_CHOICES",
     "ValidationDiagnostic",
+    "VerificationState",
+    "Freshness",
+    "assess_trust",
     "derived_definition_is_compatible",
     "evaluate",
     "plan_stateless",

@@ -9,18 +9,23 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, cast
 
 from planning.catalog import (
+    AuthoritySnapshot,
+    ChecklistItemSnapshot,
     ContradictionSnapshot,
+    EvidenceLinkSnapshot,
     KnowledgeSnapshot,
     LocalizedText,
     ProcedureCandidateSnapshot,
     ProcedureVersionSnapshot,
     QuestionSnapshot,
     ServiceSnapshot,
+    SourceSnapshot,
 )
 from planning.diagnostics import ValidationDiagnostic
 from planning.facts import FACT_DEFINITIONS, FactKind
 from planning.facts import FactDefinition as DomainFactDefinition
 from planning.rules import Predicate, RuleValidationResult, validate_rule_v1
+from planning.trust import VerificationState
 
 if TYPE_CHECKING:
     from .models import FactDefinition
@@ -110,6 +115,9 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
     """Fully evaluate ORM reads, then return an immutable, ORM-free catalog graph."""
 
     from .models import (
+        ChecklistItem,
+        EvidenceLink,
+        EvidenceLinkSource,
         FactDefinition,
         ProcedureVersion,
         Service,
@@ -156,6 +164,75 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             "effective_to",
             "published_at",
             "published_by_id",
+        )
+    )
+    checklist_rows = list(
+        ChecklistItem.objects.filter(
+            procedure_version__state__in=(
+                ProcedureVersion.State.PUBLISHED,
+                ProcedureVersion.State.WITHDRAWN,
+            )
+        )
+        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
+        .values(
+            "id",
+            "procedure_version__semantic_id",
+            "semantic_id",
+            "text_ar",
+            "text_en",
+            "classification",
+            "document_type__semantic_id",
+            "quantity",
+            "original_quantity",
+            "copy_quantity",
+            "display_order",
+            "applicability",
+            "scope",
+            "scope_reference",
+            "effective_from",
+            "effective_to",
+            "verification_state",
+            "verified_on",
+            "reverify_on",
+        )
+    )
+    evidence_rows = list(
+        EvidenceLink.objects.filter(checklist_item_id__in=[row["id"] for row in checklist_rows])
+        .order_by("checklist_item_id", "id")
+        .values(
+            "id",
+            "checklist_item_id",
+            "passage",
+            "location",
+            "applicability_context",
+            "support_status",
+            "verification_state",
+            "effective_from",
+            "effective_to",
+            "retrieved_on",
+            "verified_on",
+            "reverify_on",
+        )
+    )
+    evidence_source_rows = list(
+        EvidenceLinkSource.objects.filter(evidence_link_id__in=[row["id"] for row in evidence_rows])
+        .order_by("evidence_link_id", "position", "source__semantic_id")
+        .values(
+            "evidence_link_id",
+            "source__semantic_id",
+            "source__title",
+            "source__locator",
+            "source__classification",
+            "source__retrieved_on",
+            "source__published_on",
+            "source__effective_from",
+            "source__effective_to",
+            "source__reverify_on",
+            "source__observation_date",
+            "source__observation_context",
+            "source__authority__semantic_id",
+            "source__authority__name_ar",
+            "source__authority__name_en",
         )
     )
     question_rows = list(
@@ -206,20 +283,121 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
     candidates: dict[str, list[ProcedureCandidateSnapshot]] = defaultdict(list)
     contradictions: dict[str, list[ContradictionSnapshot]] = defaultdict(list)
     versions: list[ProcedureVersionSnapshot] = []
+    source_snapshots: dict[str, SourceSnapshot] = {}
+    evidence_sources: dict[int, list[SourceSnapshot]] = defaultdict(list)
+    for source_row in evidence_source_rows:
+        source_id = source_row["source__semantic_id"]
+        source = source_snapshots.setdefault(
+            source_id,
+            SourceSnapshot(
+                source_id,
+                AuthoritySnapshot(
+                    source_row["source__authority__semantic_id"],
+                    LocalizedText(
+                        source_row["source__authority__name_ar"],
+                        source_row["source__authority__name_en"],
+                    ),
+                ),
+                source_row["source__title"],
+                source_row["source__locator"],
+                source_row["source__classification"],
+                source_row["source__retrieved_on"],
+                source_row["source__published_on"],
+                source_row["source__effective_from"],
+                source_row["source__effective_to"],
+                source_row["source__reverify_on"],
+                source_row["source__observation_date"],
+                source_row["source__observation_context"],
+            ),
+        )
+        evidence_sources[source_row["evidence_link_id"]].append(source)
+    evidence_by_item: dict[int, list[EvidenceLinkSnapshot]] = defaultdict(list)
+    for evidence_row in evidence_rows:
+        sources = tuple(evidence_sources[evidence_row["id"]])
+        evidence_by_item[evidence_row["checklist_item_id"]].append(
+            EvidenceLinkSnapshot(
+                evidence_row["passage"],
+                evidence_row["location"],
+                evidence_row["applicability_context"],
+                evidence_row["support_status"],
+                cast(VerificationState, evidence_row["verification_state"]),
+                sources,
+                evidence_row["effective_from"],
+                evidence_row["effective_to"],
+                evidence_row["retrieved_on"],
+                evidence_row["verified_on"],
+                evidence_row["reverify_on"],
+            )
+        )
+    checklist_by_version: dict[str, list[ChecklistItemSnapshot]] = defaultdict(list)
     failures: list[StoredRuleLoadDiagnostic] = []
     # Database bypasses must not turn catalog-authored metadata into executable derivation.
     # Only exact, production-pinned derived definitions may cross the public snapshot boundary.
-    for row in fact_rows:
-        if not row.is_published or not row.derived:
+    for fact_row in fact_rows:
+        if not fact_row.is_published or not fact_row.derived:
             continue
-        expected = FACT_DEFINITIONS.get(row.key)
-        if expected is None or not expected.derived or compatibility_errors((row,)):
+        expected = FACT_DEFINITIONS.get(fact_row.key)
+        if expected is None or not expected.derived or compatibility_errors((fact_row,)):
             failures.append(
                 StoredRuleLoadDiagnostic(
-                    f"fact:{row.key}",
-                    (ValidationDiagnostic("unsupported_derived_fact", ("facts", row.key)),),
+                    f"fact:{fact_row.key}",
+                    (ValidationDiagnostic("unsupported_derived_fact", ("facts", fact_row.key)),),
                 )
             )
+
+    for item_row in checklist_rows:
+        version_id = item_row["procedure_version__semantic_id"]
+        raw_rule = item_row["applicability"]
+        predicate = None
+        if raw_rule != {}:
+            decoded = decode_stored_rule(raw_rule, published_definitions)
+            if decoded.predicate is None:
+                failures.append(
+                    StoredRuleLoadDiagnostic(
+                        f"checklist_item:{version_id}:{item_row['semantic_id']}",
+                        decoded.diagnostics,
+                    )
+                )
+                continue
+            predicate = decoded.predicate
+        links = tuple(evidence_by_item[item_row["id"]])
+        if item_row["verification_state"] == "current" and not links:
+            failures.append(
+                StoredRuleLoadDiagnostic(
+                    f"checklist_item:{version_id}:{item_row['semantic_id']}",
+                    (ValidationDiagnostic("missing_evidence_link", ("evidence",)),),
+                )
+            )
+            continue
+        if any(not link.sources for link in links):
+            failures.append(
+                StoredRuleLoadDiagnostic(
+                    f"checklist_item:{version_id}:{item_row['semantic_id']}",
+                    (ValidationDiagnostic("missing_evidence_source", ("evidence",)),),
+                )
+            )
+            continue
+        checklist_by_version[version_id].append(
+            ChecklistItemSnapshot(
+                item_row["semantic_id"],
+                LocalizedText(item_row["text_ar"], item_row["text_en"]),
+                item_row["classification"],
+                item_row["document_type__semantic_id"],
+                item_row["quantity"],
+                item_row["original_quantity"],
+                item_row["copy_quantity"],
+                item_row["display_order"],
+                predicate,
+                item_row["scope"],
+                item_row["scope_reference"],
+                item_row["effective_from"],
+                item_row["effective_to"],
+                cast(VerificationState, item_row["verification_state"]),
+                item_row["verified_on"],
+                item_row["reverify_on"],
+                links,
+            )
+        )
 
     for candidate_row in candidate_rows:
         service_id = candidate_row["service__semantic_id"]
@@ -265,6 +443,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 version_row["effective_to"],
                 version_row["published_at"],
                 version_row["published_by_id"],
+                tuple(checklist_by_version[semantic_id]),
             )
         )
     for contradiction_row in contradiction_rows:

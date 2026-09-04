@@ -1,4 +1,4 @@
-"""Conservative pure planning operation for the staged #37 contract."""
+"""Conservative pure planning operation for the stateless public contract."""
 
 from __future__ import annotations
 
@@ -9,6 +9,8 @@ from .case_preparation import (
     prepare_case,
 )
 from .catalog import KnowledgeSnapshot
+from .checklists import select_checklist_items
+from .evaluator import TruthValue, evaluate
 from .facts import validate_submitted_facts
 from .public import (
     AnswerDefinition,
@@ -17,6 +19,7 @@ from .public import (
     NextQuestionResult,
     PlanningInput,
     PlanningResult,
+    PlanResult,
     PublicDiagnostic,
     PublicQuestion,
 )
@@ -40,7 +43,7 @@ def _configuration_invalid() -> InvalidResult:
 
 
 def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -> PlanningResult:
-    """Plan from detached values, stopping at each not-yet-implemented planning stage."""
+    """Build one deterministic public result from a complete detached knowledge snapshot."""
 
     service = next(
         (item for item in snapshot.services if item.semantic_id == planning_input.service_id), None
@@ -108,6 +111,27 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     if not isinstance(resolution, ProcedureVersionResolved):
         return InconclusiveResult(resolution.reason_code)
 
-    # Procedure-Version applicability and plan assembly belong to later planning work,
-    # after the implemented case-preparation stage.
-    return InconclusiveResult("plan_assembly_unavailable")
+    version_applicability = evaluate(
+        resolution.version.applicability,
+        preparation.prepared_facts.values,
+        submitted_keys=preparation.prepared_facts.submitted_keys,
+    )
+    if version_applicability.value is TruthValue.UNKNOWN:
+        return InconclusiveResult("procedure_version_applicability_unknown")
+    if version_applicability.value is TruthValue.FALSE:
+        return InconclusiveResult("procedure_version_not_applicable")
+
+    checklist = select_checklist_items(
+        resolution.version, preparation.prepared_facts, planning_input.evaluation_date
+    )
+    if checklist.missing_facts:
+        return InconclusiveResult("checklist_applicability_unknown")
+    if checklist.trust_inconclusive:
+        return InconclusiveResult("checklist_trust_inconclusive")
+    return PlanResult(
+        service.semantic_id,
+        selection.procedure_semantic_id,
+        resolution.version.semantic_id,
+        resolution.version.text,
+        checklist.items,
+    )

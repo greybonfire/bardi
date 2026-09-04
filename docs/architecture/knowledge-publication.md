@@ -29,6 +29,33 @@ one coherent read-only transaction. Draft versions remain excluded. Public DTO p
 a separate whitelist boundary: availability in the internal snapshot does not make rule ASTs,
 raw Facts, traces, Evidence Links, discrepancy rationale, or publication actors public.
 
+## Implementation status: issue #40
+
+Checklist provenance is implemented relationally: Authorities, Document Types, and preserved
+Sources are reusable identities, while Checklist Items and their claim-specific Evidence Links
+remain owned by exactly one Procedure Version. The canonical publisher now locks and validates
+the complete evidence aggregate. Current claims require passage/context and Sources; Official
+Requirements require wholly official supporting links, and Field Guidance rejects incomplete
+Field Report observation provenance.
+
+Detached planning snapshots retain that ownership boundary. Planning evaluates claim rules with
+three-valued semantics and consumes the shared trust/freshness assessment, asserting only TRUE,
+current public classifications. Inconclusive trust on an applicable Official Requirement makes
+only Checklist output inconclusive; unavailable Practical Preparation is omitted. Public
+responses use an explicit compact Source/freshness projection and never expose passages,
+evidence locations, applicability context, support flags, or other editorial Evidence Link
+structures. The frozen prototype remains reference-only and is not imported by production code.
+
+## Implementation status: issue #55
+
+The framework-independent planning domain exposes one pure trust decision API and the five-state
+vocabulary below. Its explicit-date calculation returns one of three planner-facing decisions:
+assert as current guidance, retain only as established dated context, or make dependent output
+locally inconclusive. Effective and re-verification boundaries are inclusive. Future verification
+or retrieval cannot support an earlier evaluation. Dated context requires prior item-level
+verification; a formerly current item must also have an explicit effective end established no
+later than the period it describes.
+
 ## Lifecycle
 
 The initial Procedure-Version publication states are:

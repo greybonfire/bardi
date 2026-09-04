@@ -10,12 +10,16 @@ from django.db import transaction
 from .aggregate_guard import allow_aggregate_relation_mutation
 from .domain import decode_stored_rule, diagnostic_messages, referenced_fact_keys
 from .models import (
+    EvidenceLink,
+    EvidenceLinkSource,
     FactDefinition,
+    ProcedureVersion,
     ServiceContradiction,
     ServiceContradictionFact,
     ServiceProcedureCandidate,
     ServiceQuestion,
     ServiceQuestionResolvedFact,
+    Source,
 )
 
 
@@ -82,6 +86,29 @@ def set_contradiction_facts(
         )
     contradiction.full_clean(exclude=("facts",))
     return contradiction
+
+
+@transaction.atomic
+def set_evidence_link_sources(
+    evidence_link: EvidenceLink, sources: Iterable[Source]
+) -> EvidenceLink:
+    values = tuple(sources)
+    if evidence_link.pk is None or any(source.pk is None for source in values):
+        raise ValidationError("Evidence Link and Sources must be saved first.")
+    if len({source.pk for source in values}) != len(values):
+        raise ValidationError("Evidence Sources cannot be duplicated.")
+    version = ProcedureVersion.objects.select_for_update().get(
+        pk=evidence_link.checklist_item.procedure_version_id
+    )
+    if version.state != ProcedureVersion.State.DRAFT:
+        raise ValidationError("Published and withdrawn evidence is immutable.")
+    with allow_aggregate_relation_mutation():
+        evidence_link.source_links.all().delete()
+        EvidenceLinkSource.objects.bulk_create(
+            EvidenceLinkSource(evidence_link=evidence_link, source=source, position=position)
+            for position, source in enumerate(values, start=1)
+        )
+    return evidence_link
 
 
 def validate_core_catalog() -> None:

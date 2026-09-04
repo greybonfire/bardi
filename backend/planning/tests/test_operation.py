@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import unittest
+from dataclasses import replace
 from datetime import date
 from unittest.mock import patch
 
 from planning import (
+    ChecklistItemSnapshot,
     ContradictionSnapshot,
     FactDefinition,
     InconclusiveResult,
@@ -13,6 +15,7 @@ from planning import (
     LocalizedText,
     NextQuestionResult,
     PlanningInput,
+    PlanResult,
     Predicate,
     ProcedureCandidateSnapshot,
     ProcedureVersionSnapshot,
@@ -106,7 +109,35 @@ class PublicPlanningOperationTests(unittest.TestCase):
         )
         self.assertEqual(
             plan_stateless(snapshot(version=True), request({"answer": True})),
-            InconclusiveResult("plan_assembly_unavailable"),
+            PlanResult("service", "procedure", "version", LocalizedText("نسخة", "Version")),
+        )
+
+    def test_untrusted_official_claim_is_locally_inconclusive(self) -> None:
+        base = snapshot(version=True)
+        claim = ChecklistItemSnapshot(
+            "claim",
+            LocalizedText("متطلب", "Requirement"),
+            "official_requirement",
+            None,
+            1,
+            0,
+            0,
+            0,
+            None,
+            "procedure",
+            "",
+            None,
+            None,
+            "needs_reverification",
+            None,
+            None,
+            (),
+        )
+        version = replace(base.procedure_versions[0], checklist_items=(claim,))
+        with_claim = KnowledgeSnapshot(base.fact_definitions, base.services, (version,))
+        self.assertEqual(
+            plan_stateless(with_claim, request({"answer": True})),
+            InconclusiveResult("checklist_trust_inconclusive"),
         )
 
     def test_preparation_completes_before_candidate_selection(self) -> None:

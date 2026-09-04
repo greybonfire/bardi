@@ -11,6 +11,7 @@ from typing import Literal
 from .catalog import LocalizedText
 from .diagnostics import DiagnosticPath
 from .facts import FactKind
+from .trust import Freshness
 
 type Locale = Literal["ar", "en"]
 
@@ -68,12 +69,44 @@ class NextQuestionResult:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicSource:
+    id: str
+    authority_id: str
+    title: str
+    locator: str
+    classification: str
+    retrieved_on: date
+
+
+@dataclass(frozen=True, slots=True)
+class PublicChecklistItem:
+    id: str
+    text: LocalizedText
+    classification: str
+    classification_label: LocalizedText
+    quantity: int
+    original_quantity: int
+    copy_quantity: int
+    document_type_id: str | None
+    scope: str
+    sources: tuple[PublicSource, ...]
+    freshness: Freshness
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     service_id: str
     procedure_id: str
     procedure_version_id: str
     title: LocalizedText
+    checklist_items: tuple[PublicChecklistItem, ...] = ()
     type: Literal["plan"] = "plan"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
 
 
 @dataclass(frozen=True, slots=True)

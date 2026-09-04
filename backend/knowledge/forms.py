@@ -8,6 +8,8 @@ from django.forms.models import BaseInlineFormSet
 
 from .domain import decode_stored_rule, diagnostic_messages, referenced_fact_keys
 from .models import (
+    ChecklistItem,
+    EvidenceLink,
     FactDefinition,
     ServiceContradiction,
     ServiceProcedureCandidate,
@@ -41,6 +43,27 @@ class FactDefinitionForm(ValidatingModelForm):
     class Meta:
         model = FactDefinition
         fields = "__all__"
+
+
+class ChecklistItemForm(ValidatingModelForm):
+    class Meta:
+        model = ChecklistItem
+        fields = "__all__"
+
+    def clean_applicability(self) -> object:
+        value = self.cleaned_data["applicability"]
+        if value == {}:
+            return value
+        result = decode_stored_rule(value)
+        if result.diagnostics:
+            raise ValidationError(diagnostic_messages(result))
+        return value
+
+
+class EvidenceLinkForm(ValidatingModelForm):
+    class Meta:
+        model = EvidenceLink
+        exclude = ("sources",)
 
 
 class QuestionResolvedFactFormSet(BaseInlineFormSet):  # type: ignore[type-arg]

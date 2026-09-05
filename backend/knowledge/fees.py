@@ -8,7 +8,6 @@ the same provenance aggregate as Checklist Items, Steps, and administrative Warn
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db import models

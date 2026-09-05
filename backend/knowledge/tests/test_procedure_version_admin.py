@@ -30,6 +30,7 @@ from knowledge.models import (
     EligibilityBasis,
     EvidenceLink,
     EvidenceLinkSource,
+    FactDefinition,
     Procedure,
     ProcedureVersion,
     ProcedureVersionAuditEvent,
@@ -270,6 +271,10 @@ class GuidanceAdminTests(TestCase):
         self.user = get_user_model().objects.create_superuser(username="guidance-admin")
         self.request = RequestFactory().get("/admin/")
         self.request.user = self.user
+        basis_fact, _ = FactDefinition.objects.get_or_create(
+            key="guidance_admin_basis",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
         service = Service.objects.create(
             semantic_id="guidance.admin.service", text_ar="خدمة", text_en="Service"
         )
@@ -286,7 +291,11 @@ class GuidanceAdminTests(TestCase):
             text_en="Version",
         )
         self.basis = EligibilityBasis.objects.create(
-            procedure_version=self.version, semantic_id="basis.admin"
+            procedure_version=self.version,
+            semantic_id="basis.admin",
+            text_ar="أساس",
+            text_en="Basis",
+            qualification={"op": "eq", "fact": basis_fact.key, "value": True},
         )
         self.authority = Authority.objects.create(
             semantic_id="guidance.admin.authority", name_ar="جهة", name_en="Authority"

@@ -95,7 +95,7 @@ def _capture_discrepancy_transition(
         raise ValidationError(
             "An open discrepancy's trust outcome is immutable; resolve it to record a new outcome."
         )
-    setattr(instance, "_workflow_previous_status", previous_status)
+    instance._workflow_previous_status = previous_status  # type: ignore[attr-defined]
 
 
 @receiver(

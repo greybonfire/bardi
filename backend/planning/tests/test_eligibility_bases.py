@@ -7,7 +7,6 @@ from planning import (
     AuthoritySnapshot,
     EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
-    FactDefinition,
     LocalizedText,
     Predicate,
     PreparedFacts,

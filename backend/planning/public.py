@@ -22,6 +22,7 @@ type ProcedureDependencyStatus = Literal[
     "inconclusive",
 ]
 type RoutingStatus = Literal["resolved", "partially_resolved", "unresolved"]
+type InconclusiveSection = Literal["checklist_items", "steps"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,6 +224,7 @@ class PlanResult:
     inconclusive_basis_ids: tuple[str, ...] = ()
     dependencies: tuple[PublicProcedureDependency, ...] = ()
     routing: PublicRouting = PublicRouting("unresolved")
+    inconclusive_sections: tuple[InconclusiveSection, ...] = ()
     type: Literal["plan"] = "plan"
 
     def __post_init__(self) -> None:
@@ -233,6 +235,7 @@ class PlanResult:
         object.__setattr__(self, "eligibility_bases", tuple(self.eligibility_bases))
         object.__setattr__(self, "inconclusive_basis_ids", tuple(self.inconclusive_basis_ids))
         object.__setattr__(self, "dependencies", tuple(self.dependencies))
+        object.__setattr__(self, "inconclusive_sections", tuple(self.inconclusive_sections))
 
 
 @dataclass(frozen=True, slots=True)

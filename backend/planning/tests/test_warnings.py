@@ -88,6 +88,40 @@ class WarningSelectionTests(unittest.TestCase):
         self.assertEqual(tuple(item.id for item in selected), ("administrative", "regenerate"))
         self.assertEqual(selected[0].sources[0].id, "source")
 
+    def test_regeneration_warning_is_unconditional_product_safety_policy(self) -> None:
+        regeneration = WarningSnapshot(
+            "regenerate",
+            LocalizedText("أعد إنشاء الخطة", "Regenerate the plan"),
+            "important",
+            "product",
+            "regeneration",
+            10,
+            Predicate("eq", "ok", False),
+            date(2027, 1, 1),
+            date(2027, 12, 31),
+            "disputed",
+            date(2026, 1, 1),
+            date(2026, 1, 15),
+            (),
+        )
+        version = ProcedureVersionSnapshot(
+            "v",
+            "p",
+            LocalizedText("خ", "V"),
+            Predicate("eq", "ok", True),
+            "v1",
+            "published",
+            None,
+            None,
+            warnings=(regeneration,),
+        )
+        selected = select_warnings(
+            version, PreparedFacts({"ok": True}, frozenset({"ok"}), {}), date(2026, 2, 1)
+        )
+        self.assertEqual(tuple(item.id for item in selected), ("regenerate",))
+        self.assertEqual(selected[0].sources, ())
+        self.assertEqual(selected[0].freshness.state, "disputed")
+
 
 if __name__ == "__main__":
     unittest.main()

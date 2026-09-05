@@ -18,7 +18,7 @@ from planning.steps import select_steps
 
 
 class StepSelectionTests(unittest.TestCase):
-    def test_order_scope_and_compact_provenance_are_deterministic(self) -> None:
+    def test_order_scope_uncertainty_and_compact_provenance_are_deterministic(self) -> None:
         source = SourceSnapshot(
             "source",
             AuthoritySnapshot("authority", LocalizedText("جهة", "Authority")),
@@ -67,33 +67,30 @@ class StepSelectionTests(unittest.TestCase):
             steps=(step("b", 2), step("a", 1), step("c", 0, "eligibility_basis")),
         )
         facts = PreparedFacts({"ok": True}, frozenset({"ok"}), {})
-        self.assertEqual(
-            [item.id for item in select_steps(version, facts, date(2026, 2, 1))], ["a", "b"]
+        unresolved = select_steps(version, facts, date(2026, 2, 1))
+        self.assertEqual([item.id for item in unresolved.items], ["a", "b"])
+        self.assertTrue(unresolved.basis_resolution_required)
+
+        resolved = select_steps(
+            version, facts, date(2026, 2, 1), matched_basis_ids={"basis"}
         )
-        self.assertEqual(
-            [
-                item.id
-                for item in select_steps(
-                    version, facts, date(2026, 2, 1), matched_basis_ids={"basis"}
-                )
-            ],
-            ["c", "a", "b"],
-        )
-        self.assertEqual(select_steps(version, facts, date(2026, 2, 1))[0].sources[0].id, "source")
+        self.assertEqual([item.id for item in resolved.items], ["c", "a", "b"])
+        self.assertFalse(resolved.basis_resolution_required)
+        self.assertEqual(resolved.items[0].sources[0].id, "source")
 
         trustworthy = step("trustworthy", 1)
         mixed = replace(
             version,
             steps=(
                 trustworthy,
-                replace(step("stale", 2), verification_state="needs_reverification"),
+                replace(step("untrusted", 2), verification_state="needs_reverification"),
                 replace(step("unknown", 3), applicability=Predicate("eq", "missing", True)),
             ),
         )
-        self.assertEqual(
-            tuple(item.id for item in select_steps(mixed, facts, date(2026, 2, 1))),
-            ("trustworthy",),
-        )
+        selected = select_steps(mixed, facts, date(2026, 2, 1))
+        self.assertEqual(tuple(item.id for item in selected.items), ("trustworthy",))
+        self.assertEqual(selected.missing_facts, frozenset({"missing"}))
+        self.assertTrue(selected.trust_inconclusive)
 
 
 if __name__ == "__main__":

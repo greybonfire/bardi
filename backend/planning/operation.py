@@ -133,6 +133,12 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     steps = select_steps(
         resolution.version, preparation.prepared_facts, planning_input.evaluation_date
     )
+    if steps.basis_resolution_required:
+        return InconclusiveResult("eligibility_basis_resolution_required")
+    if steps.missing_facts:
+        return InconclusiveResult("step_applicability_unknown")
+    if steps.trust_inconclusive:
+        return InconclusiveResult("step_trust_inconclusive")
     warnings = select_warnings(
         resolution.version, preparation.prepared_facts, planning_input.evaluation_date
     )
@@ -142,6 +148,6 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         resolution.version.semantic_id,
         resolution.version.text,
         checklist.items,
-        steps,
+        steps.items,
         warnings,
     )

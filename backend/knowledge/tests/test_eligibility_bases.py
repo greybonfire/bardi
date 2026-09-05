@@ -195,7 +195,9 @@ class EligibilityBasisKnowledgeTests(TestCase):
         publish_procedure_version(self.version.pk, actor=self.actor)
         snapshot = load_knowledge_snapshot()
         version = next(
-            item for item in snapshot.procedure_versions if item.semantic_id == self.version.semantic_id
+            item
+            for item in snapshot.procedure_versions
+            if item.semantic_id == self.version.semantic_id
         )
         self.assertEqual(len(version.eligibility_bases), 1)
         detached = version.eligibility_bases[0]

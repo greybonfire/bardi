@@ -85,8 +85,8 @@ def _capture_discrepancy_transition(
     previous = sender.objects.filter(pk=instance.pk).values("status", "outcome_state").first()
     if previous is None:
         return
-    previous_status = cast(str, previous["status"])
-    previous_state = cast(str, previous["outcome_state"])
+    previous_status = previous["status"]
+    previous_state = previous["outcome_state"]
     if (
         previous_status == workflow.EvidenceDiscrepancy.Status.OPEN
         and instance.status == workflow.EvidenceDiscrepancy.Status.OPEN
@@ -95,7 +95,7 @@ def _capture_discrepancy_transition(
         raise ValidationError(
             "An open discrepancy's trust outcome is immutable; resolve it to record a new outcome."
         )
-    instance._workflow_previous_status = previous_status
+    setattr(instance, "_workflow_previous_status", previous_status)
 
 
 @receiver(

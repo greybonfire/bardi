@@ -78,7 +78,7 @@ def _clone_row(instance: models.Model, **overrides: Any) -> models.Model:
     values.update(overrides)
     clone = type(instance)(**values)
     clone.save()
-    return cast(models.Model, clone)
+    return clone
 
 
 def _next_successor_semantic_id(source: ProcedureVersion) -> str:
@@ -156,79 +156,81 @@ def clone_published_procedure_version(
         successor.save()
 
         basis_map: dict[int, EligibilityBasis] = {}
-        for row in EligibilityBasis.objects.filter(procedure_version=source).order_by("pk"):
-            clone = cast(
+        for basis_row in EligibilityBasis.objects.filter(procedure_version=source).order_by("pk"):
+            basis_clone = cast(
                 EligibilityBasis,
-                _clone_row(row, procedure_version_id=successor.pk),
+                _clone_row(basis_row, procedure_version_id=successor.pk),
             )
-            assert row.pk is not None
-            basis_map[row.pk] = clone
+            assert basis_row.pk is not None
+            basis_map[basis_row.pk] = basis_clone
 
         checklist_map: dict[int, ChecklistItem] = {}
-        for row in ChecklistItem.objects.filter(procedure_version=source).order_by("pk"):
-            clone = cast(
+        for checklist_row in ChecklistItem.objects.filter(procedure_version=source).order_by("pk"):
+            checklist_clone = cast(
                 ChecklistItem,
-                _clone_row(row, procedure_version_id=successor.pk),
+                _clone_row(checklist_row, procedure_version_id=successor.pk),
             )
-            assert row.pk is not None
-            checklist_map[row.pk] = clone
+            assert checklist_row.pk is not None
+            checklist_map[checklist_row.pk] = checklist_clone
 
         step_map: dict[int, Step] = {}
-        for row in Step.objects.filter(procedure_version=source).order_by("pk"):
-            basis_id = row.eligibility_basis_id
-            clone = cast(
+        for step_row in Step.objects.filter(procedure_version=source).order_by("pk"):
+            basis_id = step_row.eligibility_basis_id
+            step_clone = cast(
                 Step,
                 _clone_row(
-                    row,
+                    step_row,
                     procedure_version_id=successor.pk,
                     eligibility_basis_id=(basis_map[basis_id].pk if basis_id is not None else None),
                 ),
             )
-            assert row.pk is not None
-            step_map[row.pk] = clone
+            assert step_row.pk is not None
+            step_map[step_row.pk] = step_clone
 
         warning_map: dict[int, Warning] = {}
-        for row in Warning.objects.filter(procedure_version=source).order_by("pk"):
-            clone = cast(
+        for warning_row in Warning.objects.filter(procedure_version=source).order_by("pk"):
+            warning_clone = cast(
                 Warning,
-                _clone_row(row, procedure_version_id=successor.pk),
+                _clone_row(warning_row, procedure_version_id=successor.pk),
             )
-            assert row.pk is not None
-            warning_map[row.pk] = clone
+            assert warning_row.pk is not None
+            warning_map[warning_row.pk] = warning_clone
 
         fee_map: dict[int, Fee] = {}
-        for row in Fee.objects.filter(procedure_version=source).order_by("pk"):
-            basis_id = row.eligibility_basis_id
-            clone = cast(
+        for fee_row in Fee.objects.filter(procedure_version=source).order_by("pk"):
+            basis_id = fee_row.eligibility_basis_id
+            fee_clone = cast(
                 Fee,
                 _clone_row(
-                    row,
+                    fee_row,
                     procedure_version_id=successor.pk,
                     eligibility_basis_id=(basis_map[basis_id].pk if basis_id is not None else None),
                 ),
             )
-            assert row.pk is not None
-            fee_map[row.pk] = clone
+            assert fee_row.pk is not None
+            fee_map[fee_row.pk] = fee_clone
 
         dependency_map: dict[int, ProcedureDependency] = {}
-        for row in ProcedureDependency.objects.filter(procedure_version=source).order_by("pk"):
-            clone = cast(
-                ProcedureDependency,
-                _clone_row(row, procedure_version_id=successor.pk),
-            )
-            assert row.pk is not None
-            dependency_map[row.pk] = clone
-
-        association_map: dict[int, ProcedureServicePointAssociation] = {}
-        for row in ProcedureServicePointAssociation.objects.filter(
+        for dependency_row in ProcedureDependency.objects.filter(
             procedure_version=source
         ).order_by("pk"):
-            clone = cast(
-                ProcedureServicePointAssociation,
-                _clone_row(row, procedure_version_id=successor.pk),
+            dependency_clone = cast(
+                ProcedureDependency,
+                _clone_row(dependency_row, procedure_version_id=successor.pk),
             )
-            assert row.pk is not None
-            association_map[row.pk] = clone
+            assert dependency_row.pk is not None
+            dependency_map[dependency_row.pk] = dependency_clone
+
+        association_map: dict[int, ProcedureServicePointAssociation] = {}
+        for association_row in ProcedureServicePointAssociation.objects.filter(
+            procedure_version=source
+        ).order_by("pk"):
+            association_clone = cast(
+                ProcedureServicePointAssociation,
+                _clone_row(association_row, procedure_version_id=successor.pk),
+            )
+            assert association_row.pk is not None
+            association_map[association_row.pk] = association_clone
 
         owner_maps: dict[str, dict[int, models.Model]] = {
             "checklist_item": cast(dict[int, models.Model], checklist_map),
@@ -244,36 +246,38 @@ def clone_published_procedure_version(
             evidence_filter |= Q(**{f"{field_name}_id__in": tuple(mapping)})
 
         evidence_map: dict[int, EvidenceLink] = {}
-        for link in EvidenceLink.objects.filter(evidence_filter).order_by("pk"):
-            values = _copy_values(link, exclude=frozenset(_EVIDENCE_OWNER_FIELDS))
+        for evidence_link in EvidenceLink.objects.filter(evidence_filter).order_by("pk"):
+            values = _copy_values(evidence_link, exclude=frozenset(_EVIDENCE_OWNER_FIELDS))
             matched = [
-                (field_name, mapping[getattr(link, f"{field_name}_id")])
+                (field_name, mapping[getattr(evidence_link, f"{field_name}_id")])
                 for field_name, mapping in owner_maps.items()
-                if getattr(link, f"{field_name}_id", None) in mapping
+                if getattr(evidence_link, f"{field_name}_id", None) in mapping
             ]
             if len(matched) != 1:
                 raise ValidationError(
-                    f"{source.semantic_id}: evidence {link.pk} has incoherent version ownership."
+                    f"{source.semantic_id}: evidence {evidence_link.pk} has incoherent version ownership."
                 )
             field_name, new_owner = matched[0]
             values[f"{field_name}_id"] = new_owner.pk
-            clone = EvidenceLink(**values)
-            clone.save()
-            assert link.pk is not None
-            evidence_map[link.pk] = clone
+            evidence_clone = EvidenceLink(**values)
+            evidence_clone.save()
+            assert evidence_link.pk is not None
+            evidence_map[evidence_link.pk] = evidence_clone
 
-        for row in EvidenceLinkSource.objects.filter(
+        for source_link in EvidenceLinkSource.objects.filter(
             evidence_link_id__in=tuple(evidence_map)
         ).order_by("evidence_link_id", "position", "pk"):
             EvidenceLinkSource.objects.create(
-                evidence_link=evidence_map[row.evidence_link_id],
-                source_id=row.source_id,
-                position=row.position,
+                evidence_link=evidence_map[source_link.evidence_link_id],
+                source_id=source_link.source_id,
+                position=source_link.position,
             )
 
-        for scenario in PlanningScenario.objects.filter(procedure_version=source).order_by("pk"):
+        for planning_scenario in PlanningScenario.objects.filter(
+            procedure_version=source
+        ).order_by("pk"):
             _clone_scenario(
-                scenario,
+                planning_scenario,
                 successor=successor,
                 source_semantic_id=source.semantic_id,
             )

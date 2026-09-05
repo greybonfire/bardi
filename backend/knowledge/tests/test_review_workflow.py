@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
+from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.test import TransactionTestCase, override_settings
@@ -90,14 +90,23 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
             applicability=rule,
         )
 
-    def _grant(self, user: object, codename: str) -> None:
-        permission = Permission.objects.get(
+    def _permission(self, codename: str) -> Permission:
+        return Permission.objects.get(
             content_type__app_label="knowledge",
             codename=codename,
         )
-        user.user_permissions.add(permission)  # type: ignore[attr-defined]
-        if hasattr(user, "_perm_cache"):
-            delattr(user, "_perm_cache")
+
+    def _grant(self, user: User, codename: str) -> None:
+        user.user_permissions.add(self._permission(codename))
+        for cache_name in ("_perm_cache", "_user_perm_cache"):
+            if hasattr(user, cache_name):
+                delattr(user, cache_name)
+
+    def _revoke(self, user: User, codename: str) -> None:
+        user.user_permissions.remove(self._permission(codename))
+        for cache_name in ("_perm_cache", "_user_perm_cache"):
+            if hasattr(user, cache_name):
+                delattr(user, cache_name)
 
     def policy(self, **risks: bool) -> ProcedureVersionReviewPolicy:
         return ProcedureVersionReviewPolicy.objects.create(
@@ -106,13 +115,16 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
             **risks,
         )
 
-    def approve_core(self, reviewer: object | None = None) -> tuple[ProcedureVersionReviewApproval, ...]:
+    def approve_core(
+        self,
+        reviewer: User | None = None,
+    ) -> tuple[ProcedureVersionReviewApproval, ...]:
         actor = self.reviewer if reviewer is None else reviewer
         return tuple(
             approve_review_dimension(
                 self.version.pk,
                 dimension=dimension,
-                actor=actor,  # type: ignore[arg-type]
+                actor=actor,
             )
             for dimension in sorted(CORE_DIMENSIONS)
         )
@@ -171,7 +183,7 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
         self.assertEqual({row.actor for row in audit_rows}, {self.reviewer})
         self.assertEqual({row.dimension for row in audit_rows}, CORE_DIMENSIONS)
 
-    def test_configured_military_risk_requires_eligible_specialist(self) -> None:
+    def test_configured_military_risk_requires_currently_eligible_specialist(self) -> None:
         self.policy(military_risk=True)
         self.approve_core()
 
@@ -197,6 +209,15 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
         )
         self.assertEqual(approval.specialist_risk, "military")
 
+        self._revoke(self.specialist, "specialist_approve_military")
+        with self.assertRaises(PublicationRejected) as caught:
+            publish_procedure_version(self.version.pk, actor=self.publisher)
+        self.assertIn(
+            ("specialist_reviewer_not_eligible", "military"),
+            {(item.code, item.detail) for item in caught.exception.diagnostics},
+        )
+
+        self._grant(self.specialist, "specialist_approve_military")
         published = publish_procedure_version(self.version.pk, actor=self.publisher)
         event = published.audit_events.get(event_type="published")
         self.assertEqual(
@@ -267,7 +288,6 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
             required_review_dimensions(self.version),
             CORE_DIMENSIONS | {ProcedureVersionReviewApproval.Dimension.DISCREPANCY},
         )
-        self._grant(self.reviewer, "review_procedureversion")
         approval = approve_review_dimension(
             self.version.pk,
             dimension=ProcedureVersionReviewApproval.Dimension.DISCREPANCY,

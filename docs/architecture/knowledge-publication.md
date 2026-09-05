@@ -181,6 +181,12 @@ Research may update evidence without changing public meaning. If only internal v
 
 Any change to public rules, claim meaning, applicability, amount, requirement status, routing condition, translation meaning, or public evidence interpretation creates a successor Procedure Version.
 
+## Trusted Steps and Warnings (#41)
+
+Publication now locks Bases, Checklist Items, Steps, Warnings, all claim Evidence Links and source links, then Sources, Authorities, and Document Types in stable primary-key order. Core gates validate ownership, bilingual completeness, applicability against published Facts, temporal/order metadata, Basis ownership, evidence quality, contradictions and Field Report context. Current Steps and administrative Warnings require current supporting evidence. Product Warnings prohibit evidence, and each published version has exactly one important product regeneration warning.
+
+Snapshots detach these records and planners sort them deterministically. Step and Warning applicability, temporal, trust, contradiction, and support failures omit only that item so unrelated reliable guidance remains available. Existing Checklist Item policy still reports untrusted or applicability-unknown Official Requirements as a local inconclusive result. Database triggers and model guards preserve published and withdrawn claim aggregates and shared provenance.
+
 ## Admin behavior
 
 Django Admin is the initial editorial surface. It should make unsafe states difficult:

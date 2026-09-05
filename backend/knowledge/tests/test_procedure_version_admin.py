@@ -11,17 +11,23 @@ from knowledge.admin import (
     AuthorityAdmin,
     ChecklistItemAdmin,
     DocumentTypeAdmin,
+    EligibilityBasisAdmin,
     EvidenceLinkAdmin,
     EvidenceOwnerInline,
     EvidenceSourceInline,
     ProcedureVersionAdmin,
     ProcedureVersionAuditEventAdmin,
     SourceAdmin,
+    StepAdmin,
+    StepEvidenceInline,
+    WarningAdmin,
+    WarningEvidenceInline,
 )
 from knowledge.models import (
     Authority,
     ChecklistItem,
     DocumentType,
+    EligibilityBasis,
     EvidenceLink,
     EvidenceLinkSource,
     Procedure,
@@ -30,6 +36,8 @@ from knowledge.models import (
     Service,
     ServiceProcedureCandidate,
     Source,
+    Step,
+    Warning,
 )
 from knowledge.publication import publish_procedure_version
 from knowledge.services import set_evidence_link_sources
@@ -255,3 +263,163 @@ class ChecklistAdminTests(TestCase):
         )
         self.assertFalse(source_admin.has_delete_permission(self.request, self.source))
         self.assertEqual(EvidenceLinkSource.objects.filter(evidence_link=self.evidence).count(), 1)
+
+
+class GuidanceAdminTests(TestCase):
+    def setUp(self) -> None:
+        self.user = get_user_model().objects.create_superuser(username="guidance-admin")
+        self.request = RequestFactory().get("/admin/")
+        self.request.user = self.user
+        service = Service.objects.create(
+            semantic_id="guidance.admin.service", text_ar="خدمة", text_en="Service"
+        )
+        procedure = Procedure.objects.create(
+            semantic_id="guidance.admin.procedure",
+            text_ar="إجراء",
+            text_en="Procedure",
+            primary_service=service,
+        )
+        self.version = ProcedureVersion.objects.create(
+            semantic_id="guidance.admin.version",
+            procedure=procedure,
+            text_ar="نسخة",
+            text_en="Version",
+        )
+        self.basis = EligibilityBasis.objects.create(
+            procedure_version=self.version, semantic_id="basis.admin"
+        )
+        self.authority = Authority.objects.create(
+            semantic_id="guidance.admin.authority", name_ar="جهة", name_en="Authority"
+        )
+        self.source = Source.objects.create(
+            semantic_id="guidance.admin.source",
+            authority=self.authority,
+            title="Official source",
+            locator="https://example.test/guidance",
+            classification=Source.Classification.OFFICIAL,
+            retrieved_on=date(2026, 8, 1),
+        )
+
+    def test_staff_can_author_draft_steps_and_product_warnings(self) -> None:
+        self.client.force_login(self.user)
+        step_response = self.client.post(
+            reverse("admin:knowledge_step_add"),
+            {
+                "procedure_version": self.version.pk,
+                "semantic_id": "guidance.admin.step",
+                "text_ar": "قدّم الطلب",
+                "text_en": "Submit the application",
+                "phase": "submit",
+                "phase_order": 10,
+                "slot": 20,
+                "applicability": "{}",
+                "scope": Step.Scope.ELIGIBILITY_BASIS,
+                "eligibility_basis": self.basis.pk,
+                "effective_from": "",
+                "effective_to": "",
+                "verified_on": "",
+                "reverify_on": "",
+                "verification_state": "current",
+                "evidence_links-TOTAL_FORMS": "0",
+                "evidence_links-INITIAL_FORMS": "0",
+                "evidence_links-MIN_NUM_FORMS": "0",
+                "evidence_links-MAX_NUM_FORMS": "1000",
+                "_save": "Save",
+            },
+        )
+        self.assertEqual(step_response.status_code, 302)
+        step = Step.objects.get(semantic_id="guidance.admin.step")
+        evidence_response = self.client.post(
+            reverse("admin:knowledge_evidencelink_add"),
+            {
+                "checklist_item": "",
+                "step": step.pk,
+                "warning": "",
+                "passage": "Relied-upon passage",
+                "location": "Section 1",
+                "applicability_context": "Applies to this procedure",
+                "effective_from": "",
+                "effective_to": "",
+                "retrieved_on": "",
+                "verified_on": "",
+                "reverify_on": "",
+                "verification_state": "current",
+                "support_status": EvidenceLink.SupportStatus.SUPPORTS,
+                "source_links-TOTAL_FORMS": "1",
+                "source_links-INITIAL_FORMS": "0",
+                "source_links-MIN_NUM_FORMS": "0",
+                "source_links-MAX_NUM_FORMS": "1000",
+                "source_links-0-source": self.source.pk,
+                "source_links-0-position": 0,
+                "_save": "Save",
+            },
+        )
+        self.assertEqual(evidence_response.status_code, 302)
+        self.assertEqual(tuple(EvidenceLink.objects.get(step=step).sources.all()), (self.source,))
+
+        warning_response = self.client.post(
+            reverse("admin:knowledge_warning_add"),
+            {
+                "procedure_version": self.version.pk,
+                "semantic_id": "guidance.admin.warning",
+                "text_ar": "أعد إنشاء الخطة",
+                "text_en": "Regenerate the plan",
+                "severity": Warning.Severity.IMPORTANT,
+                "kind": Warning.Kind.PRODUCT,
+                "role": Warning.Role.REGENERATION,
+                "display_order": 10,
+                "applicability": "{}",
+                "effective_from": "",
+                "effective_to": "",
+                "verified_on": "",
+                "reverify_on": "",
+                "verification_state": "current",
+                "evidence_links-TOTAL_FORMS": "0",
+                "evidence_links-INITIAL_FORMS": "0",
+                "evidence_links-MIN_NUM_FORMS": "0",
+                "evidence_links-MAX_NUM_FORMS": "1000",
+                "_save": "Save",
+            },
+        )
+        self.assertEqual(warning_response.status_code, 302)
+        self.assertTrue(Warning.objects.filter(semantic_id="guidance.admin.warning").exists())
+
+    def test_guidance_admin_becomes_readonly_with_its_version(self) -> None:
+        step = Step.objects.create(
+            procedure_version=self.version,
+            semantic_id="guidance.admin.step",
+            text_ar="قدّم الطلب",
+            text_en="Submit the application",
+            phase="submit",
+            verification_state="needs_reverification",
+        )
+        warning = Warning.objects.create(
+            procedure_version=self.version,
+            semantic_id="guidance.admin.warning",
+            text_ar="تنبيه",
+            text_en="Warning",
+            severity=Warning.Severity.IMPORTANT,
+            kind=Warning.Kind.PRODUCT,
+            role=Warning.Role.REGENERATION,
+            verification_state="current",
+        )
+        self.version.state = ProcedureVersion.State.PUBLISHED
+
+        step_admin = StepAdmin(Step, admin.site)
+        warning_admin = WarningAdmin(Warning, admin.site)
+        basis_admin = EligibilityBasisAdmin(EligibilityBasis, admin.site)
+        step_inline = StepEvidenceInline(Step, admin.site)
+        warning_inline = WarningEvidenceInline(Warning, admin.site)
+        self.assertEqual(
+            set(step_admin.get_readonly_fields(self.request, step)),
+            {field.name for field in Step._meta.fields},
+        )
+        self.assertEqual(
+            set(warning_admin.get_readonly_fields(self.request, warning)),
+            {field.name for field in Warning._meta.fields},
+        )
+        self.assertFalse(step_admin.has_delete_permission(self.request, step))
+        self.assertFalse(warning_admin.has_delete_permission(self.request, warning))
+        self.assertFalse(basis_admin.has_delete_permission(self.request, self.basis))
+        self.assertFalse(step_inline.has_add_permission(self.request, step))
+        self.assertFalse(warning_inline.has_add_permission(self.request, warning))

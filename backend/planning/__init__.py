@@ -13,6 +13,7 @@ from .catalog import (
     AuthoritySnapshot,
     ChecklistItemSnapshot,
     ContradictionSnapshot,
+    EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
     KnowledgeSnapshot,
     LocalizedText,
@@ -21,6 +22,8 @@ from .catalog import (
     QuestionSnapshot,
     ServiceSnapshot,
     SourceSnapshot,
+    StepSnapshot,
+    WarningSnapshot,
 )
 from .diagnostics import DiagnosticPath, DiagnosticPathSegment, ValidationDiagnostic
 from .evaluator import Evaluation, EvaluationTrace, TruthValue, evaluate
@@ -48,6 +51,8 @@ from .public import (
     PublicDiagnostic,
     PublicQuestion,
     PublicSource,
+    PublicStep,
+    PublicWarning,
 )
 from .rules import (
     BOOLEAN_OPERATORS,
@@ -111,6 +116,7 @@ __all__ = (
     "DiagnosticPath",
     "DiagnosticPathSegment",
     "Evaluation",
+    "EligibilityBasisSnapshot",
     "EvidenceLinkSnapshot",
     "EvaluationTrace",
     "FactDefinition",
@@ -139,6 +145,8 @@ __all__ = (
     "PublicChecklistItem",
     "PublicDiagnostic",
     "PublicSource",
+    "PublicStep",
+    "PublicWarning",
     "PublicQuestion",
     "QuestionSnapshot",
     "Predicate",
@@ -151,6 +159,8 @@ __all__ = (
     "SelectionUnsupported",
     "ServiceSnapshot",
     "SourceSnapshot",
+    "StepSnapshot",
+    "WarningSnapshot",
     "TruthValue",
     "TrustAssessment",
     "TrustDisposition",

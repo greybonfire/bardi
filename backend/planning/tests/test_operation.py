@@ -22,6 +22,7 @@ from planning import (
     QuestionSnapshot,
     SelectionUnsupported,
     ServiceSnapshot,
+    StepSnapshot,
     plan_stateless,
 )
 
@@ -71,6 +72,30 @@ def snapshot(
 
 def request(facts: dict[str, object] | None = None) -> PlanningInput:
     return PlanningInput("service", facts or {}, "en", date(2026, 9, 1))
+
+
+def step(
+    *,
+    applicability: Predicate | None = None,
+    scope: str = "procedure",
+    verification_state: str = "current",
+) -> StepSnapshot:
+    return StepSnapshot(
+        "step",
+        LocalizedText("خطوة", "Step"),
+        "prepare",
+        0,
+        0,
+        applicability,
+        scope,
+        "basis" if scope == "eligibility_basis" else None,
+        None,
+        None,
+        verification_state,  # type: ignore[arg-type]
+        date(2026, 8, 1),
+        None,
+        (),
+    )
 
 
 class PublicPlanningOperationTests(unittest.TestCase):
@@ -139,6 +164,25 @@ class PublicPlanningOperationTests(unittest.TestCase):
             plan_stateless(with_claim, request({"answer": True})),
             InconclusiveResult("checklist_trust_inconclusive"),
         )
+
+    def test_step_uncertainty_and_unresolved_basis_scope_are_not_silently_omitted(self) -> None:
+        base = snapshot(version=True)
+        cases = (
+            (
+                step(applicability=Predicate("eq", "missing", True)),
+                "step_applicability_unknown",
+            ),
+            (step(verification_state="needs_reverification"), "step_trust_inconclusive"),
+            (step(scope="eligibility_basis"), "eligibility_basis_resolution_required"),
+        )
+        for guidance, reason in cases:
+            with self.subTest(reason=reason):
+                version = replace(base.procedure_versions[0], steps=(guidance,))
+                knowledge = KnowledgeSnapshot(base.fact_definitions, base.services, (version,))
+                self.assertEqual(
+                    plan_stateless(knowledge, request({"answer": True})),
+                    InconclusiveResult(reason),
+                )
 
     def test_preparation_completes_before_candidate_selection(self) -> None:
         with patch(

@@ -74,7 +74,7 @@ class FreshnessResponse(StrictSchema):
     reverify_on: date | None
 
 
-class ChecklistSourceResponse(StrictSchema):
+class GuidanceSourceResponse(StrictSchema):
     id: str
     authority_id: str
     title: str
@@ -93,7 +93,25 @@ class ChecklistItemResponse(StrictSchema):
     copy_quantity: int
     document_type_id: str | None
     scope: Literal["procedure"]
-    sources: list[ChecklistSourceResponse]
+    sources: list[GuidanceSourceResponse]
+    freshness: FreshnessResponse
+
+
+class StepResponse(StrictSchema):
+    id: str
+    text: str
+    phase: str
+    sources: list[GuidanceSourceResponse]
+    freshness: FreshnessResponse
+
+
+class WarningResponse(StrictSchema):
+    id: str
+    text: str
+    severity: Literal["info", "important"]
+    kind: Literal["administrative", "product"]
+    role: Literal["general", "regeneration", "limitation"]
+    sources: list[GuidanceSourceResponse]
     freshness: FreshnessResponse
 
 
@@ -104,6 +122,8 @@ class PlanResponse(StrictSchema):
     procedure_version_id: str
     title: str
     checklist_items: list[ChecklistItemResponse]
+    steps: list[StepResponse]
+    warnings: list[WarningResponse]
 
 
 class InconclusiveResponse(StrictSchema):

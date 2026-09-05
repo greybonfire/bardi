@@ -14,6 +14,8 @@ from .models import (
     ServiceContradiction,
     ServiceProcedureCandidate,
     ServiceQuestion,
+    Step,
+    Warning,
 )
 
 
@@ -57,6 +59,34 @@ class ChecklistItemForm(ValidatingModelForm):
         result = decode_stored_rule(value)
         if result.diagnostics:
             raise ValidationError(diagnostic_messages(result))
+        return value
+
+
+class StepForm(ValidatingModelForm):
+    class Meta:
+        model = Step
+        fields = "__all__"
+
+    def clean_applicability(self) -> object:
+        value = self.cleaned_data["applicability"]
+        if value != {}:
+            result = decode_stored_rule(value)
+            if result.diagnostics:
+                raise ValidationError(diagnostic_messages(result))
+        return value
+
+
+class WarningForm(ValidatingModelForm):
+    class Meta:
+        model = Warning
+        fields = "__all__"
+
+    def clean_applicability(self) -> object:
+        value = self.cleaned_data["applicability"]
+        if value != {}:
+            result = decode_stored_rule(value)
+            if result.diagnostics:
+                raise ValidationError(diagnostic_messages(result))
         return value
 
 

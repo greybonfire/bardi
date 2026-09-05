@@ -616,13 +616,28 @@ class Authority(models.Model):
     def save(self, *args: Any, **kwargs: Any) -> None:
         if (
             self.pk
-            and Source.objects.filter(
-                authority_id=self.pk,
-                evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
-                    "published",
-                    "withdrawn",
-                ),
-            ).exists()
+            and Source.objects.filter(authority_id=self.pk)
+            .filter(
+                Q(
+                    evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
+                )
+                | Q(
+                    evidence_source_links__evidence_link__step__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
+                )
+                | Q(
+                    evidence_source_links__evidence_link__warning__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
+                )
+            )
+            .exists()
         ):
             old = type(self).objects.get(pk=self.pk)
             if (old.semantic_id, old.name_ar, old.name_en) != (
@@ -635,13 +650,30 @@ class Authority(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        if Source.objects.filter(
-            authority_id=self.pk,
-            evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
-                "published",
-                "withdrawn",
-            ),
-        ).exists():
+        if (
+            Source.objects.filter(authority_id=self.pk)
+            .filter(
+                Q(
+                    evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
+                )
+                | Q(
+                    evidence_source_links__evidence_link__step__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
+                )
+                | Q(
+                    evidence_source_links__evidence_link__warning__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
+                )
+            )
+            .exists()
+        ):
             raise ValidationError("Authorities used by published evidence cannot be deleted.")
         return super().delete(*args, **kwargs)
 
@@ -753,10 +785,14 @@ class Source(models.Model):
         if (
             self.pk
             and self.evidence_source_links.filter(
-                evidence_link__checklist_item__procedure_version__state__in=(
-                    "published",
-                    "withdrawn",
+                Q(
+                    evidence_link__checklist_item__procedure_version__state__in=(
+                        "published",
+                        "withdrawn",
+                    )
                 )
+                | Q(evidence_link__step__procedure_version__state__in=("published", "withdrawn"))
+                | Q(evidence_link__warning__procedure_version__state__in=("published", "withdrawn"))
             ).exists()
         ):
             old = type(self).objects.get(pk=self.pk)
@@ -768,7 +804,14 @@ class Source(models.Model):
 
     def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
         if self.evidence_source_links.filter(
-            evidence_link__checklist_item__procedure_version__state__in=("published", "withdrawn")
+            Q(
+                evidence_link__checklist_item__procedure_version__state__in=(
+                    "published",
+                    "withdrawn",
+                )
+            )
+            | Q(evidence_link__step__procedure_version__state__in=("published", "withdrawn"))
+            | Q(evidence_link__warning__procedure_version__state__in=("published", "withdrawn"))
         ).exists():
             raise ValidationError("Sources used by published evidence cannot be deleted.")
         return super().delete(*args, **kwargs)
@@ -915,6 +958,218 @@ class ChecklistItem(VersionOwnedModel):
         return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
 
 
+class EligibilityBasis(VersionOwnedModel):
+    procedure_version = models.ForeignKey(
+        ProcedureVersion, on_delete=models.CASCADE, related_name="eligibility_bases"
+    )
+    semantic_id = models.CharField(max_length=128)
+
+    class Meta:
+        ordering = ("procedure_version_id", "semantic_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("procedure_version", "semantic_id"), name="unique_basis_id_per_version"
+            ),
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="basis_id_nonblank"
+            ),
+        ]
+
+    def owning_version(self) -> ProcedureVersion:
+        return self.procedure_version
+
+    def clean(self) -> None:
+        _required(self.semantic_id, "semantic_id")
+
+    def __str__(self) -> str:
+        return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
+
+
+class Step(VersionOwnedModel):
+    class Scope(models.TextChoices):
+        PROCEDURE = "procedure", "Entire procedure"
+        ELIGIBILITY_BASIS = "eligibility_basis", "Eligibility basis"
+
+    procedure_version = models.ForeignKey(
+        ProcedureVersion, on_delete=models.CASCADE, related_name="steps"
+    )
+    semantic_id = models.CharField(max_length=128)
+    text_ar = models.TextField()
+    text_en = models.TextField()
+    phase = models.CharField(max_length=128)
+    phase_order = models.PositiveIntegerField(default=0)
+    slot = models.PositiveIntegerField(default=0)
+    applicability = models.JSONField(default=dict, blank=True)
+    scope = models.CharField(max_length=24, choices=Scope.choices, default=Scope.PROCEDURE)
+    eligibility_basis = models.ForeignKey(
+        EligibilityBasis, null=True, blank=True, on_delete=models.PROTECT, related_name="steps"
+    )
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    verified_on = models.DateField(null=True, blank=True)
+    reverify_on = models.DateField(null=True, blank=True)
+    verification_state = models.CharField(
+        max_length=24, choices=VERIFICATION_CHOICES, default="unknown"
+    )
+
+    class Meta:
+        ordering = ("procedure_version_id", "phase_order", "slot", "semantic_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("procedure_version", "semantic_id"), name="unique_step_id_per_version"
+            ),
+            models.UniqueConstraint(
+                fields=("procedure_version", "phase_order", "slot"),
+                condition=Q(verification_state="current"),
+                name="unique_current_step_position",
+            ),
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="step_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="step_ar_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_en__regex=NONBLANK_PATTERN), name="step_en_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(phase__regex=NONBLANK_PATTERN), name="step_phase_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(scope="procedure", eligibility_basis__isnull=True)
+                | Q(scope="eligibility_basis", eligibility_basis__isnull=False),
+                name="step_scope_combination",
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="step_dates_ordered",
+            ),
+            models.CheckConstraint(
+                condition=Q(verification_state__in=[choice[0] for choice in VERIFICATION_CHOICES]),
+                name="step_verification_supported",
+            ),
+        ]
+
+    def owning_version(self) -> ProcedureVersion:
+        return self.procedure_version
+
+    def clean(self) -> None:
+        for field in ("semantic_id", "text_ar", "text_en", "phase"):
+            _required(getattr(self, field), field)
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            raise ValidationError({"effective_to": "Effective interval is not ordered."})
+        if self.scope == self.Scope.PROCEDURE and self.eligibility_basis_id is not None:
+            raise ValidationError({"eligibility_basis": "Procedure scope cannot have a Basis."})
+        if self.scope == self.Scope.ELIGIBILITY_BASIS:
+            if self.eligibility_basis_id is None:
+                raise ValidationError({"eligibility_basis": "Basis scope requires a Basis."})
+            assert self.eligibility_basis is not None
+            if self.eligibility_basis.procedure_version_id != self.procedure_version_id:
+                raise ValidationError(
+                    {"eligibility_basis": "Basis must belong to this Procedure Version."}
+                )
+
+    def __str__(self) -> str:
+        return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
+
+
+class Warning(VersionOwnedModel):
+    class Severity(models.TextChoices):
+        INFO = "info", "Information"
+        IMPORTANT = "important", "Important"
+
+    class Kind(models.TextChoices):
+        ADMINISTRATIVE = "administrative", "Administrative"
+        PRODUCT = "product", "Product"
+
+    class Role(models.TextChoices):
+        GENERAL = "general", "General"
+        REGENERATION = "regeneration", "Regeneration"
+        LIMITATION = "limitation", "Limitation"
+
+    procedure_version = models.ForeignKey(
+        ProcedureVersion, on_delete=models.CASCADE, related_name="warnings"
+    )
+    semantic_id = models.CharField(max_length=128)
+    text_ar = models.TextField()
+    text_en = models.TextField()
+    severity = models.CharField(max_length=16, choices=Severity.choices, default=Severity.INFO)
+    kind = models.CharField(max_length=16, choices=Kind.choices)
+    role = models.CharField(max_length=16, choices=Role.choices, default=Role.GENERAL)
+    display_order = models.PositiveIntegerField(default=0)
+    applicability = models.JSONField(default=dict, blank=True)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    verified_on = models.DateField(null=True, blank=True)
+    reverify_on = models.DateField(null=True, blank=True)
+    verification_state = models.CharField(
+        max_length=24, choices=VERIFICATION_CHOICES, default="unknown"
+    )
+
+    class Meta:
+        ordering = ("procedure_version_id", "display_order", "semantic_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("procedure_version", "semantic_id"), name="unique_warning_id_per_version"
+            ),
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="warning_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="warning_ar_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_en__regex=NONBLANK_PATTERN), name="warning_en_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(severity__in=["info", "important"]),
+                name="warning_severity_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(kind__in=["administrative", "product"]),
+                name="warning_kind_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(role__in=["general", "regeneration", "limitation"]),
+                name="warning_role_supported",
+            ),
+            models.CheckConstraint(
+                condition=~Q(role="regeneration") | Q(kind="product", severity="important"),
+                name="warning_regeneration_policy",
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="warning_dates_ordered",
+            ),
+            models.CheckConstraint(
+                condition=Q(verification_state__in=[choice[0] for choice in VERIFICATION_CHOICES]),
+                name="warning_verification_supported",
+            ),
+        ]
+
+    def owning_version(self) -> ProcedureVersion:
+        return self.procedure_version
+
+    def clean(self) -> None:
+        for field in ("semantic_id", "text_ar", "text_en"):
+            _required(getattr(self, field), field)
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            raise ValidationError({"effective_to": "Effective interval is not ordered."})
+        if self.role == self.Role.REGENERATION and (
+            self.kind != self.Kind.PRODUCT or self.severity != self.Severity.IMPORTANT
+        ):
+            raise ValidationError(
+                {"role": "Regeneration warnings must be important product warnings."}
+            )
+
+    def __str__(self) -> str:
+        return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
+
+
 class EvidenceLink(VersionOwnedModel):
     class SupportStatus(models.TextChoices):
         SUPPORTS = "supports", "Supports"
@@ -922,7 +1177,17 @@ class EvidenceLink(VersionOwnedModel):
         CONTRADICTS = "contradicts", "Contradicts"
 
     checklist_item = models.ForeignKey(
-        ChecklistItem, on_delete=models.CASCADE, related_name="evidence_links"
+        ChecklistItem,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="evidence_links",
+    )
+    step = models.ForeignKey(
+        Step, null=True, blank=True, on_delete=models.CASCADE, related_name="evidence_links"
+    )
+    warning = models.ForeignKey(
+        Warning, null=True, blank=True, on_delete=models.CASCADE, related_name="evidence_links"
     )
     passage = models.TextField()
     location = models.TextField(blank=True)
@@ -943,8 +1208,16 @@ class EvidenceLink(VersionOwnedModel):
     )
 
     class Meta:
-        ordering = ("checklist_item_id", "id")
+        ordering = ("id",)
         constraints = [
+            models.CheckConstraint(
+                condition=(
+                    Q(checklist_item__isnull=False, step__isnull=True, warning__isnull=True)
+                    | Q(checklist_item__isnull=True, step__isnull=False, warning__isnull=True)
+                    | Q(checklist_item__isnull=True, step__isnull=True, warning__isnull=False)
+                ),
+                name="evidence_exactly_one_owner",
+            ),
             models.CheckConstraint(
                 condition=Q(
                     verification_state__in=[
@@ -969,15 +1242,42 @@ class EvidenceLink(VersionOwnedModel):
             ),
         ]
 
+    @property
+    def owner(self) -> ChecklistItem | Step | Warning:
+        owners = [
+            owner for owner in (self.checklist_item, self.step, self.warning) if owner is not None
+        ]
+        if len(owners) != 1:
+            raise ValidationError("Evidence must have exactly one claim owner.")
+        return owners[0]
+
     def owning_version(self) -> ProcedureVersion:
-        return self.checklist_item.procedure_version
+        return self.owner.procedure_version
 
     def clean(self) -> None:
+        owner_ids = (self.checklist_item_id, self.step_id, self.warning_id)
+        if self.pk is not None:
+            stored = (
+                type(self)
+                .objects.filter(pk=self.pk)
+                .values_list("checklist_item_id", "step_id", "warning_id")
+                .first()
+            )
+            if stored is not None and stored != owner_ids:
+                raise ValidationError("Evidence claim ownership cannot be reassigned.")
+        if sum(value is not None for value in owner_ids) != 1:
+            raise ValidationError("Evidence must have exactly one claim owner.")
+        if (
+            self.warning_id is not None
+            and self.warning is not None
+            and self.warning.kind == Warning.Kind.PRODUCT
+        ):
+            raise ValidationError({"warning": "Product warnings cannot carry Evidence Links."})
         if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
             raise ValidationError({"effective_to": "Effective interval is not ordered."})
 
     def __str__(self) -> str:
-        return f"evidence:{self.checklist_item}:{self.pk or 'new'}"
+        return f"evidence:{self.owner}:{self.pk or 'new'}"
 
 
 class EvidenceLinkSource(VersionOwnedModel):
@@ -1001,4 +1301,4 @@ class EvidenceLinkSource(VersionOwnedModel):
         ]
 
     def owning_version(self) -> ProcedureVersion:
-        return self.evidence_link.checklist_item.procedure_version
+        return self.evidence_link.owning_version()

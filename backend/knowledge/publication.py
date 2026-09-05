@@ -25,6 +25,7 @@ from .models import (
     Authority,
     ChecklistItem,
     DocumentType,
+    EligibilityBasis,
     EvidenceLink,
     EvidenceLinkSource,
     FactDefinition,
@@ -32,6 +33,8 @@ from .models import (
     ProcedureVersion,
     ProcedureVersionAuditEvent,
     Source,
+    Step,
+    Warning,
 )
 
 
@@ -276,6 +279,137 @@ class ChecklistEvidenceGate:
         return failures
 
 
+class GuidanceGate:
+    name = "core.steps_warnings"
+
+    def validate(self, context: PublicationContext) -> Iterable[PublicationDiagnostic]:
+        failures: list[PublicationDiagnostic] = []
+        steps = list(
+            context.version.steps.select_related("eligibility_basis")
+            .prefetch_related("evidence_links__source_links__source")
+            .order_by("phase_order", "slot", "semantic_id")
+        )
+        warnings = list(
+            context.version.warnings.prefetch_related(
+                "evidence_links__source_links__source"
+            ).order_by("display_order", "semantic_id")
+        )
+        regeneration = [item for item in warnings if item.role == Warning.Role.REGENERATION]
+        # Legacy versions with no #41 guidance remain publishable; once guidance is
+        # authored, the product regeneration safety warning is mandatory.
+        if (steps or warnings) and len(regeneration) != 1:
+            failures.append(
+                PublicationDiagnostic(
+                    self.name,
+                    "exactly_one_regeneration_warning_required",
+                    context.version.semantic_id,
+                )
+            )
+        guidance: list[Step | Warning] = [*steps, *warnings]
+        for item in guidance:
+            owner = item.semantic_id
+            if not item.text_ar.strip() or not item.text_en.strip():
+                failures.append(
+                    PublicationDiagnostic(self.name, "incomplete_bilingual_claim", owner)
+                )
+            if (
+                item.effective_from
+                and item.effective_to
+                and item.effective_from > item.effective_to
+            ):
+                failures.append(
+                    PublicationDiagnostic(self.name, "invalid_effective_interval", owner)
+                )
+            if item.applicability != {}:
+                decoded = decode_stored_rule(item.applicability, context.fact_definitions)
+                failures.extend(
+                    PublicationDiagnostic(self.name, d.code, owner) for d in decoded.diagnostics
+                )
+            links = list(item.evidence_links.all())
+            if isinstance(item, Step):
+                if not item.phase.strip():
+                    failures.append(PublicationDiagnostic(self.name, "blank_phase", owner))
+                if item.scope == Step.Scope.ELIGIBILITY_BASIS and (
+                    item.eligibility_basis_id is None
+                    or item.eligibility_basis is None
+                    or item.eligibility_basis.procedure_version_id != context.version.pk
+                ):
+                    failures.append(PublicationDiagnostic(self.name, "invalid_basis_owner", owner))
+                requires_evidence = item.verification_state == "current"
+            else:
+                if (
+                    item.severity not in Warning.Severity.values
+                    or item.kind not in Warning.Kind.values
+                    or item.role not in Warning.Role.values
+                ):
+                    failures.append(
+                        PublicationDiagnostic(self.name, "unsupported_warning_metadata", owner)
+                    )
+                if item.role == Warning.Role.REGENERATION and (
+                    item.kind != Warning.Kind.PRODUCT or item.severity != Warning.Severity.IMPORTANT
+                ):
+                    failures.append(
+                        PublicationDiagnostic(self.name, "invalid_regeneration_warning", owner)
+                    )
+                if item.kind == Warning.Kind.PRODUCT and links:
+                    failures.append(
+                        PublicationDiagnostic(self.name, "product_warning_has_evidence", owner)
+                    )
+                requires_evidence = (
+                    item.kind == Warning.Kind.ADMINISTRATIVE
+                    and item.verification_state == "current"
+                )
+            adequate = False
+            for link in links:
+                sources = [row.source for row in link.source_links.all()]
+                detail = f"{owner}:{link.pk}"
+                complete = bool(
+                    sources
+                    and link.passage.strip()
+                    and link.location.strip()
+                    and link.applicability_context.strip()
+                )
+                if not sources:
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_source", detail)
+                    )
+                if not link.passage.strip():
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_passage", detail)
+                    )
+                if not link.location.strip() or not link.applicability_context.strip():
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_context", detail)
+                    )
+                for source in sources:
+                    if source.classification == Source.Classification.FIELD_REPORT and (
+                        source.observation_date is None or not source.observation_context.strip()
+                    ):
+                        failures.append(
+                            PublicationDiagnostic(self.name, "malformed_field_guidance", detail)
+                        )
+                if (
+                    link.verification_state == "current"
+                    and link.support_status == EvidenceLink.SupportStatus.CONTRADICTS
+                    and item.verification_state == "current"
+                ):
+                    failures.append(
+                        PublicationDiagnostic(
+                            self.name, "unresolved_evidence_contradiction", detail
+                        )
+                    )
+                adequate |= (
+                    complete
+                    and link.verification_state == "current"
+                    and link.support_status == EvidenceLink.SupportStatus.SUPPORTS
+                )
+            if requires_evidence and not adequate:
+                failures.append(
+                    PublicationDiagnostic(self.name, "adequate_evidence_required", owner)
+                )
+        return failures
+
+
 class TemporalOverlapGate:
     name = "core.temporal_overlap"
 
@@ -294,6 +428,7 @@ _CORE_GATES: tuple[PublicationGate, ...] = (
     RulesContractGate(),
     ApplicabilityGate(),
     ChecklistEvidenceGate(),
+    GuidanceGate(),
     TemporalGate(),
     TemporalOverlapGate(),
 )
@@ -377,6 +512,11 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
             )
             Procedure.objects.select_for_update().get(pk=version.procedure_id)
             # Lock the complete version-owned aggregate and reusable provenance before gates.
+            list(
+                EligibilityBasis.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+            )
             item_rows = list(
                 ChecklistItem.objects.select_for_update()
                 .filter(procedure_version=version)
@@ -384,6 +524,18 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .values_list("pk", "document_type_id")
             )
             item_ids = [item_id for item_id, _ in item_rows]
+            step_ids = list(
+                Step.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
+            warning_ids = list(
+                Warning.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
             document_type_ids = {
                 document_type_id
                 for _, document_type_id in item_rows
@@ -391,7 +543,11 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
             }
             link_ids = list(
                 EvidenceLink.objects.select_for_update()
-                .filter(checklist_item_id__in=item_ids)
+                .filter(
+                    Q(checklist_item_id__in=item_ids)
+                    | Q(step_id__in=step_ids)
+                    | Q(warning_id__in=warning_ids)
+                )
                 .order_by("pk")
                 .values_list("pk", flat=True)
             )

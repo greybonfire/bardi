@@ -27,8 +27,9 @@ specialist approval for that draft.
 
 ## General reviewer
 
-A general reviewer must hold Django permission `knowledge.review_procedureversion` when the
-approval is recorded. General approvals are recorded separately for these dimensions:
+A general reviewer must hold Django permission `knowledge.review_procedureversion` both when the
+approval is recorded and when that approval is used to satisfy publication. General approvals are
+recorded separately for these dimensions:
 
 - `evidence_source` — evidence and preserved-source adequacy;
 - `rule_logic` — rule and decision-logic semantics;
@@ -50,8 +51,9 @@ High-risk review is configured on the draft review policy with independent flags
 - `custody_guardianship`;
 - `contested_identity`.
 
-Each configured risk requires a fresh independent specialist approval. Eligibility is established
-when the approval is recorded by the matching Django permission:
+Each configured risk requires a fresh independent specialist approval. The reviewer must hold the
+matching Django permission both when recording the approval and when the approval is used for
+publication:
 
 - `knowledge.specialist_approve_legal`;
 - `knowledge.specialist_approve_military`;
@@ -76,10 +78,10 @@ satisfy publication.
 
 ## Publication and audit
 
-The publication gate reports missing, stale, or non-independent approvals by review dimension or
-specialist risk. When all requirements pass, it places the accepted reviewed-state signature in a
-transaction-local PostgreSQL setting. The existing atomic publisher remains the only lifecycle
-service. Its immutable publication audit insert triggers an atomic snapshot of the fresh,
+The publication gate reports missing, stale, ineligible, or non-independent approvals by review
+dimension or specialist risk. When all requirements pass, it places the accepted reviewed-state
+signature in a transaction-local PostgreSQL setting. The existing atomic publisher remains the only
+lifecycle service. Its immutable publication audit insert triggers an atomic snapshot of the fresh,
 independent approval rows and their approving actors into `ProcedureVersionAuditApproval`.
 
 Failed publication rolls back both lifecycle changes and approval-audit capture.

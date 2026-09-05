@@ -171,3 +171,14 @@ A deterministic projection/result DTO assembled from a Procedure Version and cur
 Relational storage is preferred for identities, version-owned claims, evidence, relationships, temporal metadata, review state, and objects that editors need to query or validate individually.
 
 Typed predicate ASTs are stored as validated JSONB values owned by their semantic record. Rule nodes are not normalized into generic database rows, and executable Python/JavaScript expressions are forbidden as authored rules.
+
+## Service Point routing aggregate
+
+Routing follows ADR 0010's three layers: a stable bilingual `ServicePoint`, inclusive
+ time-bounded bilingual-address `ServicePointVersion`, and an explicitly
+`ProcedureVersion`-owned `ProcedureServicePointAssociation`. Associations own required
+applicability predicates and link to one material version. Both material versions and
+associations are claim-level Evidence Link owners. Current material versions for one stable
+point cannot overlap; association intervals may overlap because each remains a distinct
+jurisdiction claim. Published/withdrawn reachability preserves stable identity, material,
+association, evidence, Source, and Authority rows.

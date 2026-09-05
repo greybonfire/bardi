@@ -138,3 +138,13 @@ A production implementation is not considered semantically complete merely becau
 - AI-authored rules or automatic legal determinations;
 - a generalized evidence knowledge graph;
 - mandatory Redis/Celery/search infrastructure before a demonstrated need.
+
+## Detached routing materialization
+
+The repeatable-read knowledge adapter eagerly loads published/withdrawn associations, their
+stable points and material versions, and both evidence/provenance graphs into immutable planning
+snapshots. Rules decode only against published Fact definitions; malformed ownership, rules,
+references, material, or required evidence fail closed with sanitized catalog diagnostics. No
+ORM model, QuerySet, related manager, or lazy relation crosses into planning. The pure selector
+evaluates every association and performs no I/O, geospatial lookup, distance calculation, or
+ranking.

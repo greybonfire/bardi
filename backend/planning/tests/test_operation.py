@@ -304,6 +304,8 @@ class PublicPlanningOperationTests(unittest.TestCase):
         assert isinstance(matched, PlanResult)
         self.assertEqual(tuple(item.id for item in matched.eligibility_bases), ("basis",))
         self.assertEqual(matched.inconclusive_basis_ids, ())
+        self.assertEqual(matched.routing.status, "unresolved")
+        self.assertEqual(matched.routing.destinations, ())
 
     def test_preparation_completes_before_candidate_selection(self) -> None:
         with patch(

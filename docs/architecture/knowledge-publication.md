@@ -205,3 +205,13 @@ A custom CMS may be introduced later only if Django Admin becomes a demonstrated
 The three evidence packs and frozen prototype fixtures are migration/reference inputs, not production runtime dependencies.
 
 Production seeding should create real production records through supported import/fixture services and then validate them using the production publication validator. The migration should preserve stable semantic IDs where useful for acceptance parity, but should not preserve prototype-only compatibility aliases or test-only synthetic structures.
+
+## Routing publication gate
+
+Publication locks routing associations, referenced stable points and material versions, both
+evidence owner sets, EvidenceLinkSource rows, Sources, and Authorities in deterministic order.
+The routing gate rejects implicit ownership, malformed published-Fact rules, incomplete
+bilingual identity/address, unsupported availability, unordered/overlapping current material,
+invalid verification metadata, incomplete support, current contradictions, and malformed Field
+Report provenance. Routing Facts need not have Service Questions because routing uncertainty is
+local and non-consequential.

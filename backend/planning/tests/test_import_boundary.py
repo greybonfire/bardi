@@ -38,6 +38,17 @@ class PureDomainImportBoundaryTests(unittest.TestCase):
         self.assertIsNotNone(PlanningResult)
         self.assertTrue(callable(plan_stateless))
 
+    def test_routing_api_is_public_and_framework_independent(self) -> None:
+        from planning import (
+            PublicRouting,
+            ServicePointSnapshot,
+            select_service_point_routing,
+        )
+
+        self.assertEqual(ServicePointSnapshot.__module__, "planning.catalog")
+        self.assertEqual(PublicRouting.__module__, "planning.public")
+        self.assertTrue(callable(select_service_point_routing))
+
     def test_shared_trust_api_is_public(self) -> None:
         from planning import Freshness, TrustAssessment, assess_trust
 

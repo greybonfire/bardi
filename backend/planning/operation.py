@@ -29,6 +29,7 @@ from .public import (
     PublicQuestion,
 )
 from .questions import pick_consequential_question
+from .routing import select_service_points
 from .selection import (
     ProcedureSelected,
     SelectionConfigurationDefect,
@@ -240,4 +241,10 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         eligibility_bases=public_bases,
         inconclusive_basis_ids=bases.inconclusive_basis_ids,
         dependencies=dependencies.dependencies,
+        routing=select_service_points(
+            snapshot,
+            resolution.version,
+            preparation.prepared_facts,
+            planning_input.evaluation_date,
+        ),
     )

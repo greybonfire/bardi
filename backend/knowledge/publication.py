@@ -512,11 +512,49 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
             )
             Procedure.objects.select_for_update().get(pk=version.procedure_id)
             # Lock the complete version-owned aggregate and reusable provenance before gates.
-            list(
+            basis_ids = list(
                 EligibilityBasis.objects.select_for_update()
                 .filter(procedure_version=version)
                 .order_by("pk")
+                .values_list("pk", flat=True)
             )
+            # Feature models are imported lazily to keep publication's model-loading
+            # dependency acyclic while preserving one deterministic aggregate lock order.
+            from .fees import Fee
+            from .procedure_dependencies import ProcedureDependency
+            from .service_point_routing import (
+                ProcedureServicePointAssociation,
+                ServicePoint,
+                ServicePointVersion,
+            )
+
+            fee_ids = list(
+                Fee.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
+            dependency_ids = list(
+                ProcedureDependency.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
+            association_rows = list(
+                ProcedureServicePointAssociation.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+                .values_list("pk", "service_point_version_id")
+            )
+            association_ids = [row[0] for row in association_rows]
+            material_ids = sorted({row[1] for row in association_rows})
+            point_ids = list(
+                ServicePointVersion.objects.select_for_update()
+                .filter(pk__in=material_ids)
+                .order_by("pk")
+                .values_list("service_point_id", flat=True)
+            )
+            list(ServicePoint.objects.select_for_update().filter(pk__in=point_ids).order_by("pk"))
             item_rows = list(
                 ChecklistItem.objects.select_for_update()
                 .filter(procedure_version=version)
@@ -547,6 +585,11 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                     Q(checklist_item_id__in=item_ids)
                     | Q(step_id__in=step_ids)
                     | Q(warning_id__in=warning_ids)
+                    | Q(fee_id__in=fee_ids)
+                    | Q(eligibility_basis_id__in=basis_ids)
+                    | Q(procedure_dependency_id__in=dependency_ids)
+                    | Q(procedure_service_point_association_id__in=association_ids)
+                    | Q(service_point_version_id__in=material_ids)
                 )
                 .order_by("pk")
                 .values_list("pk", flat=True)

@@ -72,6 +72,11 @@ class ApplicationBoundaryTests(SimpleTestCase):
                 "steps": [],
                 "fees": [],
                 "warnings": [],
+                "routing": {
+                    "status": "unresolved",
+                    "destinations": [],
+                    "verification_sources": [],
+                },
             },
         )
 

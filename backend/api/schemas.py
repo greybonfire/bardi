@@ -150,6 +150,24 @@ class WarningResponse(StrictSchema):
     freshness: FreshnessResponse
 
 
+class ServicePointResponse(StrictSchema):
+    service_point_id: str
+    service_point_version_id: str
+    association_id: str
+    name: str
+    address: str
+    availability: Literal["available", "unknown"]
+    effective_from: date | None
+    effective_to: date | None
+    sources: list[GuidanceSourceResponse]
+
+
+class RoutingResponse(StrictSchema):
+    status: Literal["resolved", "partially_resolved", "unresolved"]
+    destinations: list[ServicePointResponse]
+    verification_sources: list[GuidanceSourceResponse]
+
+
 class PlanResponse(StrictSchema):
     type: Literal["plan"]
     service_id: str
@@ -163,6 +181,7 @@ class PlanResponse(StrictSchema):
     steps: list[StepResponse]
     fees: list[FeeResponse]
     warnings: list[WarningResponse]
+    routing: RoutingResponse
 
 
 class InconclusiveResponse(StrictSchema):

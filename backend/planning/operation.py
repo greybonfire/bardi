@@ -31,11 +31,13 @@ from .selection import (
     SelectionUnsupported,
     select_procedure,
 )
+from .steps import select_steps
 from .versions import (
     ProcedureVersionConfigurationDefect,
     ProcedureVersionResolved,
     resolve_procedure_version,
 )
+from .warnings import select_warnings
 
 
 def _configuration_invalid() -> InvalidResult:
@@ -128,10 +130,18 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         return InconclusiveResult("checklist_applicability_unknown")
     if checklist.trust_inconclusive:
         return InconclusiveResult("checklist_trust_inconclusive")
+    steps = select_steps(
+        resolution.version, preparation.prepared_facts, planning_input.evaluation_date
+    )
+    warnings = select_warnings(
+        resolution.version, preparation.prepared_facts, planning_input.evaluation_date
+    )
     return PlanResult(
         service.semantic_id,
         selection.procedure_semantic_id,
         resolution.version.semantic_id,
         resolution.version.text,
         checklist.items,
+        steps,
+        warnings,
     )

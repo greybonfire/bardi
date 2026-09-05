@@ -19,6 +19,8 @@ from knowledge.models import (
     ServiceProcedureCandidate,
     ServiceQuestion,
     Source,
+    Step,
+    Warning,
 )
 from knowledge.publication import publish_procedure_version
 from knowledge.services import set_contradiction_facts, set_evidence_link_sources
@@ -371,6 +373,129 @@ class ReachableResultFamilyTests(TransactionTestCase):
                 arabic["checklist_items"][0][invariant],
                 body["checklist_items"][0][invariant],
             )
+
+    def test_plan_projects_bilingual_steps_warnings_and_compact_provenance(self) -> None:
+        actor = get_user_model().objects.create_user(username="guidance-contract-publisher")
+        version = ProcedureVersion.objects.create(
+            semantic_id="contract.guidance.version",
+            procedure=self.procedure,
+            text_ar="نسخة الإرشادات",
+            text_en="Guidance version",
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+        )
+        authority = Authority.objects.create(
+            semantic_id="contract.guidance.authority", name_ar="جهة", name_en="Authority"
+        )
+        source = Source.objects.create(
+            semantic_id="contract.guidance.source",
+            authority=authority,
+            title="Official procedure page",
+            locator="https://example.test/procedure",
+            classification=Source.Classification.OFFICIAL,
+            retrieved_on=date(2026, 8, 1),
+        )
+        step = Step.objects.create(
+            procedure_version=version,
+            semantic_id="contract.step.submit",
+            text_ar="قدّم الطلب",
+            text_en="Submit the application",
+            phase="submit",
+            phase_order=10,
+            slot=20,
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        administrative = Warning.objects.create(
+            procedure_version=version,
+            semantic_id="contract.warning.receipt",
+            text_ar="احتفظ بالإيصال",
+            text_en="Keep the receipt",
+            severity=Warning.Severity.INFO,
+            kind=Warning.Kind.ADMINISTRATIVE,
+            display_order=10,
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        Warning.objects.create(
+            procedure_version=version,
+            semantic_id="contract.warning.regenerate",
+            text_ar="أعد إنشاء الخطة قبل التنفيذ",
+            text_en="Regenerate the plan before acting",
+            severity=Warning.Severity.IMPORTANT,
+            kind=Warning.Kind.PRODUCT,
+            role=Warning.Role.REGENERATION,
+            display_order=20,
+            verification_state="current",
+        )
+        for field, owner in (("step", step), ("warning", administrative)):
+            link = EvidenceLink.objects.create(
+                **{field: owner},
+                passage="PRIVATE GUIDANCE PASSAGE",
+                location="PRIVATE GUIDANCE LOCATION",
+                applicability_context="PRIVATE GUIDANCE CONTEXT",
+                verification_state="current",
+                support_status=EvidenceLink.SupportStatus.SUPPORTS,
+            )
+            set_evidence_link_sources(link, (source,))
+        publish_procedure_version(version.pk, actor=actor)
+
+        response = self.post(facts={"is_student": True})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(
+            body["steps"],
+            [
+                {
+                    "id": "contract.step.submit",
+                    "text": "Submit the application",
+                    "phase": "submit",
+                    "sources": [
+                        {
+                            "id": "contract.guidance.source",
+                            "authority_id": "contract.guidance.authority",
+                            "title": "Official procedure page",
+                            "locator": "https://example.test/procedure",
+                            "classification": "official",
+                            "retrieved_on": "2026-08-01",
+                        }
+                    ],
+                    "freshness": {
+                        "state": "current",
+                        "verified_on": "2026-08-01",
+                        "reverify_on": None,
+                    },
+                }
+            ],
+        )
+        self.assertEqual(
+            [(item["id"], item["kind"], item["sources"]) for item in body["warnings"]],
+            [
+                (
+                    "contract.warning.receipt",
+                    "administrative",
+                    body["steps"][0]["sources"],
+                ),
+                ("contract.warning.regenerate", "product", []),
+            ],
+        )
+        rendered = response.content.decode()
+        for private in (
+            "PRIVATE GUIDANCE PASSAGE",
+            "PRIVATE GUIDANCE LOCATION",
+            "PRIVATE GUIDANCE CONTEXT",
+            "evidence_links",
+            "phase_order",
+            "display_order",
+            "eligibility_basis",
+        ):
+            self.assertNotIn(private, rendered)
+
+        arabic = self.post(facts={"is_student": True}, locale="ar").json()
+        self.assertEqual(arabic["steps"][0]["text"], "قدّم الطلب")
+        self.assertEqual(arabic["warnings"][0]["text"], "احتفظ بالإيصال")
+        self.assertEqual(arabic["warnings"][1]["text"], "أعد إنشاء الخطة قبل التنفيذ")
+        for key in ("id", "phase", "sources", "freshness"):
+            self.assertEqual(arabic["steps"][0][key], body["steps"][0][key])
 
     def test_inactive_and_derived_case_preparation_flow(self) -> None:
         inactive = Service.objects.create(

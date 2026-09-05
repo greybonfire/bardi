@@ -17,11 +17,14 @@ from .forms import (
     FactDefinitionForm,
     QuestionForm,
     QuestionResolvedFactFormSet,
+    StepForm,
+    WarningForm,
 )
 from .models import (
     Authority,
     ChecklistItem,
     DocumentType,
+    EligibilityBasis,
     EvidenceLink,
     EvidenceLinkSource,
     FactDefinition,
@@ -35,6 +38,8 @@ from .models import (
     ServiceQuestion,
     ServiceQuestionResolvedFact,
     Source,
+    Step,
+    Warning,
 )
 from .publication import (
     PublicationRejected,
@@ -46,6 +51,39 @@ from .services import (
     set_evidence_link_sources,
     set_question_resolved_facts,
 )
+
+
+def _source_is_preserved(obj: Source) -> bool:
+    return obj.evidence_source_links.filter(
+        models.Q(
+            evidence_link__checklist_item__procedure_version__state__in=("published", "withdrawn")
+        )
+        | models.Q(evidence_link__step__procedure_version__state__in=("published", "withdrawn"))
+        | models.Q(evidence_link__warning__procedure_version__state__in=("published", "withdrawn"))
+    ).exists()
+
+
+def _authority_is_preserved(obj: Authority) -> bool:
+    return obj.sources.filter(
+        models.Q(
+            evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__step__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__warning__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+    ).exists()
 
 
 def _ordered_formset_facts(
@@ -139,6 +177,31 @@ class ProcedureAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return ()
 
 
+class GuidanceOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
+    extra = 0
+    show_change_link = True
+
+    def has_add_permission(self, request: HttpRequest, obj: ProcedureVersion | None = None) -> bool:
+        return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: ProcedureVersion | None = None
+    ) -> bool:
+        return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
+
+
+class StepOwnerInline(GuidanceOwnerInline):
+    model = Step
+    fields = ("semantic_id", "phase", "phase_order", "slot", "verification_state")
+    readonly_fields = fields
+
+
+class WarningOwnerInline(GuidanceOwnerInline):
+    model = Warning
+    fields = ("semantic_id", "severity", "kind", "role", "display_order", "verification_state")
+    readonly_fields = fields
+
+
 class ChecklistItemOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     model = ChecklistItem
     form = ChecklistItemForm
@@ -176,7 +239,7 @@ class ProcedureVersionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     autocomplete_fields = ("procedure",)
     ordering = ("procedure__semantic_id", "effective_from", "semantic_id")
     actions = ("publish_selected", "withdraw_selected")
-    inlines = (ChecklistItemOwnerInline,)
+    inlines = (ChecklistItemOwnerInline, StepOwnerInline, WarningOwnerInline)
     lifecycle_fields = (
         "state",
         "published_at",
@@ -244,28 +307,12 @@ class AuthorityAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def get_readonly_fields(
         self, request: HttpRequest, obj: Authority | None = None
     ) -> tuple[str, ...]:
-        if (
-            obj is not None
-            and obj.sources.filter(
-                evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
-                    "published",
-                    "withdrawn",
-                )
-            ).exists()
-        ):
+        if obj is not None and _authority_is_preserved(obj):
             return tuple(field.name for field in self.model._meta.fields)
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: Authority | None = None) -> bool:
-        return not (
-            obj is not None
-            and obj.sources.filter(
-                evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
-                    "published",
-                    "withdrawn",
-                )
-            ).exists()
-        )
+        return not (obj is not None and _authority_is_preserved(obj))
 
 
 @admin.register(DocumentType)
@@ -304,32 +351,17 @@ class SourceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def get_readonly_fields(
         self, request: HttpRequest, obj: Source | None = None
     ) -> tuple[str, ...]:
-        if (
-            obj is not None
-            and obj.evidence_source_links.filter(
-                evidence_link__checklist_item__procedure_version__state__in=(
-                    "published",
-                    "withdrawn",
-                )
-            ).exists()
-        ):
+        if obj is not None and _source_is_preserved(obj):
             return tuple(field.name for field in self.model._meta.fields)
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: Source | None = None) -> bool:
-        return not (
-            obj is not None
-            and obj.evidence_source_links.filter(
-                evidence_link__checklist_item__procedure_version__state__in=(
-                    "published",
-                    "withdrawn",
-                )
-            ).exists()
-        )
+        return not (obj is not None and _source_is_preserved(obj))
 
 
 class EvidenceOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     model = EvidenceLink
+    fk_name = "checklist_item"
     form = EvidenceLinkForm
     fields = (
         "id",
@@ -343,18 +375,16 @@ class EvidenceOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     extra = 1
     show_change_link = True
 
-    def has_add_permission(self, request: HttpRequest, obj: ChecklistItem | None = None) -> bool:
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
-    def has_change_permission(self, request: HttpRequest, obj: ChecklistItem | None = None) -> bool:
+    def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
-    def has_delete_permission(self, request: HttpRequest, obj: ChecklistItem | None = None) -> bool:
+    def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
-    def get_readonly_fields(
-        self, request: HttpRequest, obj: ChecklistItem | None = None
-    ) -> tuple[str, ...]:
+    def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
         if obj is not None and obj.procedure_version.state != ProcedureVersion.State.DRAFT:
             return tuple(field.name for field in self.model._meta.fields)
         return ("id",)
@@ -386,36 +416,128 @@ class ChecklistItemAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
 
+class StepEvidenceInline(EvidenceOwnerInline):
+    fk_name = "step"
+
+
+class WarningEvidenceInline(EvidenceOwnerInline):
+    fk_name = "warning"
+
+    def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        return bool(
+            obj
+            and obj.kind == Warning.Kind.ADMINISTRATIVE
+            and obj.procedure_version.state == ProcedureVersion.State.DRAFT
+        )
+
+
+@admin.register(EligibilityBasis)
+class EligibilityBasisAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    list_display = ("semantic_id", "procedure_version")
+    search_fields = ("semantic_id", "procedure_version__semantic_id")
+    autocomplete_fields = ("procedure_version",)
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: EligibilityBasis | None = None
+    ) -> tuple[str, ...]:
+        return (
+            tuple(field.name for field in self.model._meta.fields)
+            if obj and obj.procedure_version.state != "draft"
+            else ()
+        )
+
+    def has_delete_permission(
+        self, request: HttpRequest, obj: EligibilityBasis | None = None
+    ) -> bool:
+        return bool(obj is None or obj.procedure_version.state == "draft")
+
+
+@admin.register(Step)
+class StepAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    form = StepForm
+    search_fields = ("semantic_id", "text_ar", "text_en", "procedure_version__semantic_id")
+    list_display = (
+        "semantic_id",
+        "procedure_version",
+        "phase",
+        "phase_order",
+        "slot",
+        "verification_state",
+    )
+    autocomplete_fields = ("procedure_version", "eligibility_basis")
+    inlines = (StepEvidenceInline,)
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Step | None = None) -> tuple[str, ...]:
+        return (
+            tuple(field.name for field in self.model._meta.fields)
+            if obj and obj.procedure_version.state != "draft"
+            else ()
+        )
+
+    def has_delete_permission(self, request: HttpRequest, obj: Step | None = None) -> bool:
+        return bool(obj is None or obj.procedure_version.state == "draft")
+
+
+@admin.register(Warning)
+class WarningAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    form = WarningForm
+    search_fields = ("semantic_id", "text_ar", "text_en", "procedure_version__semantic_id")
+    list_display = (
+        "semantic_id",
+        "procedure_version",
+        "severity",
+        "kind",
+        "role",
+        "verification_state",
+    )
+    autocomplete_fields = ("procedure_version",)
+    inlines = (WarningEvidenceInline,)
+
+    def get_readonly_fields(
+        self, request: HttpRequest, obj: Warning | None = None
+    ) -> tuple[str, ...]:
+        return (
+            tuple(field.name for field in self.model._meta.fields)
+            if obj and obj.procedure_version.state != "draft"
+            else ()
+        )
+
+    def has_delete_permission(self, request: HttpRequest, obj: Warning | None = None) -> bool:
+        return bool(obj is None or obj.procedure_version.state == "draft")
+
+
 class EvidenceSourceInline(admin.TabularInline):  # type: ignore[type-arg]
     model = EvidenceLinkSource
     extra = 1
     autocomplete_fields = ("source",)
 
     def has_add_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
-        return bool(
-            obj is None
-            or obj.checklist_item.procedure_version.state == ProcedureVersion.State.DRAFT
-        )
+        return bool(obj is None or obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
     def has_change_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
-        return bool(
-            obj is None
-            or obj.checklist_item.procedure_version.state == ProcedureVersion.State.DRAFT
-        )
+        return bool(obj is None or obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
-        return bool(
-            obj is not None
-            and obj.checklist_item.procedure_version.state == ProcedureVersion.State.DRAFT
-        )
+        return bool(obj is not None and obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
 
 @admin.register(EvidenceLink)
 class EvidenceLinkAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = EvidenceLinkForm
-    list_display = ("id", "checklist_item", "support_status", "verification_state")
-    search_fields = ("checklist_item__semantic_id", "passage", "location")
-    autocomplete_fields = ("checklist_item",)
+    list_display = ("id", "owner_display", "support_status", "verification_state")
+    search_fields = (
+        "checklist_item__semantic_id",
+        "step__semantic_id",
+        "warning__semantic_id",
+        "passage",
+        "location",
+    )
+    autocomplete_fields = ("checklist_item", "step", "warning")
+
+    @admin.display(description="Owner")
+    def owner_display(self, obj: EvidenceLink) -> object:
+        return obj.owner
+
     inlines = (EvidenceSourceInline,)
 
     def save_formset(
@@ -442,18 +564,12 @@ class EvidenceLinkAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def get_readonly_fields(
         self, request: HttpRequest, obj: EvidenceLink | None = None
     ) -> tuple[str, ...]:
-        if (
-            obj is not None
-            and obj.checklist_item.procedure_version.state != ProcedureVersion.State.DRAFT
-        ):
+        if obj is not None and obj.owning_version().state != ProcedureVersion.State.DRAFT:
             return tuple(field.name for field in self.model._meta.fields)
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
-        return bool(
-            obj is None
-            or obj.checklist_item.procedure_version.state == ProcedureVersion.State.DRAFT
-        )
+        return bool(obj is None or obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
 
 @admin.register(ProcedureVersionAuditEvent)

@@ -97,16 +97,46 @@ class PublicChecklistItem:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicStep:
+    id: str
+    text: LocalizedText
+    phase: str
+    sources: tuple[PublicSource, ...]
+    freshness: Freshness
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
+class PublicWarning:
+    id: str
+    text: LocalizedText
+    severity: str
+    kind: str
+    role: str
+    sources: tuple[PublicSource, ...]
+    freshness: Freshness
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     service_id: str
     procedure_id: str
     procedure_version_id: str
     title: LocalizedText
     checklist_items: tuple[PublicChecklistItem, ...] = ()
+    steps: tuple[PublicStep, ...] = ()
+    warnings: tuple[PublicWarning, ...] = ()
     type: Literal["plan"] = "plan"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
+        object.__setattr__(self, "steps", tuple(self.steps))
+        object.__setattr__(self, "warnings", tuple(self.warnings))
 
 
 @dataclass(frozen=True, slots=True)

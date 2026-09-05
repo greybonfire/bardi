@@ -142,6 +142,12 @@ Lightweight internal/editorial record of conflicting, stale, or wrong-applicabil
 
 Publication lifecycle (`draft`, `published`, `withdrawn`) is separate from calculated trust (`current`, `needs_reverification`, `stale`, `disputed`, `unknown`). A published version can contain locally untrusted material; that does not automatically invalidate unrelated trusted guidance.
 
+## Steps, Warnings, and claim provenance
+
+Steps and Warnings are immutable Procedure-Version-owned bilingual guidance. Steps have stable per-version IDs, phases, deterministic `(phase_order, slot, semantic_id)` ordering, applicability, temporal trust, and procedure or Eligibility-Basis scope. `EligibilityBasis` is presently only a relational scope anchor; qualification is intentionally deferred. Basis Steps fail closed unless matched Basis IDs are supplied.
+
+Warnings use deterministic `(display_order, semantic_id)` ordering. Administrative warnings make external assertions and require claim evidence. Product safety, regeneration, and limitation wording is presentation policy and must not carry Evidence Links. Every Evidence Link has exactly one Checklist Item, Step, or Warning owner; shared Sources and Authorities remain preserved provenance.
+
 ## Transient concepts that are not persistence requirements
 
 ### Anonymous Case / current Facts

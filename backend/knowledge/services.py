@@ -97,9 +97,7 @@ def set_evidence_link_sources(
         raise ValidationError("Evidence Link and Sources must be saved first.")
     if len({source.pk for source in values}) != len(values):
         raise ValidationError("Evidence Sources cannot be duplicated.")
-    version = ProcedureVersion.objects.select_for_update().get(
-        pk=evidence_link.checklist_item.procedure_version_id
-    )
+    version = ProcedureVersion.objects.select_for_update().get(pk=evidence_link.owning_version().pk)
     if version.state != ProcedureVersion.State.DRAFT:
         raise ValidationError("Published and withdrawn evidence is immutable.")
     with allow_aggregate_relation_mutation():

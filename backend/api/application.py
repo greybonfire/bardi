@@ -17,7 +17,8 @@ from planning import (
     PlanResult,
     plan_stateless,
 )
-from planning.public import Locale
+from planning.public import Locale, PublicSource
+from planning.trust import Freshness
 
 SnapshotLoader = Callable[[], KnowledgeSnapshot]
 Planner = Callable[[KnowledgeSnapshot, PlanningInput], PlanningResult]
@@ -50,6 +51,25 @@ def _decode_date_facts(
     return decoded
 
 
+def _project_source(source: PublicSource) -> dict[str, object]:
+    return {
+        "id": source.id,
+        "authority_id": source.authority_id,
+        "title": source.title,
+        "locator": source.locator,
+        "classification": source.classification,
+        "retrieved_on": source.retrieved_on,
+    }
+
+
+def _project_freshness(freshness: Freshness) -> dict[str, object]:
+    return {
+        "state": freshness.state,
+        "verified_on": freshness.verified_on,
+        "reverify_on": freshness.reverify_on,
+    }
+
+
 def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
     """Whitelist public fields; never serialize domain objects directly."""
 
@@ -78,6 +98,28 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
             "procedure_id": result.procedure_id,
             "procedure_version_id": result.procedure_version_id,
             "title": _localized(result.title, locale),
+            "steps": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "phase": item.phase,
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
+                }
+                for item in result.steps
+            ],
+            "warnings": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "severity": item.severity,
+                    "kind": item.kind,
+                    "role": item.role,
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
+                }
+                for item in result.warnings
+            ],
             "checklist_items": [
                 {
                     "id": item.id,
@@ -89,22 +131,8 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                     "copy_quantity": item.copy_quantity,
                     "document_type_id": item.document_type_id,
                     "scope": item.scope,
-                    "sources": [
-                        {
-                            "id": source.id,
-                            "authority_id": source.authority_id,
-                            "title": source.title,
-                            "locator": source.locator,
-                            "classification": source.classification,
-                            "retrieved_on": source.retrieved_on,
-                        }
-                        for source in item.sources
-                    ],
-                    "freshness": {
-                        "state": item.freshness.state,
-                        "verified_on": item.freshness.verified_on,
-                        "reverify_on": item.freshness.reverify_on,
-                    },
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
                 }
                 for item in result.checklist_items
             ],

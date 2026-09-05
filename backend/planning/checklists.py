@@ -5,10 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from .catalog import LocalizedText, ProcedureVersionSnapshot, SourceSnapshot
+from .catalog import LocalizedText, ProcedureVersionSnapshot
 from .evaluator import TruthValue, evaluate
 from .facts import PreparedFacts
-from .public import PublicChecklistItem, PublicSource
+from .provenance import supporting_sources
+from .public import PublicChecklistItem
 from .trust import assess_trust
 
 
@@ -59,56 +60,14 @@ def select_checklist_items(
             ):
                 trust_inconclusive = True
             continue
-        sources: dict[str, PublicSource] = {}
-        has_current_contradiction = False
-        for link in item.evidence_links:
-            link_assessment = assess_trust(
-                link.verification_state,
-                evaluation_date=evaluation_date,
-                effective_from=link.effective_from,
-                effective_to=link.effective_to,
-                retrieved_on=link.retrieved_on,
-                verified_on=link.verified_on,
-                reverify_on=link.reverify_on,
-            )
-            if link_assessment.disposition != "assert_current":
-                continue
-            if not link.sources or not all(
-                _source_is_current(source, evaluation_date) for source in link.sources
-            ):
-                continue
-            if link.support_status == "contradicts":
-                has_current_contradiction = True
-                continue
-            if link.support_status != "supports":
-                continue
-            if item.classification == "official_requirement" and not all(
-                source.classification == "official" for source in link.sources
-            ):
-                continue
-            for source in link.sources:
-                sources.setdefault(
-                    source.semantic_id,
-                    PublicSource(
-                        source.semantic_id,
-                        source.authority.semantic_id,
-                        source.title,
-                        source.locator,
-                        source.classification,
-                        source.retrieved_on,
-                    ),
-                )
-        if has_current_contradiction:
+        sources = supporting_sources(
+            item.evidence_links,
+            evaluation_date,
+            official_only=item.classification == "official_requirement",
+        )
+        if sources is None:
             if item.classification == "official_requirement":
                 trust_inconclusive = True
-            continue
-        if not sources:
-            if item.classification == "official_requirement":
-                trust_inconclusive = True
-            continue
-        if item.classification == "official_requirement" and not any(
-            source.classification == "official" for source in sources.values()
-        ):
             continue
         selected.append(
             PublicChecklistItem(
@@ -121,25 +80,11 @@ def select_checklist_items(
                 item.copy_quantity,
                 item.document_type_id,
                 item.scope,
-                tuple(sources.values()),
+                sources,
                 assessment.freshness,
             )
         )
     return ChecklistSelection(tuple(selected), frozenset(consequential_missing), trust_inconclusive)
-
-
-def _source_is_current(source: SourceSnapshot, evaluation_date: date) -> bool:
-    return (
-        assess_trust(
-            "current",
-            evaluation_date=evaluation_date,
-            effective_from=source.effective_from,
-            effective_to=source.effective_to,
-            retrieved_on=source.retrieved_on,
-            reverify_on=source.reverify_on,
-        ).disposition
-        == "assert_current"
-    )
 
 
 class LocalizedLabel:

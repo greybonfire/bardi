@@ -131,6 +131,52 @@ class ChecklistItemSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class EligibilityBasisSnapshot:
+    semantic_id: str
+
+
+@dataclass(frozen=True, slots=True)
+class StepSnapshot:
+    semantic_id: str
+    text: LocalizedText
+    phase: str
+    phase_order: int
+    slot: int
+    applicability: Predicate | None
+    scope: str
+    eligibility_basis_id: str | None
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
+class WarningSnapshot:
+    semantic_id: str
+    text: LocalizedText
+    severity: str
+    kind: str
+    role: str
+    display_order: int
+    applicability: Predicate | None
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
 class ProcedureVersionSnapshot:
     semantic_id: str
     procedure_semantic_id: str
@@ -143,9 +189,15 @@ class ProcedureVersionSnapshot:
     published_at: datetime | None = None
     published_by_id: int | None = None
     checklist_items: tuple[ChecklistItemSnapshot, ...] = ()
+    eligibility_bases: tuple[EligibilityBasisSnapshot, ...] = ()
+    steps: tuple[StepSnapshot, ...] = ()
+    warnings: tuple[WarningSnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
+        object.__setattr__(self, "eligibility_bases", tuple(self.eligibility_bases))
+        object.__setattr__(self, "steps", tuple(self.steps))
+        object.__setattr__(self, "warnings", tuple(self.warnings))
 
 
 @dataclass(frozen=True, slots=True)

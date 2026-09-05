@@ -6,12 +6,13 @@ from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from planning.catalog import (
     AuthoritySnapshot,
     ChecklistItemSnapshot,
     ContradictionSnapshot,
+    EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
     KnowledgeSnapshot,
     LocalizedText,
@@ -20,6 +21,8 @@ from planning.catalog import (
     QuestionSnapshot,
     ServiceSnapshot,
     SourceSnapshot,
+    StepSnapshot,
+    WarningSnapshot,
 )
 from planning.diagnostics import ValidationDiagnostic
 from planning.facts import FACT_DEFINITIONS, FactKind
@@ -114,8 +117,11 @@ class KnowledgeSnapshotLoadError(Exception):
 def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
     """Fully evaluate ORM reads, then return an immutable, ORM-free catalog graph."""
 
+    from django.db.models import Q
+
     from .models import (
         ChecklistItem,
+        EligibilityBasis,
         EvidenceLink,
         EvidenceLinkSource,
         FactDefinition,
@@ -126,6 +132,8 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
         ServiceProcedureCandidate,
         ServiceQuestion,
         ServiceQuestionResolvedFact,
+        Step,
+        Warning,
     )
 
     # Every queryset is explicitly ordered and immediately materialized.  The remaining
@@ -196,12 +204,69 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             "reverify_on",
         )
     )
+    basis_rows = list(
+        EligibilityBasis.objects.filter(procedure_version__state__in=("published", "withdrawn"))
+        .order_by("procedure_version__semantic_id", "semantic_id")
+        .values("id", "procedure_version__semantic_id", "semantic_id")
+    )
+    step_rows = list(
+        Step.objects.filter(procedure_version__state__in=("published", "withdrawn"))
+        .order_by("procedure_version__semantic_id", "phase_order", "slot", "semantic_id")
+        .values(
+            "id",
+            "procedure_version__semantic_id",
+            "semantic_id",
+            "text_ar",
+            "text_en",
+            "phase",
+            "phase_order",
+            "slot",
+            "applicability",
+            "scope",
+            "eligibility_basis_id",
+            "eligibility_basis__semantic_id",
+            "eligibility_basis__procedure_version_id",
+            "procedure_version_id",
+            "effective_from",
+            "effective_to",
+            "verification_state",
+            "verified_on",
+            "reverify_on",
+        )
+    )
+    warning_rows = list(
+        Warning.objects.filter(procedure_version__state__in=("published", "withdrawn"))
+        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
+        .values(
+            "id",
+            "procedure_version__semantic_id",
+            "semantic_id",
+            "text_ar",
+            "text_en",
+            "severity",
+            "kind",
+            "role",
+            "display_order",
+            "applicability",
+            "effective_from",
+            "effective_to",
+            "verification_state",
+            "verified_on",
+            "reverify_on",
+        )
+    )
     evidence_rows = list(
-        EvidenceLink.objects.filter(checklist_item_id__in=[row["id"] for row in checklist_rows])
-        .order_by("checklist_item_id", "id")
+        EvidenceLink.objects.filter(
+            Q(checklist_item_id__in=[row["id"] for row in checklist_rows])
+            | Q(step_id__in=[row["id"] for row in step_rows])
+            | Q(warning_id__in=[row["id"] for row in warning_rows])
+        )
+        .order_by("id")
         .values(
             "id",
             "checklist_item_id",
+            "step_id",
+            "warning_id",
             "passage",
             "location",
             "applicability_context",
@@ -311,10 +376,24 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             ),
         )
         evidence_sources[source_row["evidence_link_id"]].append(source)
-    evidence_by_item: dict[int, list[EvidenceLinkSnapshot]] = defaultdict(list)
-    for evidence_row in evidence_rows:
+    evidence_by_owner: dict[tuple[str, int], list[EvidenceLinkSnapshot]] = defaultdict(list)
+    for evidence_row in cast(list[dict[str, Any]], evidence_rows):
         sources = tuple(evidence_sources[evidence_row["id"]])
-        evidence_by_item[evidence_row["checklist_item_id"]].append(
+        evidence_owner = next(
+            (
+                (kind, evidence_row[field])
+                for kind, field in (
+                    ("checklist", "checklist_item_id"),
+                    ("step", "step_id"),
+                    ("warning", "warning_id"),
+                )
+                if evidence_row[field] is not None
+            ),
+            None,
+        )
+        if evidence_owner is None:
+            continue
+        evidence_by_owner[evidence_owner].append(
             EvidenceLinkSnapshot(
                 evidence_row["passage"],
                 evidence_row["location"],
@@ -360,7 +439,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 )
                 continue
             predicate = decoded.predicate
-        links = tuple(evidence_by_item[item_row["id"]])
+        links = tuple(evidence_by_owner[("checklist", item_row["id"])])
         if item_row["verification_state"] == "current" and not links:
             failures.append(
                 StoredRuleLoadDiagnostic(
@@ -395,6 +474,116 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 cast(VerificationState, item_row["verification_state"]),
                 item_row["verified_on"],
                 item_row["reverify_on"],
+                links,
+            )
+        )
+
+    bases_by_version: dict[str, list[EligibilityBasisSnapshot]] = defaultdict(list)
+    for basis_row in basis_rows:
+        bases_by_version[basis_row["procedure_version__semantic_id"]].append(
+            EligibilityBasisSnapshot(basis_row["semantic_id"])
+        )
+    steps_by_version: dict[str, list[StepSnapshot]] = defaultdict(list)
+    warnings_by_version: dict[str, list[WarningSnapshot]] = defaultdict(list)
+
+    def decoded_guidance_rule(raw: object, owner: str) -> Predicate | None | bool:
+        if raw == {}:
+            return None
+        decoded = decode_stored_rule(raw, published_definitions)
+        if decoded.predicate is None:
+            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
+            return False
+        return decoded.predicate
+
+    def has_adequate_evidence(links: tuple[EvidenceLinkSnapshot, ...]) -> bool:
+        return any(
+            link.verification_state == "current"
+            and link.support_status == "supports"
+            and bool(link.sources)
+            and bool(link.passage.strip())
+            and bool(link.location.strip())
+            and bool(link.applicability_context.strip())
+            for link in links
+        ) and not any(
+            link.verification_state == "current" and link.support_status == "contradicts"
+            for link in links
+        )
+
+    for row in cast(list[dict[str, Any]], step_rows):
+        owner = f"step:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
+        guidance_predicate = decoded_guidance_rule(row["applicability"], owner)
+        links = tuple(evidence_by_owner[("step", row["id"])])
+        basis_broken = row["scope"] == "eligibility_basis" and (
+            row["eligibility_basis_id"] is None
+            or row["eligibility_basis__procedure_version_id"] != row["procedure_version_id"]
+        )
+        if (
+            guidance_predicate is False
+            or basis_broken
+            or (row["verification_state"] == "current" and not has_adequate_evidence(links))
+        ):
+            if basis_broken:
+                failures.append(
+                    StoredRuleLoadDiagnostic(
+                        owner, (ValidationDiagnostic("invalid_basis_owner", ("scope",)),)
+                    )
+                )
+            elif guidance_predicate is not False:
+                failures.append(
+                    StoredRuleLoadDiagnostic(
+                        owner, (ValidationDiagnostic("inadequate_evidence", ("evidence",)),)
+                    )
+                )
+            continue
+        steps_by_version[row["procedure_version__semantic_id"]].append(
+            StepSnapshot(
+                row["semantic_id"],
+                LocalizedText(row["text_ar"], row["text_en"]),
+                row["phase"],
+                row["phase_order"],
+                row["slot"],
+                cast(Predicate | None, guidance_predicate),
+                row["scope"],
+                row["eligibility_basis__semantic_id"],
+                row["effective_from"],
+                row["effective_to"],
+                cast(VerificationState, row["verification_state"]),
+                row["verified_on"],
+                row["reverify_on"],
+                links,
+            )
+        )
+    for row in cast(list[dict[str, Any]], warning_rows):
+        owner = f"warning:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
+        guidance_predicate = decoded_guidance_rule(row["applicability"], owner)
+        links = tuple(evidence_by_owner[("warning", row["id"])])
+        invalid = (row["kind"] == "product" and bool(links)) or (
+            row["kind"] == "administrative"
+            and row["verification_state"] == "current"
+            and not has_adequate_evidence(links)
+        )
+        if guidance_predicate is False or invalid:
+            if invalid:
+                failures.append(
+                    StoredRuleLoadDiagnostic(
+                        owner, (ValidationDiagnostic("invalid_warning_evidence", ("evidence",)),)
+                    )
+                )
+            continue
+        warnings_by_version[row["procedure_version__semantic_id"]].append(
+            WarningSnapshot(
+                row["semantic_id"],
+                LocalizedText(row["text_ar"], row["text_en"]),
+                row["severity"],
+                row["kind"],
+                row["role"],
+                row["display_order"],
+                cast(Predicate | None, guidance_predicate),
+                row["effective_from"],
+                row["effective_to"],
+                cast(VerificationState, row["verification_state"]),
+                row["verified_on"],
+                row["reverify_on"],
                 links,
             )
         )
@@ -444,6 +633,9 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 version_row["published_at"],
                 version_row["published_by_id"],
                 tuple(checklist_by_version[semantic_id]),
+                tuple(bases_by_version[semantic_id]),
+                tuple(steps_by_version[semantic_id]),
+                tuple(warnings_by_version[semantic_id]),
             )
         )
     for contradiction_row in contradiction_rows:

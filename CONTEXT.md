@@ -116,6 +116,14 @@ _Avoid_: Tip, Field Report
 An item intended to reduce operational failure and supported by contextual Field Guidance, but not established as government-mandated.
 _Avoid_: Official requirement, guarantee
 
+**Step**:
+A deterministically ordered, Procedure-Version-owned bilingual action. A materially administrative Step is a Procedural Claim and carries claim-specific evidence; it may apply to the whole Procedure or one Eligibility Basis.
+_Avoid_: Mutable workflow state, unsourced administrative instruction
+
+**Warning**:
+A version-owned bilingual caution. Administrative Warnings make evidence-bearing external assertions, while product safety or limitation wording introduces no external assertion and must not carry Evidence Links.
+_Avoid_: Evidence discrepancy, undifferentiated disclaimer
+
 **Fee**:  
 A structured monetary claim with currency, applicability, evidence, and explicit value state: known, range, unknown, or unverified. Unknown means no current amount is asserted.
 _Avoid_: Invented estimate, platform price

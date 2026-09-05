@@ -133,6 +133,19 @@ class ChecklistItemSnapshot:
 @dataclass(frozen=True, slots=True)
 class EligibilityBasisSnapshot:
     semantic_id: str
+    text: LocalizedText = LocalizedText("", "")
+    reachability: Predicate | None = None
+    qualification: Predicate | None = None
+    display_order: int = 0
+    effective_from: date | None = None
+    effective_to: date | None = None
+    verification_state: VerificationState = "unknown"
+    verified_on: date | None = None
+    reverify_on: date | None = None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
 
 
 @dataclass(frozen=True, slots=True)

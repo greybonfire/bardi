@@ -71,9 +71,7 @@ class StepSelectionTests(unittest.TestCase):
         self.assertEqual([item.id for item in unresolved.items], ["a", "b"])
         self.assertTrue(unresolved.basis_resolution_required)
 
-        resolved = select_steps(
-            version, facts, date(2026, 2, 1), matched_basis_ids={"basis"}
-        )
+        resolved = select_steps(version, facts, date(2026, 2, 1), matched_basis_ids={"basis"})
         self.assertEqual([item.id for item in resolved.items], ["c", "a", "b"])
         self.assertFalse(resolved.basis_resolution_required)
         self.assertEqual(resolved.items[0].sources[0].id, "source")

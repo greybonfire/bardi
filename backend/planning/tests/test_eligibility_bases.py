@@ -8,8 +8,8 @@ from planning import (
     EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
     LocalizedText,
-    Predicate,
     PreparedFacts,
+    Predicate,
     ProcedureVersionSnapshot,
     SourceSnapshot,
 )

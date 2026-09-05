@@ -65,6 +65,7 @@ class ApplicationBoundaryTests(SimpleTestCase):
                 "procedure_id": "procedure",
                 "procedure_version_id": "version",
                 "title": "خطة",
+                "checklist_items": [],
             },
         )
 

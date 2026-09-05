@@ -9,6 +9,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q, Value
 from django.db.models.lookups import Exact
+from planning.trust import VERIFICATION_CHOICES
 
 NONBLANK_PATTERN = r".*[^[:space:]].*"
 
@@ -587,3 +588,417 @@ class ServiceContradictionFact(models.Model):
                 fields=("contradiction", "position"), name="unique_contradiction_position"
             ),
         ]
+
+
+class Authority(models.Model):
+    semantic_id = models.CharField(max_length=128, unique=True)
+    name_ar = models.TextField()
+    name_en = models.TextField()
+
+    class Meta:
+        ordering = ("semantic_id",)
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="authority_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(name_ar__regex=NONBLANK_PATTERN), name="authority_ar_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(name_en__regex=NONBLANK_PATTERN), name="authority_en_nonblank"
+            ),
+        ]
+
+    def clean(self) -> None:
+        for field in ("semantic_id", "name_ar", "name_en"):
+            _required(getattr(self, field), field)
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if (
+            self.pk
+            and Source.objects.filter(
+                authority_id=self.pk,
+                evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
+                    "published",
+                    "withdrawn",
+                ),
+            ).exists()
+        ):
+            old = type(self).objects.get(pk=self.pk)
+            if (old.semantic_id, old.name_ar, old.name_en) != (
+                self.semantic_id,
+                self.name_ar,
+                self.name_en,
+            ):
+                raise ValidationError("Authorities used by published evidence are immutable.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        if Source.objects.filter(
+            authority_id=self.pk,
+            evidence_source_links__evidence_link__checklist_item__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            ),
+        ).exists():
+            raise ValidationError("Authorities used by published evidence cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.semantic_id
+
+
+class DocumentType(models.Model):
+    semantic_id = models.CharField(max_length=128, unique=True)
+    name_ar = models.TextField()
+    name_en = models.TextField()
+
+    class Meta:
+        ordering = ("semantic_id",)
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="document_type_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(name_ar__regex=NONBLANK_PATTERN), name="document_type_ar_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(name_en__regex=NONBLANK_PATTERN), name="document_type_en_nonblank"
+            ),
+        ]
+
+    def clean(self) -> None:
+        for field in ("semantic_id", "name_ar", "name_en"):
+            _required(getattr(self, field), field)
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if (
+            self.pk
+            and ChecklistItem.objects.filter(
+                document_type_id=self.pk, procedure_version__state__in=("published", "withdrawn")
+            ).exists()
+        ):
+            old = type(self).objects.get(pk=self.pk)
+            if (old.semantic_id, old.name_ar, old.name_en) != (
+                self.semantic_id,
+                self.name_ar,
+                self.name_en,
+            ):
+                raise ValidationError("Document Types used by published claims are immutable.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        if ChecklistItem.objects.filter(
+            document_type_id=self.pk, procedure_version__state__in=("published", "withdrawn")
+        ).exists():
+            raise ValidationError("Document Types used by published claims cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.semantic_id
+
+
+class Source(models.Model):
+    class Classification(models.TextChoices):
+        OFFICIAL = "official", "Official"
+        FIELD_REPORT = "field_report", "Field report"
+        SECONDARY = "secondary", "Secondary"
+
+    semantic_id = models.CharField(max_length=128, unique=True)
+    authority = models.ForeignKey(Authority, on_delete=models.PROTECT, related_name="sources")
+    title = models.TextField()
+    locator = models.TextField()
+    classification = models.CharField(max_length=16, choices=Classification.choices)
+    published_on = models.DateField(null=True, blank=True)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    retrieved_on = models.DateField()
+    reverify_on = models.DateField(null=True, blank=True)
+    observation_date = models.DateField(null=True, blank=True)
+    observation_context = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ("semantic_id",)
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="source_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(title__regex=NONBLANK_PATTERN), name="source_title_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(locator__regex=NONBLANK_PATTERN), name="source_locator_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(classification__in=["official", "field_report", "secondary"]),
+                name="source_class_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="source_dates_ordered",
+            ),
+        ]
+
+    def clean(self) -> None:
+        for field in ("semantic_id", "title", "locator"):
+            _required(getattr(self, field), field)
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            raise ValidationError({"effective_to": "Effective interval is not ordered."})
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if (
+            self.pk
+            and self.evidence_source_links.filter(
+                evidence_link__checklist_item__procedure_version__state__in=(
+                    "published",
+                    "withdrawn",
+                )
+            ).exists()
+        ):
+            old = type(self).objects.get(pk=self.pk)
+            protected = tuple(f.name for f in self._meta.fields if f.name != "id")
+            if any(getattr(old, f) != getattr(self, f) for f in protected):
+                raise ValidationError("Sources used by published evidence are preserved.")
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        if self.evidence_source_links.filter(
+            evidence_link__checklist_item__procedure_version__state__in=("published", "withdrawn")
+        ).exists():
+            raise ValidationError("Sources used by published evidence cannot be deleted.")
+        return super().delete(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return self.semantic_id
+
+
+class VersionOwnedModel(models.Model):
+    class Meta:
+        abstract = True
+
+    def owning_version(self) -> ProcedureVersion:
+        raise NotImplementedError
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.owning_version().state != ProcedureVersion.State.DRAFT:
+            raise ValidationError(
+                "Published and withdrawn Procedure Version children are immutable."
+            )
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
+        if self.owning_version().state != ProcedureVersion.State.DRAFT:
+            raise ValidationError(
+                "Published and withdrawn Procedure Version children are immutable."
+            )
+        return super().delete(*args, **kwargs)
+
+
+class ChecklistItem(VersionOwnedModel):
+    class Classification(models.TextChoices):
+        OFFICIAL_REQUIREMENT = "official_requirement", "Official requirement"
+        PRACTICAL_PREPARATION = "practical_preparation", "Practical preparation"
+        CANDIDATE = "candidate", "Research candidate"
+
+    class Scope(models.TextChoices):
+        PROCEDURE = "procedure", "Entire procedure"
+        ELIGIBILITY_BASIS = "eligibility_basis", "Eligibility basis"
+
+    procedure_version = models.ForeignKey(
+        ProcedureVersion, on_delete=models.CASCADE, related_name="checklist_items"
+    )
+    semantic_id = models.CharField(max_length=128)
+    text_ar = models.TextField()
+    text_en = models.TextField()
+    classification = models.CharField(max_length=32, choices=Classification.choices)
+    document_type = models.ForeignKey(
+        DocumentType,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="checklist_items",
+    )
+    quantity = models.PositiveIntegerField(default=1)
+    original_quantity = models.PositiveIntegerField(default=0)
+    copy_quantity = models.PositiveIntegerField(default=0)
+    display_order = models.PositiveIntegerField(default=0)
+    applicability = models.JSONField(default=dict, blank=True)
+    scope = models.CharField(max_length=24, choices=Scope.choices, default=Scope.PROCEDURE)
+    scope_reference = models.CharField(max_length=128, blank=True)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    verified_on = models.DateField(null=True, blank=True)
+    reverify_on = models.DateField(null=True, blank=True)
+    verification_state = models.CharField(
+        max_length=24, choices=VERIFICATION_CHOICES, default="unknown"
+    )
+
+    class Meta:
+        ordering = ("procedure_version_id", "display_order", "semantic_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("procedure_version", "semantic_id"), name="unique_checklist_id_per_version"
+            ),
+            models.CheckConstraint(
+                condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="checklist_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="checklist_ar_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_en__regex=NONBLANK_PATTERN), name="checklist_en_nonblank"
+            ),
+            models.CheckConstraint(condition=Q(quantity__gt=0), name="checklist_quantity_positive"),
+            models.CheckConstraint(
+                condition=Q(
+                    classification__in=[
+                        "official_requirement",
+                        "practical_preparation",
+                        "candidate",
+                    ]
+                ),
+                name="checklist_class_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(scope__in=["procedure", "eligibility_basis"]),
+                name="checklist_scope_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(
+                    verification_state__in=[
+                        "current",
+                        "needs_reverification",
+                        "stale",
+                        "disputed",
+                        "unknown",
+                    ]
+                ),
+                name="checklist_verification_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="checklist_dates_ordered",
+            ),
+            models.CheckConstraint(
+                condition=Q(scope="procedure", scope_reference="")
+                | Q(scope="eligibility_basis", scope_reference__regex=NONBLANK_PATTERN),
+                name="checklist_scope_combination",
+            ),
+        ]
+
+    def owning_version(self) -> ProcedureVersion:
+        return self.procedure_version
+
+    def clean(self) -> None:
+        for field in ("semantic_id", "text_ar", "text_en"):
+            _required(getattr(self, field), field)
+        if self.quantity < 1:
+            raise ValidationError({"quantity": "Quantity must be positive."})
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            raise ValidationError({"effective_to": "Effective interval is not ordered."})
+        if self.scope == self.Scope.PROCEDURE and self.scope_reference:
+            raise ValidationError({"scope_reference": "Procedure scope cannot have a reference."})
+        if self.scope == self.Scope.ELIGIBILITY_BASIS and not self.scope_reference.strip():
+            raise ValidationError(
+                {"scope_reference": "Eligibility Basis scope requires a stable reference."}
+            )
+
+    def __str__(self) -> str:
+        return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
+
+
+class EvidenceLink(VersionOwnedModel):
+    class SupportStatus(models.TextChoices):
+        SUPPORTS = "supports", "Supports"
+        CONTEXT = "context", "Context only"
+        CONTRADICTS = "contradicts", "Contradicts"
+
+    checklist_item = models.ForeignKey(
+        ChecklistItem, on_delete=models.CASCADE, related_name="evidence_links"
+    )
+    passage = models.TextField()
+    location = models.TextField(blank=True)
+    applicability_context = models.TextField(blank=True)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    retrieved_on = models.DateField(null=True, blank=True)
+    verified_on = models.DateField(null=True, blank=True)
+    reverify_on = models.DateField(null=True, blank=True)
+    verification_state = models.CharField(
+        max_length=24, choices=VERIFICATION_CHOICES, default="unknown"
+    )
+    support_status = models.CharField(
+        max_length=16, choices=SupportStatus.choices, default=SupportStatus.SUPPORTS
+    )
+    sources = models.ManyToManyField(
+        Source, through="EvidenceLinkSource", related_name="evidence_links"
+    )
+
+    class Meta:
+        ordering = ("checklist_item_id", "id")
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(
+                    verification_state__in=[
+                        "current",
+                        "needs_reverification",
+                        "stale",
+                        "disputed",
+                        "unknown",
+                    ]
+                ),
+                name="evidence_verification_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(support_status__in=["supports", "context", "contradicts"]),
+                name="evidence_support_supported",
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="evidence_dates_ordered",
+            ),
+        ]
+
+    def owning_version(self) -> ProcedureVersion:
+        return self.checklist_item.procedure_version
+
+    def clean(self) -> None:
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            raise ValidationError({"effective_to": "Effective interval is not ordered."})
+
+    def __str__(self) -> str:
+        return f"evidence:{self.checklist_item}:{self.pk or 'new'}"
+
+
+class EvidenceLinkSource(VersionOwnedModel):
+    evidence_link = models.ForeignKey(
+        EvidenceLink, on_delete=models.CASCADE, related_name="source_links"
+    )
+    source = models.ForeignKey(
+        Source, on_delete=models.PROTECT, related_name="evidence_source_links"
+    )
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ("evidence_link_id", "position", "source__semantic_id")
+        constraints = [
+            models.UniqueConstraint(
+                fields=("evidence_link", "source"), name="unique_evidence_source"
+            ),
+            models.UniqueConstraint(
+                fields=("evidence_link", "position"), name="unique_evidence_source_position"
+            ),
+        ]
+
+    def owning_version(self) -> ProcedureVersion:
+        return self.evidence_link.checklist_item.procedure_version

@@ -26,10 +26,6 @@ _MESSAGES: Mapping[str, Mapping[str, str]] = {
     "unknown_service": {"ar": "الخدمة غير متاحة.", "en": "The service is unavailable."},
     "inactive_service": {"ar": "الخدمة غير نشطة.", "en": "The service is inactive."},
     "knowledge_unavailable": {"ar": "المعرفة غير متاحة حالياً.", "en": "Knowledge is unavailable."},
-    "plan_assembly_unavailable": {
-        "ar": "لا يمكن إعداد الخطة حالياً.",
-        "en": "Plan assembly is not yet available.",
-    },
 }
 _DEFAULT_MESSAGE = {"ar": "لا توجد نتيجة حاسمة.", "en": "No conclusive result is available."}
 
@@ -82,6 +78,36 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
             "procedure_id": result.procedure_id,
             "procedure_version_id": result.procedure_version_id,
             "title": _localized(result.title, locale),
+            "checklist_items": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "classification": item.classification,
+                    "classification_label": _localized(item.classification_label, locale),
+                    "quantity": item.quantity,
+                    "original_quantity": item.original_quantity,
+                    "copy_quantity": item.copy_quantity,
+                    "document_type_id": item.document_type_id,
+                    "scope": item.scope,
+                    "sources": [
+                        {
+                            "id": source.id,
+                            "authority_id": source.authority_id,
+                            "title": source.title,
+                            "locator": source.locator,
+                            "classification": source.classification,
+                            "retrieved_on": source.retrieved_on,
+                        }
+                        for source in item.sources
+                    ],
+                    "freshness": {
+                        "state": item.freshness.state,
+                        "verified_on": item.freshness.verified_on,
+                        "reverify_on": item.freshness.reverify_on,
+                    },
+                }
+                for item in result.checklist_items
+            ],
         }
     if isinstance(result, InvalidResult):
         return {

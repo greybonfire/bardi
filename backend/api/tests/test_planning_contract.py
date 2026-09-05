@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import json
+from datetime import date
+from typing import Any
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TransactionTestCase
 from knowledge.models import (
+    Authority,
+    ChecklistItem,
+    EvidenceLink,
     FactDefinition,
     Procedure,
     ProcedureVersion,
@@ -13,9 +18,10 @@ from knowledge.models import (
     ServiceContradiction,
     ServiceProcedureCandidate,
     ServiceQuestion,
+    Source,
 )
 from knowledge.publication import publish_procedure_version
-from knowledge.services import set_contradiction_facts
+from knowledge.services import set_contradiction_facts, set_evidence_link_sources
 
 
 class PlanningHttpContractTests(SimpleTestCase):
@@ -149,11 +155,17 @@ class ReachableResultFamilyTests(TransactionTestCase):
             priority=1,
         )
 
-    def post(self, *, service_id: str = "contract.service", facts: object = None):  # type: ignore[no-untyped-def]
+    def post(
+        self,
+        *,
+        service_id: str = "contract.service",
+        facts: object = None,
+        locale: str = "en",
+    ) -> Any:
         payload = {
             "service_id": service_id,
             "facts": {} if facts is None else facts,
-            "locale": "en",
+            "locale": locale,
             "evaluation_context": {"evaluation_date": "2026-09-01"},
         }
         return self.client.post(
@@ -257,8 +269,108 @@ class ReachableResultFamilyTests(TransactionTestCase):
         publish_procedure_version(version.pk, actor=actor)
         resolved = self.post(facts={"is_student": True})
         self.assertEqual(resolved.status_code, 200)
-        self.assertEqual(resolved.json()["type"], "inconclusive")
-        self.assertEqual(resolved.json()["reason"], "plan_assembly_unavailable")
+        self.assertEqual(resolved.json()["type"], "plan")
+        self.assertEqual(resolved.json()["procedure_version_id"], "contract.version")
+        self.assertEqual(resolved.json()["checklist_items"], [])
+
+    def test_plan_projects_compact_checklist_provenance_without_editorial_evidence(self) -> None:
+        actor = get_user_model().objects.create_user(username="checklist-contract-publisher")
+        version = ProcedureVersion.objects.create(
+            semantic_id="contract.checklist.version",
+            procedure=self.procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+        )
+        authority = Authority.objects.create(
+            semantic_id="contract.authority", name_ar="جهة", name_en="Authority"
+        )
+        source = Source.objects.create(
+            semantic_id="contract.source",
+            authority=authority,
+            title="Official checklist page",
+            locator="https://example.test/checklist",
+            classification=Source.Classification.OFFICIAL,
+            retrieved_on=date(2026, 8, 1),
+        )
+        item = ChecklistItem.objects.create(
+            procedure_version=version,
+            semantic_id="contract.claim",
+            text_ar="أحضر المستند",
+            text_en="Bring the document",
+            classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT,
+            quantity=2,
+            original_quantity=1,
+            copy_quantity=1,
+            display_order=1,
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        evidence = EvidenceLink.objects.create(
+            checklist_item=item,
+            passage="EDITORIAL SECRET PASSAGE",
+            location="EDITORIAL SECRET LOCATION",
+            applicability_context="EDITORIAL SECRET CONTEXT",
+            verification_state="current",
+            support_status=EvidenceLink.SupportStatus.SUPPORTS,
+        )
+        set_evidence_link_sources(evidence, (source,))
+        publish_procedure_version(version.pk, actor=actor)
+
+        response = self.post(facts={"is_student": True})
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["type"], "plan")
+        self.assertEqual(
+            body["checklist_items"],
+            [
+                {
+                    "id": "contract.claim",
+                    "text": "Bring the document",
+                    "classification": "official_requirement",
+                    "classification_label": "Official Requirement",
+                    "quantity": 2,
+                    "original_quantity": 1,
+                    "copy_quantity": 1,
+                    "document_type_id": None,
+                    "scope": "procedure",
+                    "sources": [
+                        {
+                            "id": "contract.source",
+                            "authority_id": "contract.authority",
+                            "title": "Official checklist page",
+                            "locator": "https://example.test/checklist",
+                            "classification": "official",
+                            "retrieved_on": "2026-08-01",
+                        }
+                    ],
+                    "freshness": {
+                        "state": "current",
+                        "verified_on": "2026-08-01",
+                        "reverify_on": None,
+                    },
+                }
+            ],
+        )
+        rendered = response.content.decode()
+        for secret in (
+            "EDITORIAL SECRET PASSAGE",
+            "EDITORIAL SECRET LOCATION",
+            "EDITORIAL SECRET CONTEXT",
+            "support_status",
+            "evidence_links",
+        ):
+            self.assertNotIn(secret, rendered)
+
+        arabic = self.post(facts={"is_student": True}, locale="ar").json()
+        self.assertEqual(arabic["checklist_items"][0]["text"], "أحضر المستند")
+        self.assertEqual(arabic["checklist_items"][0]["classification_label"], "متطلب رسمي")
+        for invariant in ("id", "classification", "sources", "freshness"):
+            self.assertEqual(
+                arabic["checklist_items"][0][invariant],
+                body["checklist_items"][0][invariant],
+            )
 
     def test_inactive_and_derived_case_preparation_flow(self) -> None:
         inactive = Service.objects.create(

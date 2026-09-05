@@ -1,4 +1,4 @@
-"""Django Ninja routes for the first stateless planning contract."""
+"""Django Ninja routes for the stateless public planning contract."""
 
 from __future__ import annotations
 
@@ -43,10 +43,9 @@ api = NinjaAPI(
     urls_namespace="bardi-v1",
     parser=PrivacySafeParser(),
     description=(
-        "Stateless planning API. The plan variant is reserved and remains unreachable until "
-        "later planning work implements Procedure-Version applicability and plan assembly. "
-        "Pinned Fact derivation and redacted contradiction handling run before Procedure "
-        "selection."
+        "Stateless planning API. Pinned Fact derivation and redacted contradiction handling "
+        "run before Procedure selection, version resolution, applicability, trust evaluation, "
+        "and evidence-backed Checklist assembly."
     ),
 )
 

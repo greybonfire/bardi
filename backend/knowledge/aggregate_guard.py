@@ -39,6 +39,8 @@ def allow_aggregate_relation_mutation() -> Iterator[None]:
 def _mutation_error(sender: type[Model]) -> ValidationError:
     if sender.__name__ == "ServiceQuestionResolvedFact":
         service = "set_question_resolved_facts()"
+    elif sender.__name__ == "EvidenceLinkSource":
+        service = "set_evidence_link_sources()"
     else:
         service = "set_contradiction_facts()"
     return ValidationError(f"Aggregate relation rows must be changed through {service}.")
@@ -64,9 +66,9 @@ def _guard_delete(sender: type[Model], origin: object, **kwargs: Any) -> None:
 def connect_aggregate_relation_guards() -> None:
     """Connect guards once Django's app registry is ready."""
 
-    from .models import ServiceContradictionFact, ServiceQuestionResolvedFact
+    from .models import EvidenceLinkSource, ServiceContradictionFact, ServiceQuestionResolvedFact
 
-    for model in (ServiceQuestionResolvedFact, ServiceContradictionFact):
+    for model in (ServiceQuestionResolvedFact, ServiceContradictionFact, EvidenceLinkSource):
         pre_save.connect(
             _guard_save,
             sender=model,

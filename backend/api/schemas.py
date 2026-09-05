@@ -68,12 +68,42 @@ class NextQuestionResponse(StrictSchema):
     question: QuestionResponse
 
 
+class FreshnessResponse(StrictSchema):
+    state: Literal["current", "needs_reverification", "stale", "disputed", "unknown"]
+    verified_on: date | None
+    reverify_on: date | None
+
+
+class ChecklistSourceResponse(StrictSchema):
+    id: str
+    authority_id: str
+    title: str
+    locator: str
+    classification: Literal["official", "field_report", "secondary"]
+    retrieved_on: date
+
+
+class ChecklistItemResponse(StrictSchema):
+    id: str
+    text: str
+    classification: Literal["official_requirement", "practical_preparation"]
+    classification_label: str
+    quantity: int
+    original_quantity: int
+    copy_quantity: int
+    document_type_id: str | None
+    scope: Literal["procedure"]
+    sources: list[ChecklistSourceResponse]
+    freshness: FreshnessResponse
+
+
 class PlanResponse(StrictSchema):
     type: Literal["plan"]
     service_id: str
     procedure_id: str
     procedure_version_id: str
     title: str
+    checklist_items: list[ChecklistItemResponse]
 
 
 class InconclusiveResponse(StrictSchema):

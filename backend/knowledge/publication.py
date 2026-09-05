@@ -21,7 +21,18 @@ from django.utils.module_loading import import_string
 from planning.facts import FactDefinition as DomainFactDefinition
 
 from .domain import decode_stored_rule, to_domain_fact
-from .models import FactDefinition, Procedure, ProcedureVersion, ProcedureVersionAuditEvent
+from .models import (
+    Authority,
+    ChecklistItem,
+    DocumentType,
+    EvidenceLink,
+    EvidenceLinkSource,
+    FactDefinition,
+    Procedure,
+    ProcedureVersion,
+    ProcedureVersionAuditEvent,
+    Source,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,6 +183,99 @@ def _overlap_queryset(version: ProcedureVersion) -> models.QuerySet[ProcedureVer
     return candidates.order_by("semantic_id")
 
 
+class ChecklistEvidenceGate:
+    name = "core.checklist_evidence"
+
+    def validate(self, context: PublicationContext) -> Iterable[PublicationDiagnostic]:
+        failures: list[PublicationDiagnostic] = []
+        items = context.version.checklist_items.prefetch_related(
+            "evidence_links__source_links__source"
+        ).order_by("display_order", "semantic_id")
+        for item in items:
+            owner = item.semantic_id
+            if not item.text_ar.strip() or not item.text_en.strip():
+                failures.append(
+                    PublicationDiagnostic(self.name, "incomplete_bilingual_claim", owner)
+                )
+            if item.quantity < 1:
+                failures.append(PublicationDiagnostic(self.name, "invalid_quantity", owner))
+            if item.applicability != {}:
+                decoded = decode_stored_rule(item.applicability, context.fact_definitions)
+                for diagnostic in decoded.diagnostics:
+                    failures.append(PublicationDiagnostic(self.name, diagnostic.code, owner))
+            links = list(item.evidence_links.all())
+            adequate_support = False
+            authoritative = False
+            for link in links:
+                detail = f"{owner}:{link.pk}"
+                sources = [row.source for row in link.source_links.all()]
+                has_complete_context = bool(
+                    sources
+                    and link.passage.strip()
+                    and link.location.strip()
+                    and link.applicability_context.strip()
+                )
+                supports_current_claim = (
+                    link.support_status == EvidenceLink.SupportStatus.SUPPORTS
+                    and link.verification_state == "current"
+                    and has_complete_context
+                )
+                if (
+                    item.verification_state == "current"
+                    and link.support_status == EvidenceLink.SupportStatus.CONTRADICTS
+                    and link.verification_state == "current"
+                ):
+                    failures.append(
+                        PublicationDiagnostic(
+                            self.name, "unresolved_evidence_contradiction", detail
+                        )
+                    )
+                adequate_support = adequate_support or supports_current_claim
+                if not sources:
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_source", detail)
+                    )
+                if not link.passage.strip():
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_passage", detail)
+                    )
+                if not link.location.strip() or not link.applicability_context.strip():
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_context", detail)
+                    )
+                if supports_current_claim and all(
+                    source.classification == Source.Classification.OFFICIAL for source in sources
+                ):
+                    authoritative = True
+                if item.classification == ChecklistItem.Classification.PRACTICAL_PREPARATION:
+                    for source in sources:
+                        if source.classification == Source.Classification.FIELD_REPORT and (
+                            source.observation_date is None
+                            or not source.observation_context.strip()
+                        ):
+                            failures.append(
+                                PublicationDiagnostic(self.name, "malformed_field_guidance", detail)
+                            )
+            if item.verification_state == "current":
+                if not links:
+                    failures.append(
+                        PublicationDiagnostic(self.name, "missing_evidence_link", owner)
+                    )
+                elif not adequate_support:
+                    failures.append(
+                        PublicationDiagnostic(self.name, "adequate_evidence_required", owner)
+                    )
+            if (
+                item.classification == ChecklistItem.Classification.OFFICIAL_REQUIREMENT
+                and links
+                and not authoritative
+            ):
+                failures.append(
+                    PublicationDiagnostic(self.name, "official_evidence_required", owner)
+                )
+        return failures
+
+
 class TemporalOverlapGate:
     name = "core.temporal_overlap"
 
@@ -189,6 +293,7 @@ _CORE_GATES: tuple[PublicationGate, ...] = (
     BilingualCompletenessGate(),
     RulesContractGate(),
     ApplicabilityGate(),
+    ChecklistEvidenceGate(),
     TemporalGate(),
     TemporalOverlapGate(),
 )
@@ -271,6 +376,44 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .get(pk=version_id)
             )
             Procedure.objects.select_for_update().get(pk=version.procedure_id)
+            # Lock the complete version-owned aggregate and reusable provenance before gates.
+            item_rows = list(
+                ChecklistItem.objects.select_for_update()
+                .filter(procedure_version=version)
+                .order_by("pk")
+                .values_list("pk", "document_type_id")
+            )
+            item_ids = [item_id for item_id, _ in item_rows]
+            document_type_ids = {
+                document_type_id
+                for _, document_type_id in item_rows
+                if document_type_id is not None
+            }
+            link_ids = list(
+                EvidenceLink.objects.select_for_update()
+                .filter(checklist_item_id__in=item_ids)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
+            source_ids = list(
+                EvidenceLinkSource.objects.select_for_update()
+                .filter(evidence_link_id__in=link_ids)
+                .order_by("pk")
+                .values_list("source_id", flat=True)
+            )
+            source_rows = list(
+                Source.objects.select_for_update()
+                .filter(pk__in=source_ids)
+                .order_by("pk")
+                .values_list("pk", "authority_id")
+            )
+            authority_ids = {authority_id for _, authority_id in source_rows}
+            list(Authority.objects.select_for_update().filter(pk__in=authority_ids).order_by("pk"))
+            list(
+                DocumentType.objects.select_for_update()
+                .filter(pk__in=document_type_ids)
+                .order_by("pk")
+            )
             context = PublicationContext(version, actor, _load_published_fact_definitions())
             diagnostics = _run_policy(context)
             if diagnostics:

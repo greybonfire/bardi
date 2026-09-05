@@ -38,6 +38,13 @@ class PureDomainImportBoundaryTests(unittest.TestCase):
         self.assertIsNotNone(PlanningResult)
         self.assertTrue(callable(plan_stateless))
 
+    def test_shared_trust_api_is_public(self) -> None:
+        from planning import Freshness, TrustAssessment, assess_trust
+
+        self.assertEqual(Freshness.__module__, "planning.trust")
+        self.assertEqual(TrustAssessment.__module__, "planning.trust")
+        self.assertTrue(callable(assess_trust))
+
     def test_production_modules_have_no_framework_or_io_dependencies(self) -> None:
         package = Path(__file__).resolve().parents[1]
         prohibited = {

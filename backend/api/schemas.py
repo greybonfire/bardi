@@ -102,7 +102,6 @@ class ChecklistItemResponse(StrictSchema):
     copy_quantity: int
     document_type_id: str | None
     scope: Literal["procedure", "eligibility_basis"]
-    eligibility_basis_id: str | None
     sources: list[GuidanceSourceResponse]
     freshness: FreshnessResponse
 
@@ -111,8 +110,6 @@ class StepResponse(StrictSchema):
     id: str
     text: str
     phase: str
-    scope: Literal["procedure", "eligibility_basis"]
-    eligibility_basis_id: str | None
     sources: list[GuidanceSourceResponse]
     freshness: FreshnessResponse
 

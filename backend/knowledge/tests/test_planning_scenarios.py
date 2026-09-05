@@ -101,9 +101,7 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
             expected_diagnostics=[] if diagnostics is None else diagnostics,
         )
 
-    def author_required_scenarios(
-        self, *, reverse: bool = False
-    ) -> tuple[PlanningScenario, ...]:
+    def author_required_scenarios(self, *, reverse: bool = False) -> tuple[PlanningScenario, ...]:
         matching = False if reverse else True
         rejected = True if reverse else False
         version_id = self.version.semantic_id
@@ -147,9 +145,7 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
             publish_procedure_version(self.version.pk, actor=self.actor)
 
         scenario_diagnostics = [
-            item
-            for item in caught.exception.diagnostics
-            if item.gate == "core.planning_scenarios"
+            item for item in caught.exception.diagnostics if item.gate == "core.planning_scenarios"
         ]
         self.assertEqual(
             {(item.code, item.detail) for item in scenario_diagnostics},
@@ -202,9 +198,7 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
             publish_procedure_version(self.version.pk, actor=self.actor)
 
         scenario_diagnostics = [
-            item
-            for item in caught.exception.diagnostics
-            if item.gate == "core.planning_scenarios"
+            item for item in caught.exception.diagnostics if item.gate == "core.planning_scenarios"
         ]
         self.assertEqual(
             [(item.code, item.detail) for item in scenario_diagnostics],

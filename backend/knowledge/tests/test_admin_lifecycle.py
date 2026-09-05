@@ -7,6 +7,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission, User
 from django.test import RequestFactory, TransactionTestCase, override_settings
 from django.urls import reverse
+from planning.versions import (
+    ProcedureVersionResolved,
+    ProcedureVersionUnavailable,
+    resolve_procedure_version,
+)
 
 from knowledge.admin import EvidenceLinkAdmin, ProcedureVersionAdmin
 from knowledge.admin_lifecycle import clone_published_procedure_version
@@ -40,7 +45,6 @@ from knowledge.service_point_routing import (
     ServicePointVersion,
 )
 from knowledge.services import set_evidence_link_sources
-from planning.versions import ProcedureVersionResolved, ProcedureVersionUnavailable, resolve_procedure_version
 
 
 @override_settings(PROCEDURE_VERSION_PUBLICATION_GATES=())
@@ -276,7 +280,10 @@ class SafeAdminLifecycleTests(TransactionTestCase):
         self.assertEqual(new_association.service_point_version_id, self.point_version.pk)
 
         scenario = successor.planning_scenarios.get(name="positive")
-        self.assertEqual(scenario.expected_identifiers["procedure_version_id"], successor.semantic_id)
+        self.assertEqual(
+            scenario.expected_identifiers["procedure_version_id"],
+            successor.semantic_id,
+        )
         policy = successor.review_policy
         self.assertEqual(policy.author, self.researcher)
         self.assertTrue(policy.military_risk)

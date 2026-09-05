@@ -109,7 +109,10 @@ INSTALLED_APPS = [
 
 # Mandatory feature-specific publication readiness gates extend the non-replaceable
 # structural core defined by knowledge.publication.
-PROCEDURE_VERSION_PUBLICATION_GATES = ("knowledge.fees.FeePublicationGate",)
+PROCEDURE_VERSION_PUBLICATION_GATES = (
+    "knowledge.fees.FeePublicationGate",
+    "knowledge.eligibility_bases.EligibilityBasisPublicationGate",
+)
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",

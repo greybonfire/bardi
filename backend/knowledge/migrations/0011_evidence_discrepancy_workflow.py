@@ -15,7 +15,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="EvidenceDiscrepancy",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
                 (
                     "status",
                     models.CharField(
@@ -78,7 +83,10 @@ class Migration(migrations.Migration):
                     ),
                     models.CheckConstraint(
                         condition=models.Q(
-                            ("outcome_state__in", ["current", "disputed", "needs_reverification", "stale", "unknown"])
+                            (
+                                "outcome_state__in",
+                                ["current", "disputed", "needs_reverification", "stale", "unknown"],
+                            )
                         ),
                         name="evidence_discrepancy_outcome_supported",
                     ),
@@ -105,7 +113,10 @@ class Migration(migrations.Migration):
                         condition=(
                             ~models.Q(("status", "open"))
                             | models.Q(
-                                ("outcome_state__in", ["disputed", "needs_reverification", "unknown"])
+                                (
+                                    "outcome_state__in",
+                                    ["disputed", "needs_reverification", "unknown"],
+                                )
                             )
                         ),
                         name="open_discrepancy_is_inconclusive",
@@ -116,7 +127,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="EvidenceReverificationEvent",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
                 (
                     "verification_state",
                     models.CharField(
@@ -167,7 +183,10 @@ class Migration(migrations.Migration):
                 "constraints": [
                     models.CheckConstraint(
                         condition=models.Q(
-                            ("verification_state__in", ["current", "disputed", "needs_reverification", "stale", "unknown"])
+                            (
+                                "verification_state__in",
+                                ["current", "disputed", "needs_reverification", "stale", "unknown"],
+                            )
                         ),
                         name="reverification_state_supported",
                     ),
@@ -184,8 +203,12 @@ class Migration(migrations.Migration):
                     ),
                     models.CheckConstraint(
                         condition=(
-                            models.Q(("meaning_changed", False), ("successor_version__isnull", True))
-                            | models.Q(("meaning_changed", True), ("successor_version__isnull", False))
+                            models.Q(
+                                ("meaning_changed", False), ("successor_version__isnull", True)
+                            )
+                            | models.Q(
+                                ("meaning_changed", True), ("successor_version__isnull", False)
+                            )
                         ),
                         name="reverification_successor_policy",
                     ),
@@ -195,7 +218,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="EvidenceDiscrepancyEvidence",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
                 (
                     "discrepancy",
                     models.ForeignKey(
@@ -226,7 +254,12 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name="EvidenceReverificationEvidence",
             fields=[
-                ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True, primary_key=True, serialize=False, verbose_name="ID"
+                    ),
+                ),
                 (
                     "event",
                     models.ForeignKey(

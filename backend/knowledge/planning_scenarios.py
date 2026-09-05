@@ -488,7 +488,7 @@ def _scenario_matches(scenario: PlanningScenario, result: PlanningResult) -> boo
         return False
     if any(identifiers.get(key) != value for key, value in scenario.expected_identifiers.items()):
         return False
-    return diagnostics == scenario.expected_diagnostics
+    return bool(diagnostics == scenario.expected_diagnostics)
 
 
 def _set_lifecycle_transition(value: str) -> None:

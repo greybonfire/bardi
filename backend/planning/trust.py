@@ -58,8 +58,16 @@ def assess_trust(
     ):
         return TrustAssessment("inconclusive", Freshness("unknown", verified_on, reverify_on))
     if state == "stale":
-        established_past_value = verified_on is not None and (
-            effective_from is None or effective_from <= evaluation_date
+        established_past_value = (
+            verified_on is not None
+            and (effective_from is None or effective_from <= evaluation_date)
+            and (
+                effective_to is None
+                or (
+                    verified_on <= effective_to
+                    and (retrieved_on is None or retrieved_on <= effective_to)
+                )
+            )
         )
         return TrustAssessment(
             "context_only" if established_past_value else "inconclusive", freshness

@@ -137,6 +137,22 @@ class ChecklistPublicationTests(TestCase):
         self.evidence(item, source, support_status=EvidenceLink.SupportStatus.CONTEXT)
         self.assertIn("adequate_evidence_required", self.rejection_codes())
 
+    def test_current_claim_rejects_unresolved_current_contradiction(self) -> None:
+        item = self.item()
+        self.evidence(item, self.source())
+        field_report = self.source(
+            Source.Classification.FIELD_REPORT,
+            observation_date=date(2026, 7, 31),
+            observation_context="Observed at the named office.",
+        )
+        self.evidence(
+            item,
+            field_report,
+            support_status=EvidenceLink.SupportStatus.CONTRADICTS,
+        )
+
+        self.assertIn("unresolved_evidence_contradiction", self.rejection_codes())
+
     def test_official_requirement_cannot_rely_only_on_a_field_report(self) -> None:
         item = self.item()
         field_report = self.source(
@@ -232,7 +248,7 @@ class ChecklistPublicationTests(TestCase):
 class ChecklistPublicationConcurrencyTests(TransactionTestCase):
     reset_sequences = True
 
-    def test_evidence_cannot_change_between_readiness_gates_and_publication(self) -> None:
+    def test_evidence_provenance_cannot_change_during_publication(self) -> None:
         PUBLICATION_LOCKED.clear()
         PUBLICATION_CONTINUE.clear()
         FactDefinition.objects.get_or_create(
@@ -263,6 +279,11 @@ class ChecklistPublicationConcurrencyTests(TransactionTestCase):
         authority = Authority.objects.create(
             semantic_id="checklist.race.authority", name_ar="جهة", name_en="Authority"
         )
+        document_type = DocumentType.objects.create(
+            semantic_id="checklist.race.document",
+            name_ar="مستند",
+            name_en="Document",
+        )
         source = Source.objects.create(
             semantic_id="checklist.race.source",
             authority=authority,
@@ -277,6 +298,7 @@ class ChecklistPublicationConcurrencyTests(TransactionTestCase):
             text_ar="مستند",
             text_en="Document",
             classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT,
+            document_type=document_type,
             verification_state="current",
         )
         evidence = EvidenceLink.objects.create(
@@ -298,26 +320,50 @@ class ChecklistPublicationConcurrencyTests(TransactionTestCase):
             finally:
                 close_old_connections()
 
-        def mutate() -> None:
+        def mutate(model: Any, primary_key: int, values: dict[str, object]) -> None:
             close_old_connections()
             try:
-                EvidenceLink.objects.filter(pk=evidence.pk).update(passage="Raced mutation")
+                model.objects.filter(pk=primary_key).update(**values)
             except DatabaseError:
-                outcomes.append("mutation_blocked")
+                outcomes.append(f"{model.__name__}_mutation_blocked")
             finally:
                 close_old_connections()
 
         publisher = Thread(target=publish, daemon=True)
         publisher.start()
         self.assertTrue(PUBLICATION_LOCKED.wait(timeout=10))
-        mutator = Thread(target=mutate, daemon=True)
-        mutator.start()
+        mutations = (
+            (EvidenceLink, evidence.pk, {"passage": "Raced mutation"}),
+            (Authority, authority.pk, {"name_en": "Raced mutation"}),
+            (DocumentType, document_type.pk, {"name_en": "Raced mutation"}),
+        )
+        mutators = tuple(
+            Thread(target=mutate, args=mutation, daemon=True) for mutation in mutations
+        )
+        for mutator in mutators:
+            mutator.start()
         PUBLICATION_CONTINUE.set()
         publisher.join(timeout=20)
-        mutator.join(timeout=20)
-        self.assertFalse(publisher.is_alive() or mutator.is_alive(), "publication deadlocked")
-        self.assertCountEqual(outcomes, ("published", "mutation_blocked"))
+        for mutator in mutators:
+            mutator.join(timeout=20)
+        self.assertFalse(
+            publisher.is_alive() or any(mutator.is_alive() for mutator in mutators),
+            "publication deadlocked",
+        )
+        self.assertCountEqual(
+            outcomes,
+            (
+                "published",
+                "EvidenceLink_mutation_blocked",
+                "Authority_mutation_blocked",
+                "DocumentType_mutation_blocked",
+            ),
+        )
         version.refresh_from_db()
         evidence.refresh_from_db()
+        authority.refresh_from_db()
+        document_type.refresh_from_db()
         self.assertEqual(version.state, ProcedureVersion.State.PUBLISHED)
         self.assertEqual(evidence.passage, "Passage")
+        self.assertEqual(authority.name_en, "Authority")
+        self.assertEqual(document_type.name_en, "Document")

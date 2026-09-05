@@ -122,6 +122,30 @@ class ChecklistSelectionTests(unittest.TestCase):
         self.assertEqual(practical_stale.items, ())
         self.assertFalse(practical_stale.trust_inconclusive)
 
+    def test_current_contradictory_evidence_blocks_assertion(self) -> None:
+        facts = PreparedFacts({}, frozenset(), {})
+        base = self.item()
+        support = base.evidence_links[0]
+        field_source = replace(
+            support.sources[0],
+            semantic_id="field-report",
+            classification="field_report",
+        )
+        contradiction = replace(
+            support,
+            support_status="contradicts",
+            sources=(field_source,),
+        )
+
+        result = select_checklist_items(
+            self.version(replace(base, evidence_links=(support, contradiction))),
+            facts,
+            date(2026, 2, 1),
+        )
+
+        self.assertEqual(result.items, ())
+        self.assertTrue(result.trust_inconclusive)
+
     def test_future_or_expired_evidence_is_not_back_projected(self) -> None:
         facts = PreparedFacts({}, frozenset(), {})
         base = self.item()

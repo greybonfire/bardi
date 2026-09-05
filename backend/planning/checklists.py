@@ -60,6 +60,7 @@ def select_checklist_items(
                 trust_inconclusive = True
             continue
         sources: dict[str, PublicSource] = {}
+        has_current_contradiction = False
         for link in item.evidence_links:
             link_assessment = assess_trust(
                 link.verification_state,
@@ -70,11 +71,16 @@ def select_checklist_items(
                 verified_on=link.verified_on,
                 reverify_on=link.reverify_on,
             )
-            if link.support_status != "supports" or link_assessment.disposition != "assert_current":
+            if link_assessment.disposition != "assert_current":
                 continue
             if not link.sources or not all(
                 _source_is_current(source, evaluation_date) for source in link.sources
             ):
+                continue
+            if link.support_status == "contradicts":
+                has_current_contradiction = True
+                continue
+            if link.support_status != "supports":
                 continue
             if item.classification == "official_requirement" and not all(
                 source.classification == "official" for source in link.sources
@@ -92,6 +98,10 @@ def select_checklist_items(
                         source.retrieved_on,
                     ),
                 )
+        if has_current_contradiction:
+            if item.classification == "official_requirement":
+                trust_inconclusive = True
+            continue
         if not sources:
             if item.classification == "official_requirement":
                 trust_inconclusive = True

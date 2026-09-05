@@ -89,6 +89,21 @@ class SharedTrustTests(unittest.TestCase):
                 self.assertEqual(assessment.disposition, "inconclusive")
                 self.assertEqual(assessment.freshness.state, "needs_reverification")
 
+    def test_stale_material_cannot_use_later_evidence_as_historical_context(self) -> None:
+        for dates in (
+            {"verified_on": date(2025, 1, 1), "retrieved_on": date(2020, 1, 1)},
+            {"verified_on": date(2020, 1, 1), "retrieved_on": date(2025, 1, 1)},
+        ):
+            with self.subTest(dates=dates):
+                assessment = assess_trust(
+                    "stale",
+                    evaluation_date=self.evaluation_date,
+                    effective_to=date(2020, 12, 31),
+                    **dates,
+                )
+                self.assertEqual(assessment.disposition, "inconclusive")
+                self.assertEqual(assessment.freshness.state, "stale")
+
     def test_old_noncurrent_material_is_not_reclassified_as_historical(self) -> None:
         for state in ("needs_reverification", "disputed", "unknown"):
             with self.subTest(state=state):

@@ -22,7 +22,9 @@ from planning.facts import FactDefinition as DomainFactDefinition
 
 from .domain import decode_stored_rule, to_domain_fact
 from .models import (
+    Authority,
     ChecklistItem,
+    DocumentType,
     EvidenceLink,
     EvidenceLinkSource,
     FactDefinition,
@@ -218,6 +220,16 @@ class ChecklistEvidenceGate:
                     and link.verification_state == "current"
                     and has_complete_context
                 )
+                if (
+                    item.verification_state == "current"
+                    and link.support_status == EvidenceLink.SupportStatus.CONTRADICTS
+                    and link.verification_state == "current"
+                ):
+                    failures.append(
+                        PublicationDiagnostic(
+                            self.name, "unresolved_evidence_contradiction", detail
+                        )
+                    )
                 adequate_support = adequate_support or supports_current_claim
                 if not sources:
                     failures.append(
@@ -365,12 +377,18 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
             )
             Procedure.objects.select_for_update().get(pk=version.procedure_id)
             # Lock the complete version-owned aggregate and reusable provenance before gates.
-            item_ids = list(
+            item_rows = list(
                 ChecklistItem.objects.select_for_update()
                 .filter(procedure_version=version)
                 .order_by("pk")
-                .values_list("pk", flat=True)
+                .values_list("pk", "document_type_id")
             )
+            item_ids = [item_id for item_id, _ in item_rows]
+            document_type_ids = {
+                document_type_id
+                for _, document_type_id in item_rows
+                if document_type_id is not None
+            }
             link_ids = list(
                 EvidenceLink.objects.select_for_update()
                 .filter(checklist_item_id__in=item_ids)
@@ -383,7 +401,23 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .order_by("pk")
                 .values_list("source_id", flat=True)
             )
-            list(Source.objects.select_for_update().filter(pk__in=source_ids).order_by("pk"))
+            source_rows = list(
+                Source.objects.select_for_update()
+                .filter(pk__in=source_ids)
+                .order_by("pk")
+                .values_list("pk", "authority_id")
+            )
+            authority_ids = {authority_id for _, authority_id in source_rows}
+            list(
+                Authority.objects.select_for_update()
+                .filter(pk__in=authority_ids)
+                .order_by("pk")
+            )
+            list(
+                DocumentType.objects.select_for_update()
+                .filter(pk__in=document_type_ids)
+                .order_by("pk")
+            )
             context = PublicationContext(version, actor, _load_published_fact_definitions())
             diagnostics = _run_policy(context)
             if diagnostics:

@@ -226,14 +226,11 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         for basis in bases.bases
     )
-    inconclusive_sections: tuple[InconclusiveSection, ...] = tuple(
-        section
-        for section, inconclusive in (
-            ("checklist_items", checklist.trust_inconclusive),
-            ("steps", steps.trust_inconclusive),
-        )
-        if inconclusive
-    )
+    inconclusive_section_values: list[InconclusiveSection] = []
+    if checklist.trust_inconclusive:
+        inconclusive_section_values.append("checklist_items")
+    if steps.trust_inconclusive:
+        inconclusive_section_values.append("steps")
     return PlanResult(
         service.semantic_id,
         selection.procedure_semantic_id,
@@ -252,5 +249,5 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
             preparation.prepared_facts,
             planning_input.evaluation_date,
         ),
-        inconclusive_sections=inconclusive_sections,
+        inconclusive_sections=tuple(inconclusive_section_values),
     )

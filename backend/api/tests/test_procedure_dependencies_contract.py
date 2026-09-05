@@ -284,9 +284,7 @@ class ProcedureDependencyApiContractTests(TransactionTestCase):
             by_id["dependency.blocking"]["target_procedure_version_id"],
             self.target_version_id,
         )
-        self.assertIsNone(
-            by_id["dependency.unsupported"]["target_procedure_version_id"]
-        )
+        self.assertIsNone(by_id["dependency.unsupported"]["target_procedure_version_id"])
         self.assertIsNone(by_id["dependency.untrusted"]["target_procedure_version_id"])
         self.assertEqual(
             [item["id"] for item in body["checklist_items"]],

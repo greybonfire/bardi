@@ -186,8 +186,9 @@ class ProcedureDependencyKnowledgeTests(TestCase):
             ),
         )
         for dependency in invalid:
-            with self.subTest(semantic_id=dependency.semantic_id), self.assertRaises(
-                ValidationError
+            with (
+                self.subTest(semantic_id=dependency.semantic_id),
+                self.assertRaises(ValidationError),
             ):
                 dependency.full_clean()
 

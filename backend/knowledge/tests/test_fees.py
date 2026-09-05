@@ -213,9 +213,7 @@ class FeePublicationTests(TestCase):
         )
         self.assertNotIn("fee.publication.unknown", evidence_required)
         self.assertTrue(
-            {
-                item.detail for item in diagnostics if item.code == "adequate_evidence_required"
-            }
+            {item.detail for item in diagnostics if item.code == "adequate_evidence_required"}
             >= {"fee.publication.known", "fee.publication.range"}
         )
 

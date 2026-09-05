@@ -110,6 +110,20 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                 for item in result.eligibility_bases
             ],
             "inconclusive_basis_ids": list(result.inconclusive_basis_ids),
+            "dependencies": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "relation": item.relation,
+                    "status": item.status,
+                    "target_procedure_id": item.target_procedure_id,
+                    "target_procedure": _localized(item.target_procedure, locale),
+                    "target_procedure_version_id": item.target_procedure_version_id,
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
+                }
+                for item in result.dependencies
+            ],
             "steps": [
                 {
                     "id": item.id,

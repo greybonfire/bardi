@@ -19,6 +19,7 @@ from .catalog import (
     KnowledgeSnapshot,
     LocalizedText,
     ProcedureCandidateSnapshot,
+    ProcedureDependencySnapshot,
     ProcedureVersionSnapshot,
     QuestionSnapshot,
     ServiceSnapshot,
@@ -26,6 +27,7 @@ from .catalog import (
     StepSnapshot,
     WarningSnapshot,
 )
+from .dependencies import ProcedureDependencySelection, select_procedure_dependencies
 from .diagnostics import DiagnosticPath, DiagnosticPathSegment, ValidationDiagnostic
 from .eligibility_bases import EligibilityBasisSelection, select_eligibility_bases
 from .evaluator import Evaluation, EvaluationTrace, TruthValue, evaluate
@@ -50,10 +52,12 @@ from .public import (
     PlanningInput,
     PlanningResult,
     PlanResult,
+    ProcedureDependencyStatus,
     PublicChecklistItem,
     PublicDiagnostic,
     PublicEligibilityBasis,
     PublicFee,
+    PublicProcedureDependency,
     PublicQuestion,
     PublicSource,
     PublicStep,
@@ -145,6 +149,9 @@ __all__ = (
     "Predicate",
     "PreparedFacts",
     "ProcedureCandidateSnapshot",
+    "ProcedureDependencySelection",
+    "ProcedureDependencySnapshot",
+    "ProcedureDependencyStatus",
     "ProcedureSelected",
     "ProcedureVersionConfigurationDefect",
     "ProcedureVersionResolution",
@@ -156,6 +163,7 @@ __all__ = (
     "PublicDiagnostic",
     "PublicEligibilityBasis",
     "PublicFee",
+    "PublicProcedureDependency",
     "PublicQuestion",
     "PublicSource",
     "PublicStep",
@@ -186,6 +194,7 @@ __all__ = (
     "resolve_procedure_version",
     "select_eligibility_bases",
     "select_procedure",
+    "select_procedure_dependencies",
     "serialize_rule_v1",
     "validate_rule_v1",
     "validate_submitted_facts",

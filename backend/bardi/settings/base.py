@@ -112,6 +112,7 @@ INSTALLED_APPS = [
 PROCEDURE_VERSION_PUBLICATION_GATES = (
     "knowledge.fees.FeePublicationGate",
     "knowledge.eligibility_bases.EligibilityBasisPublicationGate",
+    "knowledge.procedure_dependencies.ProcedureDependencyPublicationGate",
 )
 
 MIDDLEWARE = [

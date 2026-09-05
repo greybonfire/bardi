@@ -12,6 +12,7 @@ from .case_preparation import (
 )
 from .catalog import KnowledgeSnapshot, QuestionSnapshot
 from .checklists import select_checklist_items
+from .dependencies import select_procedure_dependencies
 from .eligibility_bases import select_eligibility_bases
 from .evaluator import TruthValue, evaluate
 from .facts import validate_submitted_facts
@@ -157,6 +158,26 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     if bases.no_applicable_basis:
         return InconclusiveResult("no_applicable_eligibility_basis")
 
+    dependencies = select_procedure_dependencies(
+        snapshot,
+        resolution.version,
+        preparation.prepared_facts,
+        planning_input.evaluation_date,
+    )
+    if dependencies.configuration_invalid:
+        return _configuration_invalid()
+    if dependencies.missing_facts:
+        question = pick_consequential_question(
+            snapshot,
+            service,
+            preparation.prepared_facts,
+            dependencies.missing_facts,
+            diagnostic_prefix="missing_dependency_question",
+        )
+        if question.diagnostic_codes or question.question is None:
+            return _configuration_invalid()
+        return _question_result(snapshot, service.semantic_id, question.question)
+
     matched_basis_ids = bases.trusted_matched_basis_ids
     checklist = select_checklist_items(
         resolution.version,
@@ -218,4 +239,5 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         fees=fees.items,
         eligibility_bases=public_bases,
         inconclusive_basis_ids=bases.inconclusive_basis_ids,
+        dependencies=dependencies.dependencies,
     )

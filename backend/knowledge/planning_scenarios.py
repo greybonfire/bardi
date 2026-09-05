@@ -268,7 +268,9 @@ class PlanningScenario(models.Model):
         except ProcedureVersion.DoesNotExist as exc:
             raise ValidationError("Scenario ownership is required.") from exc
         if owner.state != ProcedureVersion.State.DRAFT:
-            raise ValidationError("Planning scenarios are editable only while their version is draft.")
+            raise ValidationError(
+                "Planning scenarios are editable only while their version is draft."
+            )
         return owner
 
     def save(self, *args: Any, **kwargs: Any) -> None:

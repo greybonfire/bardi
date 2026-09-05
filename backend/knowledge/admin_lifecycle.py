@@ -60,7 +60,11 @@ def _validate_actor(actor: User) -> None:
         raise ValidationError("A saved staff actor is required to create a successor draft.")
 
 
-def _copy_values(instance: models.Model, *, exclude: frozenset[str] = frozenset()) -> dict[str, Any]:
+def _copy_values(
+    instance: models.Model,
+    *,
+    exclude: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
     values: dict[str, Any] = {}
     for field in instance._meta.concrete_fields:
         if field.primary_key or field.name in exclude:
@@ -95,7 +99,10 @@ def _clone_scenario(
 ) -> PlanningScenario:
     values = _copy_values(scenario, exclude=frozenset({"behavior_signature"}))
     identifiers = deepcopy(values.get("expected_identifiers", {}))
-    if isinstance(identifiers, dict) and identifiers.get("procedure_version_id") == source_semantic_id:
+    if (
+        isinstance(identifiers, dict)
+        and identifiers.get("procedure_version_id") == source_semantic_id
+    ):
         identifiers["procedure_version_id"] = successor.semantic_id
     values["expected_identifiers"] = identifiers
     values["procedure_version_id"] = successor.pk

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from typing import Any, cast
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -173,7 +174,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.version.refresh_from_db()
         self.assertEqual(self.version.state, ProcedureVersion.State.PUBLISHED)
 
-    def post(self, evaluation_date: date = TODAY) -> dict[str, object]:
+    def post(self, evaluation_date: date = TODAY) -> dict[str, Any]:
         response = self.client.post(
             "/v1/planning",
             data=json.dumps(
@@ -187,7 +188,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 200)
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     def test_open_discrepancy_is_local_and_internal_rationale_never_leaks(self) -> None:
         self.publish()

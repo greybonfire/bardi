@@ -12,7 +12,7 @@ from .fees import Fee
 from .models import EvidenceLink, ProcedureVersion
 
 
-class FeeForm(forms.ModelForm[Fee]):
+class FeeForm(forms.ModelForm):  # type: ignore[type-arg]
     class Meta:
         model = Fee
         fields = "__all__"

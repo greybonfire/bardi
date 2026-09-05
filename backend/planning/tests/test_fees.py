@@ -111,7 +111,10 @@ class FeeSelectionTests(unittest.TestCase):
             date(2026, 2, 1),
         )
 
-        self.assertEqual([item.id for item in selected.items], ["range", "known", "unknown", "unverified"])
+        self.assertEqual(
+            [item.id for item in selected.items],
+            ["range", "known", "unknown", "unverified"],
+        )
         by_id = {item.id: item for item in selected.items}
         self.assertEqual(by_id["known"].amount, 705)
         self.assertFalse(by_id["known"].current_value_unknown)

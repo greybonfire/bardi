@@ -220,11 +220,18 @@ class PlanningScenario(models.Model):
         family = self.expected_result_family
         if self.kind in {self.Kind.POSITIVE, self.Kind.SUPPORTED_EDGE} and family != "plan":
             errors["expected_result_family"] = "Positive and supported-edge scenarios must plan."
-        elif self.kind == self.Kind.NEGATIVE and family != "inconclusive":
-            errors["expected_result_family"] = "Negative scenarios must be inconclusive."
-        elif self.kind == self.Kind.UNKNOWN and family not in {"next_question", "inconclusive"}:
+        elif self.kind == self.Kind.NEGATIVE and family not in {"plan", "inconclusive"}:
             errors["expected_result_family"] = (
-                "UNKNOWN scenarios must ask a question or remain inconclusive."
+                "Negative scenarios must plan with a local exclusion or remain inconclusive."
+            )
+        elif self.kind == self.Kind.UNKNOWN and family not in {
+            "plan",
+            "next_question",
+            "inconclusive",
+        }:
+            errors["expected_result_family"] = (
+                "UNKNOWN scenarios must plan with local uncertainty, ask a question, or remain "
+                "inconclusive."
             )
         elif self.kind == self.Kind.CONTRADICTORY and family != "invalid":
             errors["expected_result_family"] = "Contradictory scenarios must be invalid."
@@ -253,23 +260,28 @@ class PlanningScenario(models.Model):
         if errors:
             raise ValidationError(errors)
 
-    def save(self, *args: Any, **kwargs: Any) -> None:
+    def _editable_owner(self) -> ProcedureVersion:
         if self.procedure_version_id is None:
             raise ValidationError("Scenario ownership is required.")
+        try:
+            owner = ProcedureVersion.objects.get(pk=self.procedure_version_id)
+        except ProcedureVersion.DoesNotExist as exc:
+            raise ValidationError("Scenario ownership is required.") from exc
+        if owner.state != ProcedureVersion.State.DRAFT:
+            raise ValidationError("Planning scenarios are editable only while their version is draft.")
+        return owner
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        owner = self._editable_owner()
         stored = type(self).objects.filter(pk=self.pk).only("procedure_version_id").first()
         if stored is not None and stored.procedure_version_id != self.procedure_version_id:
             raise ValidationError("Scenario ownership cannot be reassigned.")
-        if self.procedure_version.state != ProcedureVersion.State.DRAFT:
-            raise ValidationError(
-                "Planning scenarios are editable only while their version is draft."
-            )
-        self.behavior_signature = planning_behavior_signature(self.procedure_version)
+        self.behavior_signature = planning_behavior_signature(owner)
         self.full_clean()
         super().save(*args, **kwargs)
 
     def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        if self.procedure_version.state != ProcedureVersion.State.DRAFT:
-            raise ValidationError("Published planning scenarios are immutable acceptance history.")
+        self._editable_owner()
         return super().delete(*args, **kwargs)
 
     def __str__(self) -> str:
@@ -543,19 +555,32 @@ def _execute_scenarios(
 
         snapshots: dict[date, KnowledgeSnapshot] = {}
         for scenario in scenarios:
-            raw_date = cast(str, scenario.evaluation_context["evaluation_date"])
-            evaluation_date = date.fromisoformat(raw_date)
-            snapshot = snapshots.get(evaluation_date)
-            if snapshot is None:
-                snapshot = load_knowledge_snapshot_as_of(evaluation_date)
-                snapshots[evaluation_date] = snapshot
-            planning_input = PlanningInput(
-                context.version.procedure.primary_service.semantic_id,
-                _decode_date_facts(scenario.source_facts, snapshot.fact_definitions),
-                cast(Locale, scenario.evaluation_context["locale"]),
-                evaluation_date,
-            )
-            result = plan_stateless(snapshot, planning_input)
+            try:
+                raw_date = cast(str, scenario.evaluation_context["evaluation_date"])
+                evaluation_date = date.fromisoformat(raw_date)
+                snapshot = snapshots.get(evaluation_date)
+                if snapshot is None:
+                    snapshot = load_knowledge_snapshot_as_of(evaluation_date)
+                    snapshots[evaluation_date] = snapshot
+                planning_input = PlanningInput(
+                    context.version.procedure.primary_service.semantic_id,
+                    _decode_date_facts(scenario.source_facts, snapshot.fact_definitions),
+                    cast(Locale, scenario.evaluation_context["locale"]),
+                    evaluation_date,
+                )
+                result = plan_stateless(snapshot, planning_input)
+            except Exception:
+                # Fail closed without serializing exception details or submitted Facts. A database
+                # error may leave the transaction unusable until the outer savepoint is rolled back,
+                # so stop executing scenarios after recording the named failure.
+                failures.append(
+                    PublicationDiagnostic(
+                        PlanningScenarioPublicationGate.name,
+                        "scenario_execution_failed",
+                        scenario.name,
+                    )
+                )
+                break
             if not _scenario_matches(scenario, result):
                 failures.append(
                     PublicationDiagnostic(

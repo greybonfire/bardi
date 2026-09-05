@@ -4,6 +4,7 @@ import json
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.http import HttpResponse
 from django.test import TransactionTestCase
 from knowledge.fees import Fee
 from knowledge.models import (
@@ -45,7 +46,7 @@ class FeePlanningContractTests(TransactionTestCase):
             selection_predicate={"op": "eq", "fact": self.fact.key, "value": True},
         )
 
-    def _post(self, *, locale: str = "en"):
+    def _post(self, *, locale: str = "en") -> HttpResponse:
         return self.client.post(
             "/v1/planning",
             data=json.dumps(

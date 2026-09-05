@@ -194,6 +194,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             address_ar="العنوان",
             address_en="Address",
             availability=ServicePointVersion.Availability.AVAILABLE,
+            effective_from=date(2026, 1, 1),
             verification_state="current",
         )
         self.association = ProcedureServicePointAssociation.objects.create(

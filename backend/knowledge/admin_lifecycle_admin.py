@@ -79,8 +79,7 @@ def _render_action_form(
 def _validation_text(exc: ValidationError) -> str:
     if hasattr(exc, "message_dict"):
         return "; ".join(
-            f"{field}: {', '.join(messages_)}"
-            for field, messages_ in exc.message_dict.items()
+            f"{field}: {', '.join(messages_)}" for field, messages_ in exc.message_dict.items()
         )
     return "; ".join(exc.messages)
 

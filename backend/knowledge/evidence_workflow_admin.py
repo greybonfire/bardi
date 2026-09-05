@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 from django.contrib import admin
+from django.contrib.auth.models import User
 from django.http import HttpRequest
 from django.utils import timezone
 
@@ -105,8 +108,9 @@ class EvidenceDiscrepancyAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         form: object,
         change: bool,
     ) -> None:
+        actor = cast(User, request.user)
         if not change:
-            obj.created_by = request.user
+            obj.created_by = actor
             obj.status = EvidenceDiscrepancy.Status.OPEN
             obj.resolved_at = None
             obj.resolved_by = None
@@ -117,7 +121,7 @@ class EvidenceDiscrepancyAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
                 and obj.status == EvidenceDiscrepancy.Status.RESOLVED
             ):
                 obj.resolved_at = timezone.now()
-                obj.resolved_by = request.user
+                obj.resolved_by = actor
         super().save_model(request, obj, form, change)
 
     def has_delete_permission(

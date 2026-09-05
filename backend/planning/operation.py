@@ -10,7 +10,7 @@ from .case_preparation import (
     CasePreparationSuccess,
     prepare_case,
 )
-from .catalog import KnowledgeSnapshot
+from .catalog import KnowledgeSnapshot, QuestionSnapshot
 from .checklists import select_checklist_items
 from .eligibility_bases import select_eligibility_bases
 from .evaluator import TruthValue, evaluate
@@ -52,9 +52,8 @@ def _configuration_invalid() -> InvalidResult:
 def _question_result(
     snapshot: KnowledgeSnapshot,
     service_id: str,
-    question: object,
+    question: QuestionSnapshot,
 ) -> NextQuestionResult | InvalidResult:
-    resolved_fact_keys = getattr(question, "resolved_fact_keys")
     answers = tuple(
         AnswerDefinition(
             key,
@@ -62,14 +61,14 @@ def _question_result(
             snapshot.fact_definitions[key].enum_values,
             snapshot.fact_definitions[key].minimum,
         )
-        for key in resolved_fact_keys
+        for key in question.resolved_fact_keys
         if key in snapshot.fact_definitions
     )
-    if len(answers) != len(resolved_fact_keys):
+    if len(answers) != len(question.resolved_fact_keys):
         return _configuration_invalid()
     return NextQuestionResult(
         service_id,
-        PublicQuestion(getattr(question, "semantic_id"), getattr(question, "text"), answers),
+        PublicQuestion(question.semantic_id, question.text, answers),
     )
 
 
@@ -202,7 +201,9 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
             checklist_item_ids=tuple(
                 item.id for item in checklist.items if item.eligibility_basis_id == basis.id
             ),
-            step_ids=tuple(item.id for item in steps.items if item.eligibility_basis_id == basis.id),
+            step_ids=tuple(
+                item.id for item in steps.items if item.eligibility_basis_id == basis.id
+            ),
         )
         for basis in bases.bases
     )

@@ -421,11 +421,7 @@ class FeePublicationGate:
                 failures.append(PublicationDiagnostic(self.name, "missing_fee_type", owner_id))
             if not _valid_value_shape(fee):
                 failures.append(PublicationDiagnostic(self.name, "invalid_value_state", owner_id))
-            if (
-                fee.effective_from
-                and fee.effective_to
-                and fee.effective_from > fee.effective_to
-            ):
+            if fee.effective_from and fee.effective_to and fee.effective_from > fee.effective_to:
                 failures.append(
                     PublicationDiagnostic(self.name, "invalid_effective_interval", owner_id)
                 )

@@ -254,9 +254,11 @@ def clone_published_procedure_version(
                 if getattr(evidence_link, f"{field_name}_id", None) in mapping
             ]
             if len(matched) != 1:
-                raise ValidationError(
-                    f"{source.semantic_id}: evidence {evidence_link.pk} has incoherent version ownership."
+                message = (
+                    f"{source.semantic_id}: evidence {evidence_link.pk} "
+                    "has incoherent version ownership."
                 )
+                raise ValidationError(message)
             field_name, new_owner = matched[0]
             values[f"{field_name}_id"] = new_owner.pk
             evidence_clone = EvidenceLink(**values)

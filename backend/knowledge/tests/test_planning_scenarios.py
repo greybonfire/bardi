@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import DatabaseError
 from django.test import TransactionTestCase, override_settings
 
 from knowledge.models import (
@@ -13,12 +15,12 @@ from knowledge.models import (
     ProcedureVersionAuditEvent,
     Service,
     ServiceContradiction,
-    ServiceContradictionFact,
     ServiceProcedureCandidate,
     ServiceQuestion,
 )
 from knowledge.planning_scenarios import PlanningScenario
 from knowledge.publication import PublicationRejected, publish_procedure_version
+from knowledge.services import set_contradiction_facts
 
 EDGE_DATE = date(2026, 1, 1)
 NORMAL_DATE = date(2026, 9, 5)
@@ -179,6 +181,30 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
             scenarios[0].save()
         with self.assertRaises(ValidationError):
             scenarios[1].delete()
+        with self.assertRaises(DatabaseError):
+            PlanningScenario.objects.filter(pk=scenarios[0].pk).update(name="bypassed model guard")
+
+    def test_negative_and_unknown_scenarios_can_assert_local_plan_outcomes(self) -> None:
+        version_id = self.version.semantic_id
+        negative = self.scenario(
+            name="local rule may exclude material without excluding the procedure",
+            kind=PlanningScenario.Kind.NEGATIVE,
+            evaluation_date=NORMAL_DATE,
+            facts={"scenario_eligible": False},
+            family=PlanningScenario.ResultFamily.PLAN,
+            identifiers={"procedure_version_id": version_id},
+        )
+        unknown = self.scenario(
+            name="local uncertainty may remain inside an otherwise usable plan",
+            kind=PlanningScenario.Kind.UNKNOWN,
+            evaluation_date=NORMAL_DATE,
+            facts={},
+            family=PlanningScenario.ResultFamily.PLAN,
+            identifiers={"procedure_version_id": version_id},
+        )
+
+        negative.full_clean()
+        unknown.full_clean()
 
     def test_failing_scenario_names_only_the_scenario_and_rolls_back_publication(self) -> None:
         scenarios = list(self.author_required_scenarios())
@@ -203,6 +229,38 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
         self.assertEqual(
             [(item.code, item.detail) for item in scenario_diagnostics],
             [("scenario_failed", failing.name)],
+        )
+        diagnostic_text = str(caught.exception) + repr(caught.exception.diagnostics)
+        self.assertNotIn(secret_value, diagnostic_text)
+        self.assertNotIn("scenario_private_note", diagnostic_text)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.state, ProcedureVersion.State.DRAFT)
+        self.assertIsNone(self.version.published_at)
+        self.assertEqual(ProcedureVersionAuditEvent.objects.count(), 0)
+
+    def test_execution_error_names_scenario_without_exposing_private_facts(self) -> None:
+        scenarios = list(self.author_required_scenarios())
+        secret_value = "PRIVATE-EXECUTION-VALUE-a512f7"
+        failing = scenarios[1]
+        failing.source_facts = {
+            "scenario_eligible": False,
+            "scenario_private_note": secret_value,
+        }
+        failing.save()
+
+        with patch(
+            "knowledge.planning_scenarios.plan_stateless",
+            side_effect=RuntimeError(f"planner failure involving {secret_value}"),
+        ):
+            with self.assertRaises(PublicationRejected) as caught:
+                publish_procedure_version(self.version.pk, actor=self.actor)
+
+        scenario_diagnostics = [
+            item for item in caught.exception.diagnostics if item.gate == "core.planning_scenarios"
+        ]
+        self.assertEqual(
+            [(item.code, item.detail) for item in scenario_diagnostics],
+            [("scenario_execution_failed", failing.name)],
         )
         diagnostic_text = str(caught.exception) + repr(caught.exception.diagnostics)
         self.assertNotIn(secret_value, diagnostic_text)
@@ -295,16 +353,7 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
                 ],
             },
         )
-        ServiceContradictionFact.objects.create(
-            contradiction=contradiction,
-            fact=self.eligible,
-            position=1,
-        )
-        ServiceContradictionFact.objects.create(
-            contradiction=contradiction,
-            fact=conflict,
-            position=2,
-        )
+        set_contradiction_facts(contradiction, (self.eligible, conflict))
         self.author_required_scenarios()
 
         with self.assertRaises(PublicationRejected) as caught:

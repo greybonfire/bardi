@@ -55,9 +55,7 @@ class EvidenceDiscrepancyTransition(models.Model):
                 name="evidence_discrepancy_transition_type_supported",
             ),
             models.CheckConstraint(
-                condition=models.Q(
-                    verification_state__in=sorted(workflow._SHARED_STATES)
-                ),
+                condition=models.Q(verification_state__in=sorted(workflow._SHARED_STATES)),
                 name="evidence_discrepancy_transition_state_supported",
             ),
         ]

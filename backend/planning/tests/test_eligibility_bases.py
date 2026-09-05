@@ -12,8 +12,8 @@ from planning import (
     PreparedFacts,
     ProcedureVersionSnapshot,
     SourceSnapshot,
-    select_eligibility_bases,
 )
+from planning.eligibility_bases import select_eligibility_bases
 
 
 EVALUATION_DATE = date(2026, 9, 1)

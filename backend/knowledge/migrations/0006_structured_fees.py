@@ -1,4 +1,4 @@
-# ruff: noqa: E501
+# ruff: noqa: E501, I001
 # Generated for issue #42 structured Fees.
 
 import django.db.models.deletion

@@ -254,22 +254,22 @@ def _append_actions(existing: Iterable[str], *names: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*existing, *names)))
 
 
-setattr(ProcedureVersionAdmin, "clone_selected_to_draft", clone_selected_to_draft)
-setattr(
-    ProcedureVersionAdmin,
-    "has_clone_procedureversion_permission",
-    has_clone_procedureversion_permission,
+_procedure_version_admin = cast(Any, ProcedureVersionAdmin)
+_procedure_version_admin.clone_selected_to_draft = clone_selected_to_draft
+_procedure_version_admin.has_clone_procedureversion_permission = (
+    has_clone_procedureversion_permission
 )
-setattr(ProcedureVersionAdmin, "approve_selected_versions", approve_selected_versions)
-setattr(ProcedureVersionAdmin, "has_review_version_permission", has_review_version_permission)
+_procedure_version_admin.approve_selected_versions = approve_selected_versions
+_procedure_version_admin.has_review_version_permission = has_review_version_permission
 ProcedureVersionAdmin.actions = _append_actions(
     ProcedureVersionAdmin.actions,
     "clone_selected_to_draft",
     "approve_selected_versions",
 )
 
-setattr(EvidenceLinkAdmin, "reverify_selected_evidence", reverify_selected_evidence)
-setattr(EvidenceLinkAdmin, "has_reverify_evidence_permission", has_reverify_evidence_permission)
+_evidence_link_admin = cast(Any, EvidenceLinkAdmin)
+_evidence_link_admin.reverify_selected_evidence = reverify_selected_evidence
+_evidence_link_admin.has_reverify_evidence_permission = has_reverify_evidence_permission
 EvidenceLinkAdmin.actions = _append_actions(
     getattr(EvidenceLinkAdmin, "actions", ()),
     "reverify_selected_evidence",

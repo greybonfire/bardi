@@ -107,6 +107,10 @@ INSTALLED_APPS = [
     "api.apps.ApiConfig",
 ]
 
+# Mandatory feature-specific publication readiness gates extend the non-replaceable
+# structural core defined by knowledge.publication.
+PROCEDURE_VERSION_PUBLICATION_GATES = ("knowledge.fees.FeePublicationGate",)
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",

@@ -108,6 +108,22 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                 }
                 for item in result.steps
             ],
+            "fees": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "value_state": item.value_state,
+                    "amount": item.amount,
+                    "minimum_amount": item.minimum_amount,
+                    "maximum_amount": item.maximum_amount,
+                    "currency": item.currency,
+                    "fee_type": item.fee_type,
+                    "current_value_unknown": item.current_value_unknown,
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
+                }
+                for item in result.fees
+            ],
             "warnings": [
                 {
                     "id": item.id,

@@ -105,6 +105,20 @@ class StepResponse(StrictSchema):
     freshness: FreshnessResponse
 
 
+class FeeResponse(StrictSchema):
+    id: str
+    text: str
+    value_state: Literal["known", "range", "unknown", "unverified"]
+    amount: int | None
+    minimum_amount: int | None
+    maximum_amount: int | None
+    currency: str
+    fee_type: str
+    current_value_unknown: bool
+    sources: list[GuidanceSourceResponse]
+    freshness: FreshnessResponse
+
+
 class WarningResponse(StrictSchema):
     id: str
     text: str
@@ -123,6 +137,7 @@ class PlanResponse(StrictSchema):
     title: str
     checklist_items: list[ChecklistItemResponse]
     steps: list[StepResponse]
+    fees: list[FeeResponse]
     warnings: list[WarningResponse]
 
 

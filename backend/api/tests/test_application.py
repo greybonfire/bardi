@@ -67,6 +67,7 @@ class ApplicationBoundaryTests(SimpleTestCase):
                 "title": "خطة",
                 "checklist_items": [],
                 "steps": [],
+                "fees": [],
                 "warnings": [],
             },
         )

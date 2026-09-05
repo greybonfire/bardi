@@ -412,8 +412,7 @@ def required_scenario_kinds(
             if (
                 model.objects.filter(procedure_version=version)
                 .filter(
-                    models.Q(effective_from__isnull=False)
-                    | models.Q(effective_to__isnull=False)
+                    models.Q(effective_from__isnull=False) | models.Q(effective_to__isnull=False)
                 )
                 .exists()
             ):
@@ -469,10 +468,14 @@ def _observed_result(result: PlanningResult) -> tuple[str, dict[str, object], li
         }
         return result.type, identifiers, []
     if isinstance(result, NextQuestionResult):
-        return result.type, {
-            "service_id": result.service_id,
-            "question_id": result.question.id,
-        }, []
+        return (
+            result.type,
+            {
+                "service_id": result.service_id,
+                "question_id": result.question.id,
+            },
+            [],
+        )
     if isinstance(result, InconclusiveResult):
         return result.type, {"reason": result.reason}, []
     assert isinstance(result, InvalidResult)

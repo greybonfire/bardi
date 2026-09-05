@@ -181,9 +181,7 @@ def clone_published_procedure_version(
                 _clone_row(
                     row,
                     procedure_version_id=successor.pk,
-                    eligibility_basis_id=(
-                        basis_map[basis_id].pk if basis_id is not None else None
-                    ),
+                    eligibility_basis_id=(basis_map[basis_id].pk if basis_id is not None else None),
                 ),
             )
             assert row.pk is not None
@@ -206,9 +204,7 @@ def clone_published_procedure_version(
                 _clone_row(
                     row,
                     procedure_version_id=successor.pk,
-                    eligibility_basis_id=(
-                        basis_map[basis_id].pk if basis_id is not None else None
-                    ),
+                    eligibility_basis_id=(basis_map[basis_id].pk if basis_id is not None else None),
                 ),
             )
             assert row.pk is not None
@@ -241,9 +237,7 @@ def clone_published_procedure_version(
             "fee": cast(dict[int, models.Model], fee_map),
             "eligibility_basis": cast(dict[int, models.Model], basis_map),
             "procedure_dependency": cast(dict[int, models.Model], dependency_map),
-            "procedure_service_point_association": cast(
-                dict[int, models.Model], association_map
-            ),
+            "procedure_service_point_association": cast(dict[int, models.Model], association_map),
         }
         evidence_filter = Q(pk__in=[])
         for field_name, mapping in owner_maps.items():
@@ -295,9 +289,7 @@ def clone_published_procedure_version(
             custody_guardianship_risk=bool(
                 source_policy and source_policy.custody_guardianship_risk
             ),
-            contested_identity_risk=bool(
-                source_policy and source_policy.contested_identity_risk
-            ),
+            contested_identity_risk=bool(source_policy and source_policy.contested_identity_risk),
         )
 
         return successor

@@ -595,10 +595,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
         maximum = row["maximum_amount"]
         amount_ok = type(amount) is int and amount >= 0
         range_ok = (
-            type(minimum) is int
-            and type(maximum) is int
-            and minimum >= 0
-            and maximum >= minimum
+            type(minimum) is int and type(maximum) is int and minimum >= 0 and maximum >= minimum
         )
         if row["value_state"] == "known":
             return amount_ok and minimum is None and maximum is None
@@ -608,8 +605,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             return amount is None and minimum is None and maximum is None
         if row["value_state"] == "unverified":
             return (
-                (amount_ok and minimum is None and maximum is None)
-                or (amount is None and range_ok)
+                (amount_ok and minimum is None and maximum is None) or (amount is None and range_ok)
             ) and row["verification_state"] in {
                 "needs_reverification",
                 "stale",

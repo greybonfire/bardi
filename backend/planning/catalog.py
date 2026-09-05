@@ -216,15 +216,15 @@ class ProcedureVersionSnapshot:
     checklist_items: tuple[ChecklistItemSnapshot, ...] = ()
     eligibility_bases: tuple[EligibilityBasisSnapshot, ...] = ()
     steps: tuple[StepSnapshot, ...] = ()
-    fees: tuple[FeeSnapshot, ...] = ()
     warnings: tuple[WarningSnapshot, ...] = ()
+    fees: tuple[FeeSnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
         object.__setattr__(self, "eligibility_bases", tuple(self.eligibility_bases))
         object.__setattr__(self, "steps", tuple(self.steps))
-        object.__setattr__(self, "fees", tuple(self.fees))
         object.__setattr__(self, "warnings", tuple(self.warnings))
+        object.__setattr__(self, "fees", tuple(self.fees))
 
 
 @dataclass(frozen=True, slots=True)

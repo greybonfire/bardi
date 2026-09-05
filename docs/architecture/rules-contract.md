@@ -180,3 +180,17 @@ Public results do not expose raw rule ASTs, raw Facts, full Evaluation Traces, E
 ## Compatibility rule
 
 A published Procedure Version pins a rules-contract version. A future software release may add a new contract version, but it must retain compatible implementations required to reproduce published historical semantics. Changing a Fact's meaning requires a new Fact key rather than reinterpretation of old data.
+
+## Local routing semantics
+
+After reliable plan material is assembled, every association on the resolved exact Procedure
+Version is evaluated with the same three-valued rules contract. Inclusive date boundaries and
+FALSE predicates exclude a route. UNKNOWN predicates, missing references, out-of-date material,
+or untrusted association/material states remain local routing uncertainty. Trusted TRUE routes
+are returned association-distinct in `(service_point_id, service_point_version_id,
+association_id)` order. This uncertainty never requests a consequential Question, fails the
+whole plan, or suppresses reliable bases, dependencies, checklist items, steps, fees, or
+warnings. Compact preserved supporting provenance supplies a manual verification path for
+researched unresolved routes without asserting that stale or disputed routing content is
+current. `availability=unknown` remains a selected destination attribute. No jurisdiction,
+national coverage, nearest office, or best destination is inferred.

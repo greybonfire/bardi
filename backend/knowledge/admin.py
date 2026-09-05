@@ -60,6 +60,31 @@ def _source_is_preserved(obj: Source) -> bool:
         )
         | models.Q(evidence_link__step__procedure_version__state__in=("published", "withdrawn"))
         | models.Q(evidence_link__warning__procedure_version__state__in=("published", "withdrawn"))
+        | models.Q(evidence_link__fee__procedure_version__state__in=("published", "withdrawn"))
+        | models.Q(
+            evidence_link__eligibility_basis__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_link__procedure_dependency__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_link__procedure_service_point_association__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_link__service_point_version__associations__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
     ).exists()
 
 
@@ -79,6 +104,36 @@ def _authority_is_preserved(obj: Authority) -> bool:
         )
         | models.Q(
             evidence_source_links__evidence_link__warning__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__fee__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__eligibility_basis__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__procedure_dependency__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__procedure_service_point_association__procedure_version__state__in=(
+                "published",
+                "withdrawn",
+            )
+        )
+        | models.Q(
+            evidence_source_links__evidence_link__service_point_version__associations__procedure_version__state__in=(
                 "published",
                 "withdrawn",
             )

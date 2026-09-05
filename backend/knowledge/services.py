@@ -97,8 +97,17 @@ def set_evidence_link_sources(
         raise ValidationError("Evidence Link and Sources must be saved first.")
     if len({source.pk for source in values}) != len(values):
         raise ValidationError("Evidence Sources cannot be duplicated.")
-    version = ProcedureVersion.objects.select_for_update().get(pk=evidence_link.owning_version().pk)
-    if version.state != ProcedureVersion.State.DRAFT:
+    owning_versions = getattr(evidence_link, "owning_versions", None)
+    owner_rows = (
+        tuple(owning_versions()) if callable(owning_versions) else (evidence_link.owning_version(),)
+    )
+    owner_ids = sorted({version.pk for version in owner_rows if version.pk is not None})
+    versions = tuple(
+        ProcedureVersion.objects.select_for_update().filter(pk__in=owner_ids).order_by("pk")
+    )
+    if not versions or len(versions) != len(owner_ids):
+        raise ValidationError("Evidence owner must belong to a Procedure Version.")
+    if any(version.state != ProcedureVersion.State.DRAFT for version in versions):
         raise ValidationError("Published and withdrawn evidence is immutable.")
     with allow_aggregate_relation_mutation():
         evidence_link.source_links.all().delete()

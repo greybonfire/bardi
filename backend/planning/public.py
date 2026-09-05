@@ -21,6 +21,7 @@ type ProcedureDependencyStatus = Literal[
     "unsupported_target",
     "inconclusive",
 ]
+type RoutingStatus = Literal["resolved", "partially_resolved", "unresolved"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +183,33 @@ class PublicProcedureDependency:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicServicePoint:
+    service_point_id: str
+    service_point_version_id: str
+    association_id: str
+    name: LocalizedText
+    address: LocalizedText
+    availability: Literal["available", "unknown"]
+    effective_from: date | None
+    effective_to: date | None
+    sources: tuple[PublicSource, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
+class PublicRouting:
+    status: RoutingStatus
+    destinations: tuple[PublicServicePoint, ...] = ()
+    verification_sources: tuple[PublicSource, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "destinations", tuple(self.destinations))
+        object.__setattr__(self, "verification_sources", tuple(self.verification_sources))
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     service_id: str
     procedure_id: str
@@ -194,6 +222,7 @@ class PlanResult:
     eligibility_bases: tuple[PublicEligibilityBasis, ...] = ()
     inconclusive_basis_ids: tuple[str, ...] = ()
     dependencies: tuple[PublicProcedureDependency, ...] = ()
+    routing: PublicRouting = PublicRouting("unresolved")
     type: Literal["plan"] = "plan"
 
     def __post_init__(self) -> None:

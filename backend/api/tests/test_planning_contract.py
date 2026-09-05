@@ -23,6 +23,11 @@ from knowledge.models import (
     Warning,
 )
 from knowledge.publication import publish_procedure_version
+from knowledge.service_point_routing import (
+    ProcedureServicePointAssociation,
+    ServicePoint,
+    ServicePointVersion,
+)
 from knowledge.services import set_contradiction_facts, set_evidence_link_sources
 
 
@@ -274,6 +279,94 @@ class ReachableResultFamilyTests(TransactionTestCase):
         self.assertEqual(resolved.json()["type"], "plan")
         self.assertEqual(resolved.json()["procedure_version_id"], "contract.version")
         self.assertEqual(resolved.json()["checklist_items"], [])
+        self.assertEqual(
+            resolved.json()["routing"],
+            {"status": "unresolved", "destinations": [], "verification_sources": []},
+        )
+
+    def test_plan_projects_evidence_backed_service_point_routing_end_to_end(self) -> None:
+        version = ProcedureVersion.objects.create(
+            semantic_id="contract.routing.version",
+            procedure=self.procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+        )
+        point = ServicePoint.objects.create(
+            semantic_id="contract.office", name_ar="المكتب", name_en="Office"
+        )
+        material = ServicePointVersion.objects.create(
+            semantic_id="contract.office.v1",
+            service_point=point,
+            address_ar="العنوان",
+            address_en="Address",
+            availability=ServicePointVersion.Availability.AVAILABLE,
+            verification_state="current",
+            verified_on=date(2026, 9, 1),
+        )
+        association = ProcedureServicePointAssociation.objects.create(
+            semantic_id="contract.office.route",
+            procedure_version=version,
+            service_point_version=material,
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+            verification_state="current",
+            verified_on=date(2026, 9, 1),
+        )
+        authority = Authority.objects.create(
+            semantic_id="contract.routing.authority", name_ar="جهة", name_en="Authority"
+        )
+        source = Source.objects.create(
+            semantic_id="contract.routing.source",
+            authority=authority,
+            title="Official routing page",
+            locator="https://example.test/routing",
+            classification=Source.Classification.OFFICIAL,
+            retrieved_on=date(2026, 9, 1),
+        )
+        for owner_name, owner in (
+            ("service_point_version", material),
+            ("procedure_service_point_association", association),
+        ):
+            link = EvidenceLink.objects.create(
+                **{owner_name: owner},
+                passage="Editorial passage",
+                location="Section 1",
+                applicability_context="Jurisdiction",
+                verification_state="current",
+                verified_on=date(2026, 9, 1),
+                support_status=EvidenceLink.SupportStatus.SUPPORTS,
+            )
+            set_evidence_link_sources(link, (source,))
+        actor = get_user_model().objects.create_user(username="routing-contract-publisher")
+        publish_procedure_version(version.pk, actor=actor)
+
+        response = self.post(facts={"is_student": True}, locale="ar")
+
+        self.assertEqual(response.status_code, 200)
+        routing = response.json()["routing"]
+        self.assertEqual(routing["status"], "resolved")
+        self.assertEqual(routing["verification_sources"], [])
+        self.assertEqual(
+            [item["id"] for item in routing["destinations"][0]["sources"]],
+            ["contract.routing.source"],
+        )
+        self.assertEqual(
+            routing["destinations"][0] | {"sources": []},
+            {
+                "service_point_id": "contract.office",
+                "service_point_version_id": "contract.office.v1",
+                "association_id": "contract.office.route",
+                "name": "المكتب",
+                "address": "العنوان",
+                "availability": "available",
+                "effective_from": None,
+                "effective_to": None,
+                "sources": [],
+            },
+        )
+        serialized = response.content.decode()
+        self.assertNotIn("Editorial passage", serialized)
+        self.assertNotIn("applicability_context", serialized)
 
     def test_plan_projects_compact_checklist_provenance_without_editorial_evidence(self) -> None:
         actor = get_user_model().objects.create_user(username="checklist-contract-publisher")

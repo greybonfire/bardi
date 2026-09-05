@@ -162,6 +162,26 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                 }
                 for item in result.warnings
             ],
+            "routing": {
+                "status": result.routing.status,
+                "destinations": [
+                    {
+                        "service_point_id": item.service_point_id,
+                        "service_point_version_id": item.service_point_version_id,
+                        "association_id": item.association_id,
+                        "name": _localized(item.name, locale),
+                        "address": _localized(item.address, locale),
+                        "availability": item.availability,
+                        "effective_from": item.effective_from,
+                        "effective_to": item.effective_to,
+                        "sources": [_project_source(source) for source in item.sources],
+                    }
+                    for item in result.routing.destinations
+                ],
+                "verification_sources": [
+                    _project_source(source) for source in result.routing.verification_sources
+                ],
+            },
             "checklist_items": [
                 {
                     "id": item.id,

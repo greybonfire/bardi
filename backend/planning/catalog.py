@@ -236,6 +236,45 @@ class ProcedureDependencySnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class ServicePointSnapshot:
+    semantic_id: str
+    text: LocalizedText
+
+
+@dataclass(frozen=True, slots=True)
+class ServicePointVersionSnapshot:
+    semantic_id: str
+    service_point_id: str
+    address: LocalizedText
+    availability: str
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
+class ProcedureServicePointAssociationSnapshot:
+    semantic_id: str
+    service_point_version_id: str
+    applicability: Predicate
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
 class ProcedureVersionSnapshot:
     semantic_id: str
     procedure_semantic_id: str
@@ -253,6 +292,7 @@ class ProcedureVersionSnapshot:
     warnings: tuple[WarningSnapshot, ...] = ()
     fees: tuple[FeeSnapshot, ...] = ()
     dependencies: tuple[ProcedureDependencySnapshot, ...] = ()
+    service_point_associations: tuple[ProcedureServicePointAssociationSnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
@@ -261,6 +301,9 @@ class ProcedureVersionSnapshot:
         object.__setattr__(self, "warnings", tuple(self.warnings))
         object.__setattr__(self, "fees", tuple(self.fees))
         object.__setattr__(self, "dependencies", tuple(self.dependencies))
+        object.__setattr__(
+            self, "service_point_associations", tuple(self.service_point_associations)
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,8 +311,12 @@ class KnowledgeSnapshot:
     fact_definitions: Mapping[str, FactDefinition]
     services: tuple[ServiceSnapshot, ...]
     procedure_versions: tuple[ProcedureVersionSnapshot, ...] = ()
+    service_points: tuple[ServicePointSnapshot, ...] = ()
+    service_point_versions: tuple[ServicePointVersionSnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "fact_definitions", MappingProxyType(dict(self.fact_definitions)))
         object.__setattr__(self, "services", tuple(self.services))
         object.__setattr__(self, "procedure_versions", tuple(self.procedure_versions))
+        object.__setattr__(self, "service_points", tuple(self.service_points))
+        object.__setattr__(self, "service_point_versions", tuple(self.service_point_versions))

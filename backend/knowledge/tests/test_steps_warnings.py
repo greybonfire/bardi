@@ -132,8 +132,13 @@ class GuidancePublicationTests(TestCase):
         self.assertIn("adequate_evidence_required", self.rejection_codes())
 
     def test_product_warnings_reject_evidence_and_basis_scope_checks_ownership(self) -> None:
+        qualification = {"op": "eq", "fact": "is_student", "value": True}
         basis = EligibilityBasis.objects.create(
-            procedure_version=self.version, semantic_id="basis.student"
+            procedure_version=self.version,
+            semantic_id="basis.student",
+            text_ar="أساس الطالب",
+            text_en="Student basis",
+            qualification=qualification,
         )
         step = self.step(
             scope=Step.Scope.ELIGIBILITY_BASIS,
@@ -147,7 +152,11 @@ class GuidancePublicationTests(TestCase):
             text_en="Other version",
         )
         other_basis = EligibilityBasis.objects.create(
-            procedure_version=other_version, semantic_id="basis.other"
+            procedure_version=other_version,
+            semantic_id="basis.other",
+            text_ar="أساس آخر",
+            text_en="Other basis",
+            qualification=qualification,
         )
         Step.objects.filter(pk=step.pk).update(eligibility_basis=other_basis)
         product = self.regeneration_warning()

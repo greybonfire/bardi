@@ -27,6 +27,10 @@ include = ["backend/**/*.py"]
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
 
+[tool.ruff.lint.per-file-ignores]
+"backend/knowledge/evidence_workflow.py" = ["E501"]
+"backend/knowledge/migrations/0011_evidence_discrepancy_workflow.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.14"
 mypy_path = "backend"

@@ -6,7 +6,6 @@ from typing import Any
 
 from django.contrib.auth import get_user_model
 from django.test import TransactionTestCase
-
 from knowledge.models import (
     Authority,
     ChecklistItem,

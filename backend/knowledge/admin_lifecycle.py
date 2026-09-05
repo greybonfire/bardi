@@ -211,9 +211,9 @@ def clone_published_procedure_version(
             fee_map[fee_row.pk] = fee_clone
 
         dependency_map: dict[int, ProcedureDependency] = {}
-        for dependency_row in ProcedureDependency.objects.filter(
-            procedure_version=source
-        ).order_by("pk"):
+        for dependency_row in ProcedureDependency.objects.filter(procedure_version=source).order_by(
+            "pk"
+        ):
             dependency_clone = cast(
                 ProcedureDependency,
                 _clone_row(dependency_row, procedure_version_id=successor.pk),
@@ -275,9 +275,9 @@ def clone_published_procedure_version(
                 position=source_link.position,
             )
 
-        for planning_scenario in PlanningScenario.objects.filter(
-            procedure_version=source
-        ).order_by("pk"):
+        for planning_scenario in PlanningScenario.objects.filter(procedure_version=source).order_by(
+            "pk"
+        ):
             _clone_scenario(
                 planning_scenario,
                 successor=successor,

@@ -408,11 +408,7 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .values_list("pk", "authority_id")
             )
             authority_ids = {authority_id for _, authority_id in source_rows}
-            list(
-                Authority.objects.select_for_update()
-                .filter(pk__in=authority_ids)
-                .order_by("pk")
-            )
+            list(Authority.objects.select_for_update().filter(pk__in=authority_ids).order_by("pk"))
             list(
                 DocumentType.objects.select_for_update()
                 .filter(pk__in=document_type_ids)

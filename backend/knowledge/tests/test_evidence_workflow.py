@@ -299,7 +299,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertEqual(historical["checklist_items"], [])
         self.assertEqual(historical["inconclusive_sections"], ["checklist_items"])
 
-    def test_meaning_change_requires_distinct_draft_successor_and_does_not_rewrite_old_plan(self) -> None:
+    def test_meaning_change_requires_distinct_draft_successor(self) -> None:
         self.publish()
         with self.assertRaises(ValidationError):
             record_evidence_reverification(
@@ -392,7 +392,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.version.refresh_from_db()
         self.assertEqual(self.version.state, ProcedureVersion.State.DRAFT)
 
-    def test_workflow_rejects_cross_subject_evidence_and_admin_exposes_read_only_history(self) -> None:
+    def test_workflow_rejects_cross_subject_evidence_and_admin_history(self) -> None:
         with self.assertRaises(ValidationError):
             open_evidence_discrepancy(
                 anchor_evidence_link=self.checklist_evidence,

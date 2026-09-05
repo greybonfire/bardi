@@ -110,6 +110,7 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                 for item in result.eligibility_bases
             ],
             "inconclusive_basis_ids": list(result.inconclusive_basis_ids),
+            "inconclusive_sections": list(result.inconclusive_sections),
             "dependencies": [
                 {
                     "id": item.id,

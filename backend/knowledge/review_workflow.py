@@ -73,10 +73,10 @@ def _jsonable(value: object) -> object:
     return value
 
 
-def _row_payload(instance: models.Model, *, exclude: frozenset[str] = frozenset()) -> dict[str, object]:
+def _row_payload(instance: models.Model) -> dict[str, object]:
     payload: dict[str, object] = {"model": instance._meta.label_lower}
     for field in instance._meta.concrete_fields:
-        if field.primary_key or field.name in exclude:
+        if field.primary_key:
             continue
         payload[field.name] = _jsonable(getattr(instance, field.attname))
     return payload
@@ -301,7 +301,13 @@ class ProcedureVersionAuditApproval(models.Model):
 
     class Meta:
         app_label = "knowledge"
-        ordering = ("audit_event_id", "approval_kind", "dimension", "specialist_risk", "id")
+        ordering = (
+            "audit_event_id",
+            "approval_kind",
+            "dimension",
+            "specialist_risk",
+            "id",
+        )
         constraints = [
             models.UniqueConstraint(
                 fields=("audit_event", "approval"),
@@ -321,8 +327,12 @@ def _version_evidence_links(version: ProcedureVersion) -> models.QuerySet[Eviden
     from .procedure_dependencies import ProcedureDependency
     from .service_point_routing import ProcedureServicePointAssociation
 
-    checklist_ids = ChecklistItem.objects.filter(procedure_version=version).values_list("pk", flat=True)
-    basis_ids = EligibilityBasis.objects.filter(procedure_version=version).values_list("pk", flat=True)
+    checklist_ids = ChecklistItem.objects.filter(procedure_version=version).values_list(
+        "pk", flat=True
+    )
+    basis_ids = EligibilityBasis.objects.filter(procedure_version=version).values_list(
+        "pk", flat=True
+    )
     step_ids = Step.objects.filter(procedure_version=version).values_list("pk", flat=True)
     warning_ids = Warning.objects.filter(procedure_version=version).values_list("pk", flat=True)
     fee_ids = Fee.objects.filter(procedure_version=version).values_list("pk", flat=True)
@@ -344,9 +354,15 @@ def _version_evidence_links(version: ProcedureVersion) -> models.QuerySet[Eviden
     ).order_by("pk")
 
 
-def _discrepancies_for_version(version: ProcedureVersion) -> models.QuerySet[EvidenceDiscrepancy]:
+def _discrepancies_for_version(
+    version: ProcedureVersion,
+) -> models.QuerySet[EvidenceDiscrepancy]:
     link_ids = _version_evidence_links(version).values_list("pk", flat=True)
-    return EvidenceDiscrepancy.objects.filter(evidence_links__pk__in=link_ids).distinct().order_by("pk")
+    return (
+        EvidenceDiscrepancy.objects.filter(evidence_links__pk__in=link_ids)
+        .distinct()
+        .order_by("pk")
+    )
 
 
 def required_review_dimensions(version: ProcedureVersion) -> frozenset[str]:
@@ -428,7 +444,9 @@ def approve_review_dimension(
                 procedure_version=version
             )
         except ProcedureVersionReviewPolicy.DoesNotExist as exc:
-            raise ValidationError("A review policy with an accountable author is required.") from exc
+            raise ValidationError(
+                "A review policy with an accountable author is required."
+            ) from exc
         if actor.pk == policy.author_id:
             raise ValidationError("The accountable author cannot approve their own draft.")
         if dimension not in required_review_dimensions(version):
@@ -465,7 +483,9 @@ def approve_specialist_risk(
                 procedure_version=version
             )
         except ProcedureVersionReviewPolicy.DoesNotExist as exc:
-            raise ValidationError("A review policy with an accountable author is required.") from exc
+            raise ValidationError(
+                "A review policy with an accountable author is required."
+            ) from exc
         if actor.pk == policy.author_id:
             raise ValidationError("The accountable author cannot approve their own draft.")
         if risk_kind not in policy.risk_kinds:
@@ -487,19 +507,36 @@ def _approval_diagnostic(
     current_signature: str,
     author_id: int,
     publisher_id: int | None,
+    permission: str,
     missing_code: str,
     stale_code: str,
     independence_code: str,
+    ineligible_code: str,
     detail: str,
 ) -> PublicationDiagnostic | None:
     if not approvals:
-        return PublicationDiagnostic(ProcedureVersionReviewPublicationGate.name, missing_code, detail)
+        return PublicationDiagnostic(
+            ProcedureVersionReviewPublicationGate.name,
+            missing_code,
+            detail,
+        )
     fresh = tuple(row for row in approvals if row.reviewed_signature == current_signature)
     if not fresh:
-        return PublicationDiagnostic(ProcedureVersionReviewPublicationGate.name, stale_code, detail)
+        return PublicationDiagnostic(
+            ProcedureVersionReviewPublicationGate.name,
+            stale_code,
+            detail,
+        )
+    eligible = tuple(row for row in fresh if row.reviewer.has_perm(permission))
+    if not eligible:
+        return PublicationDiagnostic(
+            ProcedureVersionReviewPublicationGate.name,
+            ineligible_code,
+            detail,
+        )
     independent = tuple(
         row
-        for row in fresh
+        for row in eligible
         if row.reviewer_id != author_id
         and (publisher_id is None or row.reviewer_id != publisher_id)
     )
@@ -543,7 +580,8 @@ class ProcedureVersionReviewPublicationGate:
             rows = tuple(
                 row
                 for row in approvals
-                if row.approval_kind == ProcedureVersionReviewApproval.ApprovalKind.DIMENSION
+                if row.approval_kind
+                == ProcedureVersionReviewApproval.ApprovalKind.DIMENSION
                 and row.dimension == dimension
             )
             diagnostic = _approval_diagnostic(
@@ -551,9 +589,11 @@ class ProcedureVersionReviewPublicationGate:
                 current_signature=current_signature,
                 author_id=policy.author_id,
                 publisher_id=publisher_id,
+                permission=_REVIEW_PERMISSION,
                 missing_code="missing_review_approval",
                 stale_code="stale_review_approval",
                 independence_code="review_not_independent",
+                ineligible_code="reviewer_not_eligible",
                 detail=dimension,
             )
             if diagnostic is not None:
@@ -563,7 +603,8 @@ class ProcedureVersionReviewPublicationGate:
             rows = tuple(
                 row
                 for row in approvals
-                if row.approval_kind == ProcedureVersionReviewApproval.ApprovalKind.SPECIALIST
+                if row.approval_kind
+                == ProcedureVersionReviewApproval.ApprovalKind.SPECIALIST
                 and row.specialist_risk == risk_kind
             )
             diagnostic = _approval_diagnostic(
@@ -571,9 +612,11 @@ class ProcedureVersionReviewPublicationGate:
                 current_signature=current_signature,
                 author_id=policy.author_id,
                 publisher_id=publisher_id,
+                permission=_SPECIALIST_PERMISSIONS[risk_kind],
                 missing_code="missing_specialist_approval",
                 stale_code="stale_specialist_approval",
                 independence_code="specialist_review_not_independent",
+                ineligible_code="specialist_reviewer_not_eligible",
                 detail=risk_kind,
             )
             if diagnostic is not None:

@@ -110,7 +110,10 @@ def install_procedure_version_fee_inline() -> None:
     from .admin import ProcedureVersionAdmin
 
     if FeeOwnerInline not in ProcedureVersionAdmin.inlines:
-        ProcedureVersionAdmin.inlines = (*ProcedureVersionAdmin.inlines, FeeOwnerInline)
+        ProcedureVersionAdmin.inlines = (  # type: ignore[assignment]
+            *ProcedureVersionAdmin.inlines,
+            FeeOwnerInline,
+        )
 
 
 install_procedure_version_fee_inline()

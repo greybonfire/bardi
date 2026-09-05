@@ -18,11 +18,15 @@ class KnowledgeConfig(AppConfig):
         eligibility_bases = import_module(".eligibility_bases", package=__package__)
         procedure_dependencies = import_module(".procedure_dependencies", package=__package__)
         service_point_routing = import_module(".service_point_routing", package=__package__)
+        service_point_routing_contract = import_module(
+            ".service_point_routing_contract", package=__package__
+        )
 
         assert fees.Fee is not None
         assert eligibility_bases.EligibilityBasisPublicationGate is not None
         assert procedure_dependencies.ProcedureDependency is not None
         assert service_point_routing.ServicePointVersion is not None
+        assert service_point_routing_contract.install_service_point_temporal_contract is not None
 
     def ready(self) -> None:
         from . import eligibility_basis_admin as _eligibility_basis_admin

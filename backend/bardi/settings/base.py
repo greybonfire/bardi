@@ -1,99 +1,50 @@
-"""Shared settings for the Bardi Django project."""
-
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
+from pathlib import Path
+from urllib.parse import parse_qs, unquote, urlparse
 
-from django.core.exceptions import ImproperlyConfigured
-
-
-def env_bool(name: str, *, default: bool = False) -> bool:
-    """Read a boolean environment variable with an explicit accepted vocabulary."""
-    value = os.environ.get(name)
-    if value is None:
-        return default
-
-    normalized = value.strip().lower()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise ImproperlyConfigured(f"{name} must be one of 1, 0, true, false, yes, no, on, or off")
+BASE_DIR = Path(__file__).resolve().parents[2]
 
 
-def env_list(name: str, *, default: Sequence[str] = ()) -> list[str]:
-    """Read a comma-separated environment variable as a list of non-empty values."""
-    value = os.environ.get(name)
-    if value is None:
-        return list(default)
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-def required_env(name: str) -> str:
-    """Read a required, non-blank environment variable."""
-    value = os.environ.get(name)
-    if value is None or not value.strip():
-        raise ImproperlyConfigured(f"{name} must be set")
-    return value
-
-
-def required_env_list(name: str) -> list[str]:
-    """Read a required comma-separated environment variable."""
-    values = env_list(name)
-    if not values:
-        raise ImproperlyConfigured(f"{name} must contain at least one value")
-    return values
-
-
-def postgres_database(*, defaults: Mapping[str, str] | None = None) -> dict[str, str]:
-    """Build a PostgreSQL connection dictionary, optionally with local defaults."""
-    values: dict[str, str] = {}
-    for name in (
-        "POSTGRES_DB",
-        "POSTGRES_USER",
-        "POSTGRES_PASSWORD",
-        "POSTGRES_HOST",
-        "POSTGRES_PORT",
-    ):
-        value = os.environ.get(name)
-        if value is None and defaults is not None:
-            value = defaults.get(name)
-        if value is None or not value.strip():
-            raise ImproperlyConfigured(f"{name} must be set for PostgreSQL")
-        values[name] = value
-
-    try:
-        port = int(values["POSTGRES_PORT"])
-    except ValueError as exc:
-        raise ImproperlyConfigured("POSTGRES_PORT must be an integer") from exc
-    if not 1 <= port <= 65535:
-        raise ImproperlyConfigured("POSTGRES_PORT must be between 1 and 65535")
-
+def database_from_url(url: str) -> dict[str, object]:
+    parsed = urlparse(url)
+    if parsed.scheme not in {"postgres", "postgresql"}:
+        raise ValueError("DATABASE_URL must use postgres:// or postgresql://")
+    options = parse_qs(parsed.query)
     return {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": values["POSTGRES_DB"],
-        "USER": values["POSTGRES_USER"],
-        "PASSWORD": values["POSTGRES_PASSWORD"],
-        "HOST": values["POSTGRES_HOST"],
-        "PORT": values["POSTGRES_PORT"],
+        "NAME": unquote(parsed.path.lstrip("/")),
+        "USER": unquote(parsed.username or ""),
+        "PASSWORD": unquote(parsed.password or ""),
+        "HOST": parsed.hostname or "",
+        "PORT": parsed.port or 5432,
+        "OPTIONS": {key: values[-1] for key, values in options.items()},
     }
 
 
-# These values let interactive development start after copying .env.example. The
-# production and test overlays deliberately replace this database configuration.
-DEVELOPMENT_DATABASE_DEFAULTS = {
-    "POSTGRES_DB": "bardi",
-    "POSTGRES_USER": "bardi",
-    "POSTGRES_PASSWORD": "bardi-development-only",
-    "POSTGRES_HOST": "localhost",
-    "POSTGRES_PORT": "5432",
-}
+def postgres_database(*, defaults: Mapping[str, str] | None = None) -> dict[str, object]:
+    url = os.getenv("DATABASE_URL")
+    if url:
+        return database_from_url(url)
+    values = dict(defaults or {})
+    return {
+        "ENGINE": "django.db.backends.postgresql",
+        "NAME": os.getenv("POSTGRES_DB", values.get("NAME", "bardi")),
+        "USER": os.getenv("POSTGRES_USER", values.get("USER", "bardi")),
+        "PASSWORD": os.getenv("POSTGRES_PASSWORD", values.get("PASSWORD", "bardi")),
+        "HOST": os.getenv("POSTGRES_HOST", values.get("HOST", "localhost")),
+        "PORT": int(os.getenv("POSTGRES_PORT", values.get("PORT", "5432"))),
+    }
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-development-only-change-me")
-DEBUG = env_bool("DJANGO_DEBUG", default=False)
-ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
-CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "unsafe-development-only-key")
+DEBUG = os.getenv("DJANGO_DEBUG", "0") == "1"
+ALLOWED_HOSTS = [host for host in os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if host]
+CSRF_TRUSTED_ORIGINS = [
+    origin for origin in os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if origin
+]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -114,6 +65,7 @@ PROCEDURE_VERSION_PUBLICATION_GATES = (
     "knowledge.eligibility_bases.EligibilityBasisPublicationGate",
     "knowledge.procedure_dependencies.ProcedureDependencyPublicationGate",
     "knowledge.service_point_routing.ServicePointRoutingPublicationGate",
+    "knowledge.evidence_workflow.EvidenceWorkflowPublicationGate",
 )
 
 MIDDLEWARE = [
@@ -127,8 +79,6 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "bardi.urls"
-WSGI_APPLICATION = "bardi.wsgi.application"
-ASGI_APPLICATION = "bardi.asgi.application"
 
 TEMPLATES = [
     {
@@ -137,23 +87,20 @@ TEMPLATES = [
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
-                "django.template.context_processors.debug",
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
         },
-    },
+    }
 ]
 
-DATABASES = {"default": postgres_database(defaults=DEVELOPMENT_DATABASE_DEFAULTS)}
+WSGI_APPLICATION = "bardi.wsgi.application"
+ASGI_APPLICATION = "bardi.asgi.application"
 
-AUTH_PASSWORD_VALIDATORS = [
-    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
-    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
-    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
-    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
-]
+DATABASES = {"default": postgres_database()}
+
+AUTH_PASSWORD_VALIDATORS = []
 
 LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
@@ -166,46 +113,20 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "filters": {
-        "planning_privacy": {"()": "api.privacy.PlanningPrivacyFilter"},
+    "formatters": {
+        "safe": {
+            "format": "{levelname} {name} {message}",
+            "style": "{",
+        }
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "filters": ["planning_privacy"],
-        },
+            "formatter": "safe",
+        }
     },
-    "loggers": {
-        "django": {
-            "handlers": ["console"],
-            "filters": ["planning_privacy"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "django.request": {
-            "handlers": ["console"],
-            "filters": ["planning_privacy"],
-            "level": "WARNING",
-            "propagate": False,
-        },
-        "django.server": {
-            "handlers": ["console"],
-            "filters": ["planning_privacy"],
-            "level": "INFO",
-            "propagate": False,
-        },
-        "django.security": {
-            "handlers": ["console"],
-            "filters": ["planning_privacy"],
-            "level": "WARNING",
-            "propagate": False,
-        },
-        "bardi.api": {
-            "handlers": ["console"],
-            "filters": ["planning_privacy"],
-            "level": "INFO",
-            "propagate": False,
-        },
+    "root": {
+        "handlers": ["console"],
+        "level": os.getenv("DJANGO_LOG_LEVEL", "INFO"),
     },
-    "root": {"handlers": ["console"], "level": "WARNING"},
 }

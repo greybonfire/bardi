@@ -50,9 +50,7 @@ class EligibilityBasisEvidenceInline(admin.TabularInline):  # type: ignore[type-
     extra = 1
     show_change_link = True
 
-    def has_add_permission(
-        self, request: HttpRequest, obj: EligibilityBasis | None = None
-    ) -> bool:
+    def has_add_permission(self, request: HttpRequest, obj: EligibilityBasis | None = None) -> bool:
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_change_permission(
@@ -115,9 +113,7 @@ class EligibilityBasisOwnerInline(admin.TabularInline):  # type: ignore[type-arg
     extra = 0
     show_change_link = True
 
-    def has_add_permission(
-        self, request: HttpRequest, obj: ProcedureVersion | None = None
-    ) -> bool:
+    def has_add_permission(self, request: HttpRequest, obj: ProcedureVersion | None = None) -> bool:
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(

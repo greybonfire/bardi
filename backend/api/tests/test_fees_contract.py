@@ -158,12 +158,15 @@ class FeePlanningContractTests(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         body = response.json()
         self.assertEqual(body["type"], "plan")
-        self.assertEqual([item["id"] for item in body["fees"]], [
-            "fee.known",
-            "fee.range",
-            "fee.unknown",
-            "fee.unverified",
-        ])
+        self.assertEqual(
+            [item["id"] for item in body["fees"]],
+            [
+                "fee.known",
+                "fee.range",
+                "fee.unknown",
+                "fee.unverified",
+            ],
+        )
         known, range_fee, unknown, unverified = body["fees"]
         self.assertEqual((known["value_state"], known["amount"]), ("known", 705))
         self.assertFalse(known["current_value_unknown"])

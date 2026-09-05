@@ -14,6 +14,7 @@ from planning.catalog import (
     ContradictionSnapshot,
     EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
+    FeeSnapshot,
     KnowledgeSnapshot,
     LocalizedText,
     ProcedureCandidateSnapshot,
@@ -119,6 +120,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
 
     from django.db.models import Q
 
+    from .fees import Fee
     from .models import (
         ChecklistItem,
         EligibilityBasis,
@@ -234,6 +236,35 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             "reverify_on",
         )
     )
+    fee_rows = list(
+        Fee.objects.filter(procedure_version__state__in=("published", "withdrawn"))
+        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
+        .values(
+            "id",
+            "procedure_version__semantic_id",
+            "semantic_id",
+            "text_ar",
+            "text_en",
+            "value_state",
+            "amount",
+            "minimum_amount",
+            "maximum_amount",
+            "currency",
+            "fee_type",
+            "display_order",
+            "applicability",
+            "scope",
+            "eligibility_basis_id",
+            "eligibility_basis__semantic_id",
+            "eligibility_basis__procedure_version_id",
+            "procedure_version_id",
+            "effective_from",
+            "effective_to",
+            "verification_state",
+            "verified_on",
+            "reverify_on",
+        )
+    )
     warning_rows = list(
         Warning.objects.filter(procedure_version__state__in=("published", "withdrawn"))
         .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
@@ -259,6 +290,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
         EvidenceLink.objects.filter(
             Q(checklist_item_id__in=[row["id"] for row in checklist_rows])
             | Q(step_id__in=[row["id"] for row in step_rows])
+            | Q(fee_id__in=[row["id"] for row in fee_rows])
             | Q(warning_id__in=[row["id"] for row in warning_rows])
         )
         .order_by("id")
@@ -266,6 +298,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             "id",
             "checklist_item_id",
             "step_id",
+            "fee_id",
             "warning_id",
             "passage",
             "location",
@@ -385,6 +418,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 for kind, field in (
                     ("checklist", "checklist_item_id"),
                     ("step", "step_id"),
+                    ("fee", "fee_id"),
                     ("warning", "warning_id"),
                 )
                 if evidence_row[field] is not None
@@ -484,6 +518,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
             EligibilityBasisSnapshot(basis_row["semantic_id"])
         )
     steps_by_version: dict[str, list[StepSnapshot]] = defaultdict(list)
+    fees_by_version: dict[str, list[FeeSnapshot]] = defaultdict(list)
     warnings_by_version: dict[str, list[WarningSnapshot]] = defaultdict(list)
 
     def decoded_guidance_rule(raw: object, owner: str) -> Predicate | None | bool:
@@ -553,6 +588,99 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 links,
             )
         )
+
+    def valid_fee_shape(row: dict[str, Any]) -> bool:
+        amount = row["amount"]
+        minimum = row["minimum_amount"]
+        maximum = row["maximum_amount"]
+        amount_ok = type(amount) is int and amount >= 0
+        range_ok = (
+            type(minimum) is int
+            and type(maximum) is int
+            and minimum >= 0
+            and maximum >= minimum
+        )
+        if row["value_state"] == "known":
+            return amount_ok and minimum is None and maximum is None
+        if row["value_state"] == "range":
+            return amount is None and range_ok
+        if row["value_state"] == "unknown":
+            return amount is None and minimum is None and maximum is None
+        if row["value_state"] == "unverified":
+            return (
+                (amount_ok and minimum is None and maximum is None)
+                or (amount is None and range_ok)
+            ) and row["verification_state"] in {
+                "needs_reverification",
+                "stale",
+                "disputed",
+            }
+        return False
+
+    for row in cast(list[dict[str, Any]], fee_rows):
+        owner = f"fee:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
+        fee_predicate = decoded_guidance_rule(row["applicability"], owner)
+        links = tuple(evidence_by_owner[("fee", row["id"])])
+        basis_broken = row["scope"] == "eligibility_basis" and (
+            row["eligibility_basis_id"] is None
+            or row["eligibility_basis__procedure_version_id"] != row["procedure_version_id"]
+        )
+        evidence_required = row["value_state"] in {"known", "range", "unverified"}
+        current_support_required = (
+            row["value_state"] in {"known", "range"} and row["verification_state"] == "current"
+        )
+        invalid = (
+            fee_predicate is False
+            or basis_broken
+            or not row["currency"].strip()
+            or not row["fee_type"].strip()
+            or not valid_fee_shape(row)
+            or (evidence_required and not links)
+            or (evidence_required and any(not link.sources for link in links))
+            or (current_support_required and not has_adequate_evidence(links))
+        )
+        if invalid:
+            if fee_predicate is False:
+                continue
+            if basis_broken:
+                code, path = "invalid_basis_owner", ("scope",)
+            elif not row["currency"].strip():
+                code, path = "missing_currency", ("currency",)
+            elif not row["fee_type"].strip():
+                code, path = "missing_fee_type", ("fee_type",)
+            elif not valid_fee_shape(row):
+                code, path = "invalid_fee_value", ("value_state",)
+            elif evidence_required and not links:
+                code, path = "missing_evidence_link", ("evidence",)
+            elif evidence_required and any(not link.sources for link in links):
+                code, path = "missing_evidence_source", ("evidence",)
+            else:
+                code, path = "inadequate_evidence", ("evidence",)
+            failures.append(StoredRuleLoadDiagnostic(owner, (ValidationDiagnostic(code, path),)))
+            continue
+        fees_by_version[row["procedure_version__semantic_id"]].append(
+            FeeSnapshot(
+                row["semantic_id"],
+                LocalizedText(row["text_ar"], row["text_en"]),
+                row["value_state"],
+                row["amount"],
+                row["minimum_amount"],
+                row["maximum_amount"],
+                row["currency"],
+                row["fee_type"],
+                row["display_order"],
+                cast(Predicate | None, fee_predicate),
+                row["scope"],
+                row["eligibility_basis__semantic_id"],
+                row["effective_from"],
+                row["effective_to"],
+                cast(VerificationState, row["verification_state"]),
+                row["verified_on"],
+                row["reverify_on"],
+                links,
+            )
+        )
+
     for row in cast(list[dict[str, Any]], warning_rows):
         owner = f"warning:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
         guidance_predicate = decoded_guidance_rule(row["applicability"], owner)
@@ -632,10 +760,11 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 version_row["effective_to"],
                 version_row["published_at"],
                 version_row["published_by_id"],
-                tuple(checklist_by_version[semantic_id]),
-                tuple(bases_by_version[semantic_id]),
-                tuple(steps_by_version[semantic_id]),
-                tuple(warnings_by_version[semantic_id]),
+                checklist_items=tuple(checklist_by_version[semantic_id]),
+                eligibility_bases=tuple(bases_by_version[semantic_id]),
+                steps=tuple(steps_by_version[semantic_id]),
+                fees=tuple(fees_by_version[semantic_id]),
+                warnings=tuple(warnings_by_version[semantic_id]),
             )
         )
     for contradiction_row in contradiction_rows:

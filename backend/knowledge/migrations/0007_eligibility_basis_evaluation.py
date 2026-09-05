@@ -233,18 +233,46 @@ class Migration(migrations.Migration):
                 to="knowledge.eligibilitybasis",
             ),
         ),
-        migrations.RemoveConstraint(
-            model_name="evidencelink", name="evidence_exactly_one_owner"
-        ),
+        migrations.RemoveConstraint(model_name="evidencelink", name="evidence_exactly_one_owner"),
         migrations.AddConstraint(
             model_name="evidencelink",
             constraint=models.CheckConstraint(
                 condition=(
-                    models.Q(checklist_item__isnull=False, step__isnull=True, warning__isnull=True, fee__isnull=True, eligibility_basis__isnull=True)
-                    | models.Q(checklist_item__isnull=True, step__isnull=False, warning__isnull=True, fee__isnull=True, eligibility_basis__isnull=True)
-                    | models.Q(checklist_item__isnull=True, step__isnull=True, warning__isnull=False, fee__isnull=True, eligibility_basis__isnull=True)
-                    | models.Q(checklist_item__isnull=True, step__isnull=True, warning__isnull=True, fee__isnull=False, eligibility_basis__isnull=True)
-                    | models.Q(checklist_item__isnull=True, step__isnull=True, warning__isnull=True, fee__isnull=True, eligibility_basis__isnull=False)
+                    models.Q(
+                        checklist_item__isnull=False,
+                        step__isnull=True,
+                        warning__isnull=True,
+                        fee__isnull=True,
+                        eligibility_basis__isnull=True,
+                    )
+                    | models.Q(
+                        checklist_item__isnull=True,
+                        step__isnull=False,
+                        warning__isnull=True,
+                        fee__isnull=True,
+                        eligibility_basis__isnull=True,
+                    )
+                    | models.Q(
+                        checklist_item__isnull=True,
+                        step__isnull=True,
+                        warning__isnull=False,
+                        fee__isnull=True,
+                        eligibility_basis__isnull=True,
+                    )
+                    | models.Q(
+                        checklist_item__isnull=True,
+                        step__isnull=True,
+                        warning__isnull=True,
+                        fee__isnull=False,
+                        eligibility_basis__isnull=True,
+                    )
+                    | models.Q(
+                        checklist_item__isnull=True,
+                        step__isnull=True,
+                        warning__isnull=True,
+                        fee__isnull=True,
+                        eligibility_basis__isnull=False,
+                    )
                 ),
                 name="evidence_exactly_one_owner",
             ),

@@ -101,7 +101,9 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
             expected_diagnostics=[] if diagnostics is None else diagnostics,
         )
 
-    def author_required_scenarios(self, *, reverse: bool = False) -> tuple[PlanningScenario, ...]:
+    def author_required_scenarios(
+        self, *, reverse: bool = False
+    ) -> tuple[PlanningScenario, ...]:
         matching = False if reverse else True
         rejected = True if reverse else False
         version_id = self.version.semantic_id
@@ -263,7 +265,10 @@ class PlanningScenarioPublicationTests(TransactionTestCase):
         self.assertEqual(ProcedureVersionAuditEvent.objects.count(), 0)
 
         for scenario in scenarios:
-            if scenario.kind in {PlanningScenario.Kind.POSITIVE, PlanningScenario.Kind.SUPPORTED_EDGE}:
+            if scenario.kind in {
+                PlanningScenario.Kind.POSITIVE,
+                PlanningScenario.Kind.SUPPORTED_EDGE,
+            }:
                 scenario.source_facts = {"scenario_eligible": False}
             elif scenario.kind == PlanningScenario.Kind.NEGATIVE:
                 scenario.source_facts = {"scenario_eligible": True}

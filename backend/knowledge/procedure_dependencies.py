@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
-from typing import Any, cast
+from typing import cast
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -23,11 +23,7 @@ from planning.rules import Predicate
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
 from . import domain as knowledge_domain
-from .domain import (
-    KnowledgeSnapshotLoadError,
-    StoredRuleLoadDiagnostic,
-    decode_stored_rule,
-)
+from .domain import KnowledgeSnapshotLoadError, StoredRuleLoadDiagnostic, decode_stored_rule
 from .eligibility_bases import _source_fact_keys
 from .models import (
     NONBLANK_PATTERN,
@@ -131,14 +127,11 @@ class ProcedureDependency(VersionOwnedModel):
             and self.procedure_version.procedure_id == self.target_procedure_id
         ):
             raise ValidationError({"target_procedure": "A Procedure cannot depend on itself."})
-        if self.applicability != {}:
-            decoded = decode_stored_rule(self.applicability)
-            if decoded.diagnostics:
-                raise ValidationError({"applicability": "Dependency applicability is invalid."})
+        if self.applicability != {} and decode_stored_rule(self.applicability).diagnostics:
+            raise ValidationError({"applicability": "Dependency applicability is invalid."})
         if self.satisfied_when == {}:
             raise ValidationError({"satisfied_when": "Dependency satisfaction rule is required."})
-        decoded = decode_stored_rule(self.satisfied_when)
-        if decoded.diagnostics:
+        if decode_stored_rule(self.satisfied_when).diagnostics:
             raise ValidationError({"satisfied_when": "Dependency satisfaction rule is invalid."})
 
     def __str__(self) -> str:
@@ -286,9 +279,8 @@ _install_dependency_evidence_owner()
 def _has_blocking_cycle(rows: Iterable[ProcedureDependency]) -> bool:
     edges: dict[int, set[int]] = defaultdict(set)
     for dependency in rows:
-        if dependency.relation != ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
-            continue
-        edges[dependency.procedure_version.procedure_id].add(dependency.target_procedure_id)
+        if dependency.relation == ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
+            edges[dependency.procedure_version.procedure_id].add(dependency.target_procedure_id)
 
     visiting: set[int] = set()
     visited: set[int] = set()
@@ -299,14 +291,22 @@ def _has_blocking_cycle(rows: Iterable[ProcedureDependency]) -> bool:
         if node in visited:
             return False
         visiting.add(node)
-        for target in edges.get(node, set()):
-            if visit(target):
-                return True
+        if any(visit(target) for target in edges.get(node, set())):
+            return True
         visiting.remove(node)
         visited.add(node)
         return False
 
     return any(visit(node) for node in sorted(edges))
+
+
+def _evidence_complete(link: EvidenceLink) -> bool:
+    return bool(
+        list(link.source_links.all())
+        and link.passage.strip()
+        and link.location.strip()
+        and link.applicability_context.strip()
+    )
 
 
 class ProcedureDependencyPublicationGate:
@@ -356,8 +356,7 @@ class ProcedureDependencyPublicationGate:
             .order_by("display_order", "semantic_id")
         )
         predicates: list[Predicate] = []
-        for dependency_model in dependencies:
-            dependency = cast(Any, dependency_model)
+        for dependency in dependencies:
             owner_id = dependency.semantic_id
             if not dependency.text_ar.strip() or not dependency.text_en.strip():
                 failures.append(
@@ -380,31 +379,22 @@ class ProcedureDependencyPublicationGate:
                     PublicationDiagnostic(self.name, "invalid_effective_interval", owner_id)
                 )
 
-            if dependency.applicability != {}:
-                decoded = decode_stored_rule(dependency.applicability, context.fact_definitions)
-                if decoded.predicate is None:
-                    failures.extend(
-                        PublicationDiagnostic(
-                            self.name,
-                            diagnostic.code,
-                            f"{owner_id}:applicability",
-                        )
-                        for diagnostic in decoded.diagnostics
+            for field_name in ("applicability", "satisfied_when"):
+                stored_rule = getattr(dependency, field_name)
+                if field_name == "applicability" and stored_rule == {}:
+                    continue
+                if stored_rule == {}:
+                    failures.append(
+                        PublicationDiagnostic(self.name, "satisfied_when_required", owner_id)
                     )
-                else:
-                    predicates.append(decoded.predicate)
-            if dependency.satisfied_when == {}:
-                failures.append(
-                    PublicationDiagnostic(self.name, "satisfied_when_required", owner_id)
-                )
-            else:
-                decoded = decode_stored_rule(dependency.satisfied_when, context.fact_definitions)
+                    continue
+                decoded = decode_stored_rule(stored_rule, context.fact_definitions)
                 if decoded.predicate is None:
                     failures.extend(
                         PublicationDiagnostic(
                             self.name,
                             diagnostic.code,
-                            f"{owner_id}:satisfied_when",
+                            f"{owner_id}:{field_name}",
                         )
                         for diagnostic in decoded.diagnostics
                     )
@@ -423,17 +413,15 @@ class ProcedureDependencyPublicationGate:
                     getattr(link, "procedure_dependency_id", None),
                 )
                 detail = f"{owner_id}:{link.pk}"
-                if sum(value is not None for value in owner_ids) != 1 or owner_ids[-1] != dependency.pk:
+                valid_owner = (
+                    sum(value is not None for value in owner_ids) == 1
+                    and owner_ids[-1] == dependency.pk
+                )
+                if not valid_owner:
                     failures.append(
                         PublicationDiagnostic(self.name, "invalid_evidence_owner", detail)
                     )
-                sources = [source_link.source for source_link in link.source_links.all()]
-                complete = bool(
-                    sources
-                    and link.passage.strip()
-                    and link.location.strip()
-                    and link.applicability_context.strip()
-                )
+                sources = [row.source for row in link.source_links.all()]
                 if not sources:
                     failures.append(
                         PublicationDiagnostic(self.name, "missing_evidence_source", detail)
@@ -466,7 +454,7 @@ class ProcedureDependencyPublicationGate:
                         )
                     )
                 adequate_current_support |= (
-                    complete
+                    _evidence_complete(link)
                     and link.verification_state == "current"
                     and link.support_status == EvidenceLink.SupportStatus.SUPPORTS
                 )
@@ -488,11 +476,7 @@ class ProcedureDependencyPublicationGate:
         )
         if _has_blocking_cycle(graph_rows):
             failures.append(
-                PublicationDiagnostic(
-                    self.name,
-                    "blocking_cycle",
-                    context.version.semantic_id,
-                )
+                PublicationDiagnostic(self.name, "blocking_cycle", context.version.semantic_id)
             )
 
         source_keys, dependency_defects = _source_fact_keys(predicates, context)
@@ -512,134 +496,72 @@ class ProcedureDependencyPublicationGate:
         return failures
 
 
+def _source_snapshot(source: Source) -> SourceSnapshot:
+    return SourceSnapshot(
+        source.semantic_id,
+        AuthoritySnapshot(
+            source.authority.semantic_id,
+            LocalizedText(source.authority.name_ar, source.authority.name_en),
+        ),
+        source.title,
+        source.locator,
+        source.classification,
+        source.retrieved_on,
+        source.published_on,
+        source.effective_from,
+        source.effective_to,
+        source.reverify_on,
+        source.observation_date,
+        source.observation_context,
+    )
+
+
+def _evidence_snapshot(link: EvidenceLink) -> EvidenceLinkSnapshot:
+    source_rows = sorted(
+        link.source_links.all(),
+        key=lambda row: (row.position, row.source.semantic_id),
+    )
+    return EvidenceLinkSnapshot(
+        link.passage,
+        link.location,
+        link.applicability_context,
+        link.support_status,
+        cast(VerificationState, link.verification_state),
+        tuple(_source_snapshot(row.source) for row in source_rows),
+        link.effective_from,
+        link.effective_to,
+        link.retrieved_on,
+        link.verified_on,
+        link.reverify_on,
+    )
+
+
 def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
-    dependency_rows = list(
-        ProcedureDependency.objects.filter(
+    rows = list(
+        ProcedureDependency.objects.select_related(
+            "procedure_version__procedure",
+            "target_procedure",
+        )
+        .prefetch_related("evidence_links__source_links__source__authority")
+        .filter(
             procedure_version__state__in=(
                 ProcedureVersion.State.PUBLISHED,
                 ProcedureVersion.State.WITHDRAWN,
             )
         )
         .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
-        .values(
-            "id",
-            "procedure_version__semantic_id",
-            "procedure_version__procedure__semantic_id",
-            "semantic_id",
-            "text_ar",
-            "text_en",
-            "target_procedure__semantic_id",
-            "target_procedure__text_ar",
-            "target_procedure__text_en",
-            "relation",
-            "applicability",
-            "satisfied_when",
-            "display_order",
-            "effective_from",
-            "effective_to",
-            "verification_state",
-            "verified_on",
-            "reverify_on",
-        )
     )
-    if not dependency_rows:
+    if not rows:
         return snapshot
-
-    evidence_rows = list(
-        EvidenceLink.objects.filter(
-            procedure_dependency_id__in=[row["id"] for row in dependency_rows]
-        )
-        .order_by("id")
-        .values(
-            "id",
-            "procedure_dependency_id",
-            "passage",
-            "location",
-            "applicability_context",
-            "support_status",
-            "verification_state",
-            "effective_from",
-            "effective_to",
-            "retrieved_on",
-            "verified_on",
-            "reverify_on",
-        )
-    )
-    evidence_source_rows = list(
-        EvidenceLinkSource.objects.filter(
-            evidence_link_id__in=[row["id"] for row in evidence_rows]
-        )
-        .order_by("evidence_link_id", "position", "source__semantic_id")
-        .values(
-            "evidence_link_id",
-            "source__semantic_id",
-            "source__title",
-            "source__locator",
-            "source__classification",
-            "source__retrieved_on",
-            "source__published_on",
-            "source__effective_from",
-            "source__effective_to",
-            "source__reverify_on",
-            "source__observation_date",
-            "source__observation_context",
-            "source__authority__semantic_id",
-            "source__authority__name_ar",
-            "source__authority__name_en",
-        )
-    )
-    source_snapshots: dict[str, SourceSnapshot] = {}
-    sources_by_link: dict[int, list[SourceSnapshot]] = defaultdict(list)
-    for source_row in evidence_source_rows:
-        source_id = source_row["source__semantic_id"]
-        source = source_snapshots.setdefault(
-            source_id,
-            SourceSnapshot(
-                source_id,
-                AuthoritySnapshot(
-                    source_row["source__authority__semantic_id"],
-                    LocalizedText(
-                        source_row["source__authority__name_ar"],
-                        source_row["source__authority__name_en"],
-                    ),
-                ),
-                source_row["source__title"],
-                source_row["source__locator"],
-                source_row["source__classification"],
-                source_row["source__retrieved_on"],
-                source_row["source__published_on"],
-                source_row["source__effective_from"],
-                source_row["source__effective_to"],
-                source_row["source__reverify_on"],
-                source_row["source__observation_date"],
-                source_row["source__observation_context"],
-            ),
-        )
-        sources_by_link[source_row["evidence_link_id"]].append(source)
-
-    evidence_by_dependency: dict[int, list[EvidenceLinkSnapshot]] = defaultdict(list)
-    for evidence_row in cast(list[dict[str, Any]], evidence_rows):
-        evidence_by_dependency[evidence_row["procedure_dependency_id"]].append(
-            EvidenceLinkSnapshot(
-                evidence_row["passage"],
-                evidence_row["location"],
-                evidence_row["applicability_context"],
-                evidence_row["support_status"],
-                cast(VerificationState, evidence_row["verification_state"]),
-                tuple(sources_by_link[evidence_row["id"]]),
-                evidence_row["effective_from"],
-                evidence_row["effective_to"],
-                evidence_row["retrieved_on"],
-                evidence_row["verified_on"],
-                evidence_row["reverify_on"],
-            )
-        )
 
     failures: list[StoredRuleLoadDiagnostic] = []
     by_version: dict[str, list[ProcedureDependencySnapshot]] = defaultdict(list)
-    for row in cast(list[dict[str, Any]], dependency_rows):
-        owner = f"procedure_dependency:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        if row["relation"] != ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
+    for dependency in rows:
+        owner = (
+            f"procedure_dependency:{dependency.procedure_version.semantic_id}:"
+            f"{dependency.semantic_id}"
+        )
+        if dependency.relation != ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
             failures.append(
                 StoredRuleLoadDiagnostic(
                     owner,
@@ -647,7 +569,7 @@ def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 )
             )
             continue
-        if row["procedure_version__procedure__semantic_id"] == row["target_procedure__semantic_id"]:
+        if dependency.procedure_version.procedure_id == dependency.target_procedure_id:
             failures.append(
                 StoredRuleLoadDiagnostic(
                     owner,
@@ -655,14 +577,15 @@ def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 )
             )
             continue
+
         applicability: Predicate | None = None
-        if row["applicability"] != {}:
-            decoded = decode_stored_rule(row["applicability"], snapshot.fact_definitions)
+        if dependency.applicability != {}:
+            decoded = decode_stored_rule(dependency.applicability, snapshot.fact_definitions)
             if decoded.predicate is None:
                 failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
                 continue
             applicability = decoded.predicate
-        if row["satisfied_when"] == {}:
+        if dependency.satisfied_when == {}:
             failures.append(
                 StoredRuleLoadDiagnostic(
                     owner,
@@ -670,14 +593,15 @@ def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 )
             )
             continue
-        decoded = decode_stored_rule(row["satisfied_when"], snapshot.fact_definitions)
+        decoded = decode_stored_rule(dependency.satisfied_when, snapshot.fact_definitions)
         if decoded.predicate is None:
             failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
             continue
-        links = tuple(evidence_by_dependency[row["id"]])
+
+        links = tuple(_evidence_snapshot(link) for link in dependency.evidence_links.all())
         invalid = (
-            not row["text_ar"].strip()
-            or not row["text_en"].strip()
+            not dependency.text_ar.strip()
+            or not dependency.text_en.strip()
             or not links
             or any(not link.sources for link in links)
         )
@@ -689,24 +613,25 @@ def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 )
             )
             continue
-        by_version[row["procedure_version__semantic_id"]].append(
+
+        by_version[dependency.procedure_version.semantic_id].append(
             ProcedureDependencySnapshot(
-                row["semantic_id"],
-                LocalizedText(row["text_ar"], row["text_en"]),
-                row["target_procedure__semantic_id"],
+                dependency.semantic_id,
+                LocalizedText(dependency.text_ar, dependency.text_en),
+                dependency.target_procedure.semantic_id,
                 LocalizedText(
-                    row["target_procedure__text_ar"],
-                    row["target_procedure__text_en"],
+                    dependency.target_procedure.text_ar,
+                    dependency.target_procedure.text_en,
                 ),
-                row["relation"],
+                dependency.relation,
                 applicability,
                 decoded.predicate,
-                row["display_order"],
-                row["effective_from"],
-                row["effective_to"],
-                cast(VerificationState, row["verification_state"]),
-                row["verified_on"],
-                row["reverify_on"],
+                dependency.display_order,
+                dependency.effective_from,
+                dependency.effective_to,
+                cast(VerificationState, dependency.verification_state),
+                dependency.verified_on,
+                dependency.reverify_on,
                 links,
             )
         )

@@ -178,7 +178,7 @@ def _owner_key(link: EvidenceLink) -> tuple[str, int]:
     owner = link.owner
     if owner.pk is None:
         raise ValidationError("Evidence owner must be saved before re-verification.")
-    return owner._meta.label_lower, cast(int, owner.pk)
+    return owner._meta.label_lower, owner.pk
 
 
 def _complete_owner_evidence(link: EvidenceLink) -> tuple[EvidenceLink, ...]:
@@ -260,8 +260,8 @@ _procedure_version_admin.has_clone_procedureversion_permission = (
 )
 _procedure_version_admin.approve_selected_versions = approve_selected_versions
 _procedure_version_admin.has_review_version_permission = has_review_version_permission
-ProcedureVersionAdmin.actions = _append_actions(
-    ProcedureVersionAdmin.actions,
+_procedure_version_admin.actions = _append_actions(
+    getattr(_procedure_version_admin, "actions", ()),
     "clone_selected_to_draft",
     "approve_selected_versions",
 )
@@ -269,8 +269,8 @@ ProcedureVersionAdmin.actions = _append_actions(
 _evidence_link_admin = cast(Any, EvidenceLinkAdmin)
 _evidence_link_admin.reverify_selected_evidence = reverify_selected_evidence
 _evidence_link_admin.has_reverify_evidence_permission = has_reverify_evidence_permission
-EvidenceLinkAdmin.actions = _append_actions(
-    getattr(EvidenceLinkAdmin, "actions", ()),
+_evidence_link_admin.actions = _append_actions(
+    getattr(_evidence_link_admin, "actions", ()),
     "reverify_selected_evidence",
 )
 

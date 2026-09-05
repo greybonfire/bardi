@@ -13,6 +13,7 @@ from typing import Any, cast
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
@@ -68,13 +69,9 @@ def _owner_evidence(link: EvidenceLink) -> tuple[EvidenceLink, ...]:
     return tuple(manager.order_by("pk"))
 
 
-def _validate_actor(actor: models.Model) -> None:
+def _validate_actor(actor: User) -> None:
     user_model = get_user_model()
-    if (
-        not isinstance(actor, user_model)
-        or actor.pk is None
-        or not user_model._default_manager.filter(pk=actor.pk).exists()
-    ):
+    if actor.pk is None or not user_model._default_manager.filter(pk=actor.pk).exists():
         raise ValidationError("A saved staff actor is required.")
 
 
@@ -165,7 +162,7 @@ class EvidenceDiscrepancy(models.Model):
             _owner_key(self.anchor_evidence_link)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        stored = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        stored = type(self).objects.filter(pk=self.pk).first() if not self._state.adding else None
         if stored is None:
             if self.status != self.Status.OPEN:
                 raise ValidationError("Discrepancies must be created open.")
@@ -214,7 +211,7 @@ class EvidenceDiscrepancyEvidence(models.Model):
                 raise ValidationError("Discrepancy evidence must belong to one affected subject.")
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if self.pk is not None:
+        if not self._state.adding:
             raise ValidationError("Discrepancy evidence links cannot be reassigned.")
         if self.discrepancy_id and self.discrepancy.status != EvidenceDiscrepancy.Status.OPEN:
             raise ValidationError("Resolved discrepancy evidence is immutable.")
@@ -222,7 +219,8 @@ class EvidenceDiscrepancyEvidence(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        if self.discrepancy.status != EvidenceDiscrepancy.Status.OPEN:
+        status = cast(str, self.discrepancy.status)
+        if status != EvidenceDiscrepancy.Status.OPEN:
             raise ValidationError("Resolved discrepancy evidence is immutable.")
         return super().delete(*args, **kwargs)
 
@@ -296,7 +294,7 @@ class EvidenceReverificationEvent(models.Model):
             _owner_key(self.anchor_evidence_link)
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if self.pk is not None:
+        if not self._state.adding:
             raise ValidationError("Re-verification events are append-only history.")
         self.full_clean()
         super().save(*args, **kwargs)
@@ -336,7 +334,7 @@ class EvidenceReverificationEvidence(models.Model):
                 raise ValidationError("Reviewed evidence must belong to one affected subject.")
 
     def save(self, *args: Any, **kwargs: Any) -> None:
-        if self.pk is not None:
+        if not self._state.adding:
             raise ValidationError("Re-verification evidence history is immutable.")
         self.full_clean()
         super().save(*args, **kwargs)
@@ -350,7 +348,7 @@ def open_evidence_discrepancy(
     anchor_evidence_link: EvidenceLink,
     evidence_links: Iterable[EvidenceLink],
     rationale: str,
-    actor: models.Model,
+    actor: User,
     outcome_state: VerificationState = "disputed",
 ) -> EvidenceDiscrepancy:
     """Open one internal concern for a single semantic subject and its evidence."""
@@ -361,8 +359,8 @@ def open_evidence_discrepancy(
     values = tuple(evidence_links)
     if not values or any(item.pk is None for item in values):
         raise ValidationError("Discrepancy evidence must be saved.")
-    by_id = {cast(int, item.pk): item for item in values}
-    by_id[cast(int, anchor_evidence_link.pk)] = anchor_evidence_link
+    by_id = {item.pk: item for item in values}
+    by_id[anchor_evidence_link.pk] = anchor_evidence_link
     owner_key = _owner_key(anchor_evidence_link)
     if any(_owner_key(item) != owner_key for item in by_id.values()):
         raise ValidationError("Discrepancy evidence must belong to one affected subject.")
@@ -377,7 +375,7 @@ def open_evidence_discrepancy(
             raise ValidationError("Discrepancy evidence could not be locked.")
         version_ids = sorted(
             {
-                cast(int, version.pk)
+                version.pk
                 for item in locked
                 for version in _owning_versions(item)
                 if version.pk is not None
@@ -405,7 +403,7 @@ def resolve_evidence_discrepancy(
     *,
     outcome_state: VerificationState,
     resolution: str = "",
-    actor: models.Model,
+    actor: User,
 ) -> EvidenceDiscrepancy:
     """Resolve an open discrepancy once, preserving its original research rationale."""
 
@@ -433,7 +431,7 @@ def record_evidence_reverification(
     verified_on: date,
     reverify_on: date | None,
     rationale: str,
-    actor: models.Model,
+    actor: User,
     meaning_changed: bool = False,
     successor_version: ProcedureVersion | None = None,
 ) -> EvidenceReverificationEvent:
@@ -450,18 +448,15 @@ def record_evidence_reverification(
         raise ValidationError("Meaning-changing review requires a successor Procedure Version.")
 
     reviewed = tuple(reviewed_evidence_links)
-    reviewed_by_id = {cast(int, item.pk): item for item in reviewed if item.pk is not None}
+    reviewed_by_id = {item.pk: item for item in reviewed if item.pk is not None}
     owner_key = _owner_key(anchor_evidence_link)
     if any(_owner_key(item) != owner_key for item in reviewed_by_id.values()):
         raise ValidationError("Reviewed evidence must belong to one affected subject.")
 
     with transaction.atomic():
         expected = _owner_evidence(anchor_evidence_link)
-        expected_ids = {cast(int, item.pk) for item in expected if item.pk is not None}
-        if (
-            set(reviewed_by_id) != expected_ids
-            or cast(int, anchor_evidence_link.pk) not in expected_ids
-        ):
+        expected_ids = {item.pk for item in expected if item.pk is not None}
+        if set(reviewed_by_id) != expected_ids or anchor_evidence_link.pk not in expected_ids:
             raise ValidationError(
                 "Re-verification must review the subject's complete evidence set."
             )
@@ -471,7 +466,7 @@ def record_evidence_reverification(
             .order_by("pk")
         )
         versions = _owning_versions(anchor_evidence_link)
-        version_ids = sorted(cast(int, item.pk) for item in versions if item.pk is not None)
+        version_ids = sorted(item.pk for item in versions if item.pk is not None)
         locked_versions = tuple(
             ProcedureVersion.objects.select_for_update().filter(pk__in=version_ids).order_by("pk")
         )
@@ -528,14 +523,16 @@ class EvidenceWorkflowPublicationGate:
             .select_related("anchor_evidence_link")
             .order_by("pk")
         )
-        for row in rows:
+        for discrepancy in rows:
             try:
-                versions = _owning_versions(row.anchor_evidence_link)
+                versions = _owning_versions(discrepancy.anchor_evidence_link)
             except ValidationError:
                 continue
             if any(version.pk == context.version.pk for version in versions):
                 failures.append(
-                    PublicationDiagnostic(self.name, "open_evidence_discrepancy", str(row.pk))
+                    PublicationDiagnostic(
+                        self.name, "open_evidence_discrepancy", str(discrepancy.pk)
+                    )
                 )
         return failures
 
@@ -561,39 +558,43 @@ def _max_date(left: date | None, right: date | None) -> date | None:
 
 def _workflow_overlays() -> dict[tuple[str, str, str], _TrustOverlay]:
     timeline: list[tuple[datetime, int, int, str, object]] = []
-    for row in EvidenceDiscrepancy.objects.select_related("anchor_evidence_link").order_by("pk"):
+    for discrepancy_row in EvidenceDiscrepancy.objects.select_related(
+        "anchor_evidence_link"
+    ).order_by("pk"):
         occurred = (
-            row.resolved_at if row.status == EvidenceDiscrepancy.Status.RESOLVED else row.created_at
+            discrepancy_row.resolved_at
+            if discrepancy_row.status == EvidenceDiscrepancy.Status.RESOLVED
+            else discrepancy_row.created_at
         )
         if occurred is not None:
-            timeline.append((occurred, 0, cast(int, row.pk), "discrepancy", row))
-    for row in (
+            timeline.append((occurred, 0, discrepancy_row.pk, "discrepancy", discrepancy_row))
+    for review_row in (
         EvidenceReverificationEvent.objects.filter(meaning_changed=False)
         .select_related("anchor_evidence_link")
         .order_by("pk")
     ):
-        timeline.append((row.occurred_at, 1, cast(int, row.pk), "reverification", row))
+        timeline.append((review_row.occurred_at, 1, review_row.pk, "reverification", review_row))
 
     overlays: dict[tuple[str, str, str], _TrustOverlay] = {}
     for occurred, _, _, kind, raw in sorted(timeline, key=lambda item: item[:3]):
         if kind == "discrepancy":
-            row = cast(EvidenceDiscrepancy, raw)
-            key = _owner_key(row.anchor_evidence_link)
+            discrepancy = cast(EvidenceDiscrepancy, raw)
+            key = _owner_key(discrepancy.anchor_evidence_link)
             overlay = overlays.setdefault(key, _TrustOverlay())
-            overlay.state = cast(VerificationState, row.outcome_state)
+            overlay.state = cast(VerificationState, discrepancy.outcome_state)
             overlay.owner_verified_on = _max_date(overlay.owner_verified_on, occurred.date())
         else:
-            row = cast(EvidenceReverificationEvent, raw)
-            key = _owner_key(row.anchor_evidence_link)
+            review = cast(EvidenceReverificationEvent, raw)
+            key = _owner_key(review.anchor_evidence_link)
             overlay = overlays.setdefault(key, _TrustOverlay())
-            established_on = max(row.verified_on, occurred.date())
-            overlay.state = cast(VerificationState, row.verification_state)
+            established_on = max(review.verified_on, occurred.date())
+            overlay.state = cast(VerificationState, review.verification_state)
             overlay.owner_verified_on = established_on
-            overlay.reverify_on = row.reverify_on
+            overlay.reverify_on = review.reverify_on
             overlay.reverify_seen = True
-            overlay.evidence_state = cast(VerificationState, row.verification_state)
+            overlay.evidence_state = cast(VerificationState, review.verification_state)
             overlay.evidence_verified_on = established_on
-            overlay.evidence_reverify_on = row.reverify_on
+            overlay.evidence_reverify_on = review.reverify_on
     return overlays
 
 

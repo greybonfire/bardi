@@ -52,10 +52,7 @@ def select_fees(
             and evaluation_date > item.effective_to
         ):
             continue
-        if (
-            item.scope == "eligibility_basis"
-            and item.eligibility_basis_id not in known_basis_ids
-        ):
+        if item.scope == "eligibility_basis" and item.eligibility_basis_id not in known_basis_ids:
             basis_resolution_required = True
             continue
 

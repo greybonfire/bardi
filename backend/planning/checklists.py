@@ -30,6 +30,7 @@ def select_checklist_items(
     matched_basis_ids: Set[str] | None = None,
 ) -> ChecklistSelection:
     matched = None if matched_basis_ids is None else frozenset(matched_basis_ids)
+    known_basis_ids = frozenset(item.semantic_id for item in version.eligibility_bases)
     selected: list[PublicChecklistItem] = []
     consequential_missing: set[str] = set()
     trust_inconclusive = False
@@ -42,6 +43,9 @@ def select_checklist_items(
         if item.scope not in {"procedure", "eligibility_basis"}:
             continue
         if item.scope == "eligibility_basis":
+            if item.scope_reference not in known_basis_ids:
+                basis_resolution_required = True
+                continue
             if matched is None:
                 basis_resolution_required = True
                 continue

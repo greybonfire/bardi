@@ -14,6 +14,7 @@ from .facts import FactKind
 from .trust import Freshness
 
 type Locale = Literal["ar", "en"]
+type FeeValueState = Literal["known", "range", "unknown", "unverified"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +124,24 @@ class PublicWarning:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicFee:
+    id: str
+    text: LocalizedText
+    value_state: FeeValueState
+    amount: int | None
+    minimum_amount: int | None
+    maximum_amount: int | None
+    currency: str
+    fee_type: str
+    current_value_unknown: bool
+    sources: tuple[PublicSource, ...]
+    freshness: Freshness
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     service_id: str
     procedure_id: str
@@ -131,12 +150,14 @@ class PlanResult:
     checklist_items: tuple[PublicChecklistItem, ...] = ()
     steps: tuple[PublicStep, ...] = ()
     warnings: tuple[PublicWarning, ...] = ()
+    fees: tuple[PublicFee, ...] = ()
     type: Literal["plan"] = "plan"
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
         object.__setattr__(self, "steps", tuple(self.steps))
         object.__setattr__(self, "warnings", tuple(self.warnings))
+        object.__setattr__(self, "fees", tuple(self.fees))
 
 
 @dataclass(frozen=True, slots=True)

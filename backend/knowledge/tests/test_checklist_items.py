@@ -14,12 +14,14 @@ from knowledge.models import (
     Authority,
     ChecklistItem,
     DocumentType,
+    EligibilityBasis,
     EvidenceLink,
     FactDefinition,
     Procedure,
     ProcedureVersion,
     Service,
     ServiceProcedureCandidate,
+    ServiceQuestion,
     Source,
 )
 from knowledge.publication import (
@@ -45,6 +47,10 @@ class BlockingChecklistGate:
 
 class ChecklistPublicationTests(TestCase):
     def setUp(self) -> None:
+        self.student_fact, _ = FactDefinition.objects.get_or_create(
+            key="is_student",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
         self.actor = get_user_model().objects.create_user(username="checklist-publisher")
         self.service = Service.objects.create(
             semantic_id="checklist.service", text_ar="خدمة", text_en="Service"
@@ -55,7 +61,7 @@ class ChecklistPublicationTests(TestCase):
             text_en="Procedure",
             primary_service=self.service,
         )
-        predicate = {"op": "eq", "fact": "is_student", "value": True}
+        predicate = {"op": "eq", "fact": self.student_fact.key, "value": True}
         ServiceProcedureCandidate.objects.create(
             service=self.service,
             procedure=self.procedure,
@@ -169,11 +175,37 @@ class ChecklistPublicationTests(TestCase):
         self.assertIn("malformed_field_guidance", self.rejection_codes())
 
     def test_candidate_and_basis_scoped_claims_remain_authored_but_not_current(self) -> None:
+        predicate = {"op": "eq", "fact": self.student_fact.key, "value": True}
+        ServiceQuestion.objects.create(
+            semantic_id="checklist.basis.question",
+            service=self.service,
+            fact=self.student_fact,
+            text_ar="هل أنت طالب؟",
+            text_en="Are you a student?",
+            priority=1,
+        )
+        basis = EligibilityBasis.objects.create(
+            procedure_version=self.version,
+            semantic_id="basis.family",
+            text_ar="مسار الأسرة",
+            text_en="Family route",
+            qualification=predicate,
+            verification_state="needs_reverification",
+        )
+        basis_evidence = EvidenceLink.objects.create(
+            eligibility_basis=basis,
+            passage="Basis passage",
+            location="Section 1",
+            applicability_context="Candidate route context",
+            verification_state="needs_reverification",
+            support_status=EvidenceLink.SupportStatus.SUPPORTS,
+        )
+        set_evidence_link_sources(basis_evidence, (self.source(),))
         self.item(
             ChecklistItem.Classification.CANDIDATE,
             verification_state="needs_reverification",
             scope=ChecklistItem.Scope.ELIGIBILITY_BASIS,
-            scope_reference="basis.family",
+            scope_reference=basis.semantic_id,
         )
         published = publish_procedure_version(self.version.pk, actor=self.actor)
         self.assertEqual(published.state, ProcedureVersion.State.PUBLISHED)

@@ -6,6 +6,7 @@ from datetime import date
 
 from planning import (
     AuthoritySnapshot,
+    EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
     FeeSnapshot,
     LocalizedText,
@@ -83,6 +84,7 @@ class FeeSelectionTests(unittest.TestCase):
             "published",
             None,
             None,
+            eligibility_bases=(EligibilityBasisSnapshot("basis"),),
             fees=fees,
         )
 

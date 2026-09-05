@@ -28,6 +28,10 @@ from knowledge.publication import PublicationRejected, publish_procedure_version
 
 class FeeModelValidationTests(TestCase):
     def setUp(self) -> None:
+        self.basis_fact, _ = FactDefinition.objects.get_or_create(
+            key="fee_validation_basis",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
         service = Service.objects.create(
             semantic_id="fee.validation.service", text_ar="خدمة", text_en="Service"
         )
@@ -92,6 +96,13 @@ class FeeModelValidationTests(TestCase):
         other_basis = EligibilityBasis.objects.create(
             procedure_version=other_version,
             semantic_id="fee.validation.other-basis",
+            text_ar="أساس آخر",
+            text_en="Other basis",
+            qualification={
+                "op": "eq",
+                "fact": self.basis_fact.key,
+                "value": True,
+            },
         )
         fee = self.fee(
             scope=Fee.Scope.ELIGIBILITY_BASIS,
@@ -222,6 +233,9 @@ class FeePublicationTests(TestCase):
         basis = EligibilityBasis.objects.create(
             procedure_version=self.version,
             semantic_id="fee.publication.basis",
+            text_ar="أساس",
+            text_en="Basis",
+            qualification={"op": "eq", "fact": self.fact.key, "value": True},
         )
         fee = self.fee(
             "fee.publication.basis-fee",
@@ -239,6 +253,9 @@ class FeePublicationTests(TestCase):
         other_basis = EligibilityBasis.objects.create(
             procedure_version=other_version,
             semantic_id="fee.publication.other-basis",
+            text_ar="أساس آخر",
+            text_en="Other basis",
+            qualification={"op": "eq", "fact": self.fact.key, "value": True},
         )
         Fee.objects.filter(pk=fee.pk).update(eligibility_basis=other_basis)
 

@@ -30,6 +30,7 @@ def select_steps(
     matched_basis_ids: Set[str] | None = None,
 ) -> StepSelection:
     matched = None if matched_basis_ids is None else frozenset(matched_basis_ids)
+    known_basis_ids = frozenset(item.semantic_id for item in version.eligibility_bases)
     selected: list[PublicStep] = []
     consequential_missing: set[str] = set()
     trust_inconclusive = False
@@ -45,8 +46,9 @@ def select_steps(
         ):
             continue
         if item.scope == "eligibility_basis":
-            # Basis reachability/qualification is owned by #43. Until that stage has
-            # produced matched IDs, a complete public plan cannot safely omit the Step.
+            if item.eligibility_basis_id not in known_basis_ids:
+                basis_resolution_required = True
+                continue
             if matched is None:
                 basis_resolution_required = True
                 continue
@@ -75,7 +77,15 @@ def select_steps(
             trust_inconclusive = True
             continue
         selected.append(
-            PublicStep(item.semantic_id, item.text, item.phase, sources, trust.freshness)
+            PublicStep(
+                item.semantic_id,
+                item.text,
+                item.phase,
+                sources,
+                trust.freshness,
+                item.scope,
+                item.eligibility_basis_id,
+            )
         )
     return StepSelection(
         tuple(selected),

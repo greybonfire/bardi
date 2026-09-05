@@ -83,6 +83,15 @@ class GuidanceSourceResponse(StrictSchema):
     retrieved_on: date
 
 
+class EligibilityBasisResponse(StrictSchema):
+    id: str
+    text: str
+    checklist_item_ids: list[str]
+    step_ids: list[str]
+    sources: list[GuidanceSourceResponse]
+    freshness: FreshnessResponse
+
+
 class ChecklistItemResponse(StrictSchema):
     id: str
     text: str
@@ -92,7 +101,7 @@ class ChecklistItemResponse(StrictSchema):
     original_quantity: int
     copy_quantity: int
     document_type_id: str | None
-    scope: Literal["procedure"]
+    scope: Literal["procedure", "eligibility_basis"]
     sources: list[GuidanceSourceResponse]
     freshness: FreshnessResponse
 
@@ -135,6 +144,8 @@ class PlanResponse(StrictSchema):
     procedure_id: str
     procedure_version_id: str
     title: str
+    eligibility_bases: list[EligibilityBasisResponse]
+    inconclusive_basis_ids: list[str]
     checklist_items: list[ChecklistItemResponse]
     steps: list[StepResponse]
     fees: list[FeeResponse]

@@ -37,6 +37,7 @@ def select_fees(
     rather than silently relabeled as current or historical.
     """
     matched = None if matched_basis_ids is None else frozenset(matched_basis_ids)
+    known_basis_ids = frozenset(item.semantic_id for item in version.eligibility_bases)
     selected: list[PublicFee] = []
     missing: set[str] = set()
     basis_resolution_required = False
@@ -50,6 +51,9 @@ def select_fees(
             or item.effective_to is not None
             and evaluation_date > item.effective_to
         ):
+            continue
+        if item.scope == "eligibility_basis" and item.eligibility_basis_id not in known_basis_ids:
+            basis_resolution_required = True
             continue
 
         trust = assess_trust(

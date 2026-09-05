@@ -65,6 +65,8 @@ class ApplicationBoundaryTests(SimpleTestCase):
                 "procedure_id": "procedure",
                 "procedure_version_id": "version",
                 "title": "خطة",
+                "eligibility_bases": [],
+                "inconclusive_basis_ids": [],
                 "checklist_items": [],
                 "steps": [],
                 "fees": [],

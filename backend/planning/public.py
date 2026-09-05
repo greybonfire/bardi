@@ -92,6 +92,7 @@ class PublicChecklistItem:
     scope: str
     sources: tuple[PublicSource, ...]
     freshness: Freshness
+    eligibility_basis_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sources", tuple(self.sources))
@@ -104,6 +105,8 @@ class PublicStep:
     phase: str
     sources: tuple[PublicSource, ...]
     freshness: Freshness
+    scope: str = "procedure"
+    eligibility_basis_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sources", tuple(self.sources))
@@ -142,6 +145,21 @@ class PublicFee:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicEligibilityBasis:
+    id: str
+    text: LocalizedText
+    sources: tuple[PublicSource, ...]
+    freshness: Freshness
+    checklist_item_ids: tuple[str, ...] = ()
+    step_ids: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+        object.__setattr__(self, "checklist_item_ids", tuple(self.checklist_item_ids))
+        object.__setattr__(self, "step_ids", tuple(self.step_ids))
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     service_id: str
     procedure_id: str
@@ -151,6 +169,8 @@ class PlanResult:
     steps: tuple[PublicStep, ...] = ()
     warnings: tuple[PublicWarning, ...] = ()
     fees: tuple[PublicFee, ...] = ()
+    eligibility_bases: tuple[PublicEligibilityBasis, ...] = ()
+    inconclusive_basis_ids: tuple[str, ...] = ()
     type: Literal["plan"] = "plan"
 
     def __post_init__(self) -> None:
@@ -158,6 +178,8 @@ class PlanResult:
         object.__setattr__(self, "steps", tuple(self.steps))
         object.__setattr__(self, "warnings", tuple(self.warnings))
         object.__setattr__(self, "fees", tuple(self.fees))
+        object.__setattr__(self, "eligibility_bases", tuple(self.eligibility_bases))
+        object.__setattr__(self, "inconclusive_basis_ids", tuple(self.inconclusive_basis_ids))
 
 
 @dataclass(frozen=True, slots=True)

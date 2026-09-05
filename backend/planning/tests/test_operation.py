@@ -6,8 +6,11 @@ from datetime import date
 from unittest.mock import patch
 
 from planning import (
+    AuthoritySnapshot,
     ChecklistItemSnapshot,
     ContradictionSnapshot,
+    EligibilityBasisSnapshot,
+    EvidenceLinkSnapshot,
     FactDefinition,
     InconclusiveResult,
     InvalidResult,
@@ -22,6 +25,7 @@ from planning import (
     QuestionSnapshot,
     SelectionUnsupported,
     ServiceSnapshot,
+    SourceSnapshot,
     StepSnapshot,
     plan_stateless,
 )
@@ -165,7 +169,7 @@ class PublicPlanningOperationTests(unittest.TestCase):
             InconclusiveResult("checklist_trust_inconclusive"),
         )
 
-    def test_step_uncertainty_and_unresolved_basis_scope_are_not_silently_omitted(self) -> None:
+    def test_step_uncertainty_is_not_silently_omitted(self) -> None:
         base = snapshot(version=True)
         cases = (
             (
@@ -173,7 +177,6 @@ class PublicPlanningOperationTests(unittest.TestCase):
                 "step_applicability_unknown",
             ),
             (step(verification_state="needs_reverification"), "step_trust_inconclusive"),
-            (step(scope="eligibility_basis"), "eligibility_basis_resolution_required"),
         )
         for guidance, reason in cases:
             with self.subTest(reason=reason):
@@ -183,6 +186,124 @@ class PublicPlanningOperationTests(unittest.TestCase):
                     plan_stateless(knowledge, request({"answer": True})),
                     InconclusiveResult(reason),
                 )
+
+    def test_unknown_basis_scope_is_configuration_invalid_after_basis_resolution(self) -> None:
+        base = snapshot(version=True)
+        version = replace(
+            base.procedure_versions[0],
+            steps=(step(scope="eligibility_basis"),),
+        )
+        knowledge = KnowledgeSnapshot(base.fact_definitions, base.services, (version,))
+        result = plan_stateless(knowledge, request({"answer": True}))
+        self.assertIsInstance(result, InvalidResult)
+        assert isinstance(result, InvalidResult)
+        self.assertEqual(result.diagnostics[0].code, "knowledge_configuration_invalid")
+
+    def test_basis_reachability_precedes_qualification_questions(self) -> None:
+        source = SourceSnapshot(
+            "basis-source",
+            AuthoritySnapshot("authority", LocalizedText("جهة", "Authority")),
+            "Basis source",
+            "https://example.test/basis",
+            "official",
+            date(2026, 8, 1),
+        )
+        evidence = EvidenceLinkSnapshot(
+            "Basis passage",
+            "Section",
+            "Basis assertion",
+            "supports",
+            "current",
+            (source,),
+            verified_on=date(2026, 8, 1),
+        )
+        candidate = ProcedureCandidateSnapshot(
+            "procedure",
+            LocalizedText("إجراء", "Procedure"),
+            Predicate("eq", "answer", True),
+        )
+        questions = (
+            QuestionSnapshot(
+                "answer-question",
+                LocalizedText("جواب", "Answer"),
+                1,
+                "answer",
+                ("answer",),
+            ),
+            QuestionSnapshot(
+                "gate-question",
+                LocalizedText("بوابة", "Gate"),
+                2,
+                "gate",
+                ("gate",),
+            ),
+            QuestionSnapshot(
+                "qualification-question",
+                LocalizedText("تأهيل", "Qualification"),
+                3,
+                "qualification",
+                ("qualification",),
+            ),
+        )
+        service = ServiceSnapshot(
+            "service",
+            LocalizedText("خدمة", "Service"),
+            (candidate,),
+            questions,
+            (),
+            True,
+        )
+        basis = EligibilityBasisSnapshot(
+            "basis",
+            LocalizedText("أساس", "Basis"),
+            Predicate("eq", "gate", True),
+            Predicate("eq", "qualification", True),
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+            evidence_links=(evidence,),
+        )
+        version = ProcedureVersionSnapshot(
+            "version",
+            "procedure",
+            LocalizedText("نسخة", "Version"),
+            Predicate("eq", "answer", True),
+            "v1",
+            "published",
+            None,
+            None,
+            eligibility_bases=(basis,),
+        )
+        knowledge = KnowledgeSnapshot(
+            {
+                "answer": FactDefinition("answer", "boolean"),
+                "gate": FactDefinition("gate", "boolean"),
+                "qualification": FactDefinition("qualification", "boolean"),
+            },
+            (service,),
+            (version,),
+        )
+
+        gate = plan_stateless(knowledge, request({"answer": True}))
+        self.assertIsInstance(gate, NextQuestionResult)
+        assert isinstance(gate, NextQuestionResult)
+        self.assertEqual(gate.question.id, "gate-question")
+
+        no_basis = plan_stateless(knowledge, request({"answer": True, "gate": False}))
+        self.assertEqual(no_basis, InconclusiveResult("no_applicable_eligibility_basis"))
+
+        qualification = plan_stateless(knowledge, request({"answer": True, "gate": True}))
+        self.assertIsInstance(qualification, NextQuestionResult)
+        assert isinstance(qualification, NextQuestionResult)
+        self.assertEqual(qualification.question.id, "qualification-question")
+
+        matched = plan_stateless(
+            knowledge,
+            request({"answer": True, "gate": True, "qualification": True}),
+        )
+        self.assertIsInstance(matched, PlanResult)
+        assert isinstance(matched, PlanResult)
+        self.assertEqual(tuple(item.id for item in matched.eligibility_bases), ("basis",))
+        self.assertEqual(matched.inconclusive_basis_ids, ())
 
     def test_preparation_completes_before_candidate_selection(self) -> None:
         with patch(

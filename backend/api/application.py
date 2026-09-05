@@ -98,6 +98,18 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
             "procedure_id": result.procedure_id,
             "procedure_version_id": result.procedure_version_id,
             "title": _localized(result.title, locale),
+            "eligibility_bases": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "checklist_item_ids": list(item.checklist_item_ids),
+                    "step_ids": list(item.step_ids),
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
+                }
+                for item in result.eligibility_bases
+            ],
+            "inconclusive_basis_ids": list(result.inconclusive_basis_ids),
             "steps": [
                 {
                     "id": item.id,
@@ -182,7 +194,8 @@ def execute_planning(
 
 
 def list_active_services(
-    *, snapshot_loader: SnapshotLoader = load_consistent_knowledge_snapshot
+    *,
+    snapshot_loader: SnapshotLoader = load_consistent_knowledge_snapshot,
 ) -> dict[str, object]:
     snapshot = snapshot_loader()
     return {

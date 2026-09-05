@@ -313,6 +313,6 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
                 dimension=ProcedureVersionReviewApproval.Dimension.RULE_LOGIC
             )
         with self.assertRaises(DatabaseError), transaction.atomic():
-            ProcedureVersionAuditApproval.objects.filter(
-                audit_event__version=published
-            ).update(dimension="rule_logic")
+            ProcedureVersionAuditApproval.objects.filter(audit_event__version=published).update(
+                dimension="rule_logic"
+            )

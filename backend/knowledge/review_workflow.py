@@ -398,9 +398,7 @@ def review_state_signature(version: ProcedureVersion) -> str:
     payload: dict[str, object] = {
         "planning_behavior": planning_behavior_signature(version),
         "review_policy": None if policy is None else _row_payload(policy),
-        "scenarios": _ordered_payload(
-            PlanningScenario.objects.filter(procedure_version=version)
-        ),
+        "scenarios": _ordered_payload(PlanningScenario.objects.filter(procedure_version=version)),
         "evidence_links": [_row_payload(row) for row in link_rows],
         "evidence_sources": [_row_payload(row) for row in source_link_rows],
         "sources": [_row_payload(row) for row in source_rows],
@@ -580,8 +578,7 @@ class ProcedureVersionReviewPublicationGate:
             rows = tuple(
                 row
                 for row in approvals
-                if row.approval_kind
-                == ProcedureVersionReviewApproval.ApprovalKind.DIMENSION
+                if row.approval_kind == ProcedureVersionReviewApproval.ApprovalKind.DIMENSION
                 and row.dimension == dimension
             )
             diagnostic = _approval_diagnostic(
@@ -603,8 +600,7 @@ class ProcedureVersionReviewPublicationGate:
             rows = tuple(
                 row
                 for row in approvals
-                if row.approval_kind
-                == ProcedureVersionReviewApproval.ApprovalKind.SPECIALIST
+                if row.approval_kind == ProcedureVersionReviewApproval.ApprovalKind.SPECIALIST
                 and row.specialist_risk == risk_kind
             )
             diagnostic = _approval_diagnostic(

@@ -157,6 +157,31 @@ class StepSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class FeeSnapshot:
+    semantic_id: str
+    text: LocalizedText
+    value_state: str
+    amount: int | None
+    minimum_amount: int | None
+    maximum_amount: int | None
+    currency: str
+    fee_type: str
+    display_order: int
+    applicability: Predicate | None
+    scope: str
+    eligibility_basis_id: str | None
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
 class WarningSnapshot:
     semantic_id: str
     text: LocalizedText
@@ -191,12 +216,14 @@ class ProcedureVersionSnapshot:
     checklist_items: tuple[ChecklistItemSnapshot, ...] = ()
     eligibility_bases: tuple[EligibilityBasisSnapshot, ...] = ()
     steps: tuple[StepSnapshot, ...] = ()
+    fees: tuple[FeeSnapshot, ...] = ()
     warnings: tuple[WarningSnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
         object.__setattr__(self, "eligibility_bases", tuple(self.eligibility_bases))
         object.__setattr__(self, "steps", tuple(self.steps))
+        object.__setattr__(self, "fees", tuple(self.fees))
         object.__setattr__(self, "warnings", tuple(self.warnings))
 
 

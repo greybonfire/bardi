@@ -45,8 +45,6 @@ def select_steps(
         ):
             continue
         if item.scope == "eligibility_basis":
-            # Basis reachability/qualification is owned by #43. Until that stage has
-            # produced matched IDs, a complete public plan cannot safely omit the Step.
             if matched is None:
                 basis_resolution_required = True
                 continue
@@ -75,7 +73,15 @@ def select_steps(
             trust_inconclusive = True
             continue
         selected.append(
-            PublicStep(item.semantic_id, item.text, item.phase, sources, trust.freshness)
+            PublicStep(
+                item.semantic_id,
+                item.text,
+                item.phase,
+                sources,
+                trust.freshness,
+                item.scope,
+                item.eligibility_basis_id,
+            )
         )
     return StepSelection(
         tuple(selected),

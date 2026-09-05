@@ -301,6 +301,7 @@ class ReachableResultFamilyTests(TransactionTestCase):
             address_ar="العنوان",
             address_en="Address",
             availability=ServicePointVersion.Availability.AVAILABLE,
+            effective_from=date(2026, 1, 1),
             verification_state="current",
             verified_on=date(2026, 9, 1),
         )
@@ -359,7 +360,7 @@ class ReachableResultFamilyTests(TransactionTestCase):
                 "name": "المكتب",
                 "address": "العنوان",
                 "availability": "available",
-                "effective_from": None,
+                "effective_from": "2026-01-01",
                 "effective_to": None,
                 "sources": [],
             },

@@ -26,6 +26,7 @@ class KnowledgeConfig(AppConfig):
             ".evidence_workflow_temporal", package=__package__
         )
         planning_scenarios = import_module(".planning_scenarios", package=__package__)
+        review_workflow = import_module(".review_workflow", package=__package__)
 
         assert fees.Fee is not None
         assert eligibility_bases.EligibilityBasisPublicationGate is not None
@@ -35,6 +36,7 @@ class KnowledgeConfig(AppConfig):
         assert evidence_workflow.EvidenceDiscrepancy is not None
         assert evidence_workflow_temporal.EvidenceDiscrepancyTransition is not None
         assert planning_scenarios.PlanningScenario is not None
+        assert review_workflow.ProcedureVersionReviewApproval is not None
 
     def ready(self) -> None:
         from . import eligibility_basis_admin as _eligibility_basis_admin
@@ -42,6 +44,7 @@ class KnowledgeConfig(AppConfig):
         from . import fee_admin as _fee_admin
         from . import planning_scenario_admin as _planning_scenario_admin
         from . import procedure_dependency_admin as _procedure_dependency_admin
+        from . import review_workflow_admin as _review_workflow_admin
         from . import service_point_routing_admin as _service_point_routing_admin
         from .aggregate_guard import connect_aggregate_relation_guards
 
@@ -51,4 +54,5 @@ class KnowledgeConfig(AppConfig):
         assert _service_point_routing_admin.ServicePointVersionAdmin is not None
         assert _evidence_workflow_admin.EvidenceDiscrepancyAdmin is not None
         assert _planning_scenario_admin.PlanningScenarioAdmin is not None
+        assert _review_workflow_admin.ProcedureVersionReviewPolicyAdmin is not None
         connect_aggregate_relation_guards()

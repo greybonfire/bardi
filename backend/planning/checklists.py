@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Set
 from dataclasses import dataclass
 from datetime import date
 
@@ -18,23 +19,34 @@ class ChecklistSelection:
     items: tuple[PublicChecklistItem, ...]
     missing_facts: frozenset[str] = frozenset()
     trust_inconclusive: bool = False
+    basis_resolution_required: bool = False
 
 
 def select_checklist_items(
     version: ProcedureVersionSnapshot,
     facts: PreparedFacts,
     evaluation_date: date,
+    *,
+    matched_basis_ids: Set[str] | None = None,
 ) -> ChecklistSelection:
+    matched = None if matched_basis_ids is None else frozenset(matched_basis_ids)
     selected: list[PublicChecklistItem] = []
     consequential_missing: set[str] = set()
     trust_inconclusive = False
+    basis_resolution_required = False
     for item in sorted(
         version.checklist_items, key=lambda value: (value.display_order, value.semantic_id)
     ):
         if item.classification not in {"official_requirement", "practical_preparation"}:
             continue
-        if item.scope != "procedure":
+        if item.scope not in {"procedure", "eligibility_basis"}:
             continue
+        if item.scope == "eligibility_basis":
+            if matched is None:
+                basis_resolution_required = True
+                continue
+            if item.scope_reference not in matched:
+                continue
         if item.effective_from is not None and evaluation_date < item.effective_from:
             continue
         if item.effective_to is not None and evaluation_date > item.effective_to:
@@ -82,15 +94,20 @@ def select_checklist_items(
                 item.scope,
                 sources,
                 assessment.freshness,
+                item.scope_reference if item.scope == "eligibility_basis" else None,
             )
         )
-    return ChecklistSelection(tuple(selected), frozenset(consequential_missing), trust_inconclusive)
+    return ChecklistSelection(
+        tuple(selected),
+        frozenset(consequential_missing),
+        trust_inconclusive,
+        basis_resolution_required,
+    )
 
 
 class LocalizedLabel:
     @staticmethod
     def for_classification(classification: str) -> LocalizedText:
-
         if classification == "official_requirement":
             return LocalizedText("متطلب رسمي", "Official Requirement")
         return LocalizedText("تحضير عملي", "Practical Preparation")

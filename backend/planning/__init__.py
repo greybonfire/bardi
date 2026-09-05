@@ -96,7 +96,6 @@ from .versions import (
     ProcedureVersionResolution,
     ProcedureVersionResolutionOutcome,
     ProcedureVersionResolved,
-    ProcedureVersionSnapshot,
     ProcedureVersionUnavailable,
     resolve_procedure_version,
 )

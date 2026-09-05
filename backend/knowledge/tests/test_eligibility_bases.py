@@ -11,6 +11,7 @@ from django.test import TestCase
 from knowledge.domain import load_knowledge_snapshot
 from knowledge.models import (
     Authority,
+    ChecklistItem,
     EligibilityBasis,
     EvidenceLink,
     FactDefinition,
@@ -184,6 +185,54 @@ class EligibilityBasisKnowledgeTests(TestCase):
         self.assertIn(("evidence_required", "basis.route"), codes)
         self.assertIn(("adequate_evidence_required", "basis.route"), codes)
         self.assertIn(("missing_service_question", self.qualification.key), codes)
+
+    def test_publication_rejects_malformed_persisted_rule_stages(self) -> None:
+        self.regeneration_warning()
+        self.add_question(self.gate, priority=1)
+        self.add_question(self.qualification, priority=2)
+        basis = self.basis()
+        self.evidence(basis)
+
+        EligibilityBasis.objects.filter(pk=basis.pk).update(
+            reachability={"op": "unsupported", "fact": self.gate.key}
+        )
+        reachability_diagnostics = self.rejection().diagnostics
+        self.assertTrue(
+            any(item.detail == "basis.route:reachability" for item in reachability_diagnostics)
+        )
+
+        EligibilityBasis.objects.filter(pk=basis.pk).update(
+            reachability=self.predicate,
+            qualification={},
+        )
+        qualification_diagnostics = self.rejection().diagnostics
+        self.assertIn(
+            ("qualification_required", "basis.route"),
+            {(item.code, item.detail) for item in qualification_diagnostics},
+        )
+
+    def test_publication_rejects_unknown_basis_scope_ownership(self) -> None:
+        self.regeneration_warning()
+        self.add_question(self.gate, priority=1)
+        self.add_question(self.qualification, priority=2)
+        basis = self.basis()
+        self.evidence(basis)
+        ChecklistItem.objects.create(
+            procedure_version=self.version,
+            semantic_id="basis.orphaned.claim",
+            text_ar="مطالبة",
+            text_en="Claim",
+            classification=ChecklistItem.Classification.CANDIDATE,
+            scope=ChecklistItem.Scope.ELIGIBILITY_BASIS,
+            scope_reference="basis.missing",
+            verification_state="needs_reverification",
+        )
+
+        diagnostics = self.rejection().diagnostics
+        self.assertIn(
+            ("invalid_basis_owner", "basis.orphaned.claim"),
+            {(item.code, item.detail) for item in diagnostics},
+        )
 
     def test_published_snapshot_contains_detached_two_stage_basis_and_evidence(self) -> None:
         self.regeneration_warning()

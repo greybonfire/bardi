@@ -140,8 +140,7 @@ class EvidenceDiscrepancy(models.Model):
                 name="evidence_discrepancy_lifecycle",
             ),
             models.CheckConstraint(
-                condition=~Q(status="open")
-                | Q(outcome_state__in=sorted(_OPEN_OUTCOMES)),
+                condition=~Q(status="open") | Q(outcome_state__in=sorted(_OPEN_OUTCOMES)),
                 name="open_discrepancy_is_inconclusive",
             ),
         ]
@@ -384,7 +383,9 @@ def open_evidence_discrepancy(
                 if version.pk is not None
             }
         )
-        tuple(ProcedureVersion.objects.select_for_update().filter(pk__in=version_ids).order_by("pk"))
+        tuple(
+            ProcedureVersion.objects.select_for_update().filter(pk__in=version_ids).order_by("pk")
+        )
         discrepancy = EvidenceDiscrepancy(
             anchor_evidence_link=anchor_evidence_link,
             outcome_state=outcome_state,
@@ -457,10 +458,17 @@ def record_evidence_reverification(
     with transaction.atomic():
         expected = _owner_evidence(anchor_evidence_link)
         expected_ids = {cast(int, item.pk) for item in expected if item.pk is not None}
-        if set(reviewed_by_id) != expected_ids or cast(int, anchor_evidence_link.pk) not in expected_ids:
-            raise ValidationError("Re-verification must review the subject's complete evidence set.")
+        if (
+            set(reviewed_by_id) != expected_ids
+            or cast(int, anchor_evidence_link.pk) not in expected_ids
+        ):
+            raise ValidationError(
+                "Re-verification must review the subject's complete evidence set."
+            )
         locked = tuple(
-            EvidenceLink.objects.select_for_update().filter(pk__in=sorted(expected_ids)).order_by("pk")
+            EvidenceLink.objects.select_for_update()
+            .filter(pk__in=sorted(expected_ids))
+            .order_by("pk")
         )
         versions = _owning_versions(anchor_evidence_link)
         version_ids = sorted(cast(int, item.pk) for item in versions if item.pk is not None)
@@ -470,7 +478,9 @@ def record_evidence_reverification(
         if not locked_versions or all(
             item.state == ProcedureVersion.State.DRAFT for item in locked_versions
         ):
-            raise ValidationError("Draft material should be edited directly instead of re-verified.")
+            raise ValidationError(
+                "Draft material should be edited directly instead of re-verified."
+            )
         if meaning_changed:
             assert successor_version is not None
             successor_version = ProcedureVersion.objects.select_for_update().get(
@@ -552,12 +562,16 @@ def _max_date(left: date | None, right: date | None) -> date | None:
 def _workflow_overlays() -> dict[tuple[str, str, str], _TrustOverlay]:
     timeline: list[tuple[datetime, int, int, str, object]] = []
     for row in EvidenceDiscrepancy.objects.select_related("anchor_evidence_link").order_by("pk"):
-        occurred = row.resolved_at if row.status == EvidenceDiscrepancy.Status.RESOLVED else row.created_at
+        occurred = (
+            row.resolved_at if row.status == EvidenceDiscrepancy.Status.RESOLVED else row.created_at
+        )
         if occurred is not None:
             timeline.append((occurred, 0, cast(int, row.pk), "discrepancy", row))
-    for row in EvidenceReverificationEvent.objects.filter(meaning_changed=False).select_related(
-        "anchor_evidence_link"
-    ).order_by("pk"):
+    for row in (
+        EvidenceReverificationEvent.objects.filter(meaning_changed=False)
+        .select_related("anchor_evidence_link")
+        .order_by("pk")
+    ):
         timeline.append((row.occurred_at, 1, cast(int, row.pk), "reverification", row))
 
     overlays: dict[tuple[str, str, str], _TrustOverlay] = {}
@@ -621,9 +635,7 @@ def _apply_workflow_overlays(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
         replace(
             version,
             checklist_items=version_items(version, "checklist_items", "checklist"),
-            eligibility_bases=version_items(
-                version, "eligibility_bases", "eligibility_basis"
-            ),
+            eligibility_bases=version_items(version, "eligibility_bases", "eligibility_basis"),
             steps=version_items(version, "steps", "step"),
             warnings=version_items(version, "warnings", "warning"),
             fees=version_items(version, "fees", "fee"),

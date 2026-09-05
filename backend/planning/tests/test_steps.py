@@ -6,6 +6,7 @@ from datetime import date
 
 from planning import (
     AuthoritySnapshot,
+    EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
     LocalizedText,
     Predicate,
@@ -64,6 +65,7 @@ class StepSelectionTests(unittest.TestCase):
             "published",
             None,
             None,
+            eligibility_bases=(EligibilityBasisSnapshot("basis"),),
             steps=(step("b", 2), step("a", 1), step("c", 0, "eligibility_basis")),
         )
         facts = PreparedFacts({"ok": True}, frozenset({"ok"}), {})

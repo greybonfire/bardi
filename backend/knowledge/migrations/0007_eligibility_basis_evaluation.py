@@ -220,7 +220,7 @@ class Migration(migrations.Migration):
         ),
         migrations.AlterModelOptions(
             name="eligibilitybasis",
-            options={"ordering": ("procedure_version_id", "display_order", "semantic_id")},
+            options={"ordering": ("procedure_version_id", "semantic_id")},
         ),
         migrations.AddField(
             model_name="evidencelink",

@@ -115,8 +115,6 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                     "id": item.id,
                     "text": _localized(item.text, locale),
                     "phase": item.phase,
-                    "scope": item.scope,
-                    "eligibility_basis_id": item.eligibility_basis_id,
                     "sources": [_project_source(source) for source in item.sources],
                     "freshness": _project_freshness(item.freshness),
                 }
@@ -161,7 +159,6 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                     "copy_quantity": item.copy_quantity,
                     "document_type_id": item.document_type_id,
                     "scope": item.scope,
-                    "eligibility_basis_id": item.eligibility_basis_id,
                     "sources": [_project_source(source) for source in item.sources],
                     "freshness": _project_freshness(item.freshness),
                 }
@@ -197,7 +194,8 @@ def execute_planning(
 
 
 def list_active_services(
-    *, snapshot_loader: SnapshotLoader = load_consistent_knowledge_snapshot
+    *,
+    snapshot_loader: SnapshotLoader = load_consistent_knowledge_snapshot,
 ) -> dict[str, object]:
     snapshot = snapshot_loader()
     return {

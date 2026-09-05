@@ -74,7 +74,9 @@ def select_steps(
         if sources is None:
             trust_inconclusive = True
             continue
-        selected.append(PublicStep(item.semantic_id, item.text, item.phase, sources, trust.freshness))
+        selected.append(
+            PublicStep(item.semantic_id, item.text, item.phase, sources, trust.freshness)
+        )
     return StepSelection(
         tuple(selected),
         frozenset(consequential_missing),

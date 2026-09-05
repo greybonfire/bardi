@@ -318,8 +318,8 @@ def _install_fee_evidence_owner() -> None:
             raise ValidationError({"effective_to": "Effective interval is not ordered."})
 
     EvidenceLink.owner = property(owner)  # type: ignore[assignment]
-    EvidenceLink.owning_version = owning_version  # type: ignore[method-assign]
-    EvidenceLink.clean = clean  # type: ignore[method-assign]
+    EvidenceLink.owning_version = owning_version  # type: ignore[assignment]
+    EvidenceLink.clean = clean  # type: ignore[assignment]
 
 
 _install_fee_evidence_owner()

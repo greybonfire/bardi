@@ -64,6 +64,7 @@ class RoutingFixtureMixin:
             address_ar="العنوان",
             address_en="Address",
             availability="available",
+            effective_from=date(2026, 1, 1),
             verification_state="current",
             verified_on=date(2026, 9, 1),
         )
@@ -142,6 +143,10 @@ class ServicePointRoutingTests(RoutingFixtureMixin, TestCase):
                 self.source.semantic_id,
             )
             self.assertEqual(snapshot.service_point_versions[0].address.en, "Address")
+            self.assertEqual(
+                snapshot.service_point_versions[0].effective_from,
+                date(2026, 1, 1),
+            )
 
         self.association.refresh_from_db()
         self.material.refresh_from_db()
@@ -157,6 +162,19 @@ class ServicePointRoutingTests(RoutingFixtureMixin, TestCase):
             set(material_admin.get_readonly_fields(request, self.material)),
             {field.name for field in ServicePointVersion._meta.fields},
         )
+
+    def test_service_point_material_requires_an_effective_start(self) -> None:
+        invalid = ServicePointVersion(
+            semantic_id="routing.point.missing-start",
+            service_point=self.point,
+            address_ar="عنوان",
+            address_en="Address",
+            availability="available",
+            verification_state="current",
+            verified_on=date(2026, 9, 1),
+        )
+        with self.assertRaises(ValidationError):
+            invalid.full_clean()
 
     def test_service_point_material_and_evidence_are_reusable_across_draft_versions(self) -> None:
         second_version = ProcedureVersion.objects.create(
@@ -216,7 +234,19 @@ class ServicePointRoutingDatabaseTests(RoutingFixtureMixin, TransactionTestCase)
                 address_ar="عنوان آخر",
                 address_en="Another address",
                 availability="unknown",
+                effective_from=date(2026, 1, 1),
                 verification_state="current",
+            )
+
+    def test_database_rejects_material_without_an_effective_start(self) -> None:
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            ServicePointVersion.objects.create(
+                semantic_id="routing.point.no-start",
+                service_point=self.point,
+                address_ar="عنوان بدون بداية",
+                address_en="Address without start",
+                availability="unknown",
+                verification_state="needs_reverification",
             )
 
     def test_database_preserves_published_routing_and_provenance(self) -> None:

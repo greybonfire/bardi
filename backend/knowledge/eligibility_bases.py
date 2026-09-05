@@ -67,7 +67,7 @@ def _install_basis_fields() -> None:
 
     EligibilityBasis._meta.ordering = ("procedure_version_id", "display_order", "semantic_id")
     constraint_names = {constraint.name for constraint in EligibilityBasis._meta.constraints}
-    additions: list[models.BaseConstraint] = []
+    additions: list[Any] = []
     if "basis_ar_nonblank" not in constraint_names:
         additions.append(
             models.CheckConstraint(
@@ -99,18 +99,23 @@ def _install_basis_fields() -> None:
     EligibilityBasis._meta.constraints = [*EligibilityBasis._meta.constraints, *additions]
 
     def clean(basis: EligibilityBasis) -> None:
-        _required(basis.semantic_id, "semantic_id")
-        _required(basis.text_ar, "text_ar")
-        _required(basis.text_en, "text_en")
-        if basis.effective_from and basis.effective_to and basis.effective_from > basis.effective_to:
+        authored = cast(Any, basis)
+        _required(authored.semantic_id, "semantic_id")
+        _required(authored.text_ar, "text_ar")
+        _required(authored.text_en, "text_en")
+        if (
+            authored.effective_from
+            and authored.effective_to
+            and authored.effective_from > authored.effective_to
+        ):
             raise ValidationError({"effective_to": "Effective interval is not ordered."})
-        if basis.reachability != {}:
-            reachability = decode_stored_rule(basis.reachability)
+        if authored.reachability != {}:
+            reachability = decode_stored_rule(authored.reachability)
             if reachability.diagnostics:
                 raise ValidationError({"reachability": "Reachability rule is invalid."})
-        if basis.qualification == {}:
+        if authored.qualification == {}:
             raise ValidationError({"qualification": "Eligibility Basis qualification is required."})
-        qualification = decode_stored_rule(basis.qualification)
+        qualification = decode_stored_rule(authored.qualification)
         if qualification.diagnostics:
             raise ValidationError({"qualification": "Qualification rule is invalid."})
 
@@ -318,7 +323,8 @@ class EligibilityBasisPublicationGate:
                 )
 
         predicates: list[Predicate] = []
-        for basis in bases:
+        for basis_model in bases:
+            basis = cast(Any, basis_model)
             owner_id = basis.semantic_id
             if not basis.text_ar.strip() or not basis.text_en.strip():
                 failures.append(
@@ -336,7 +342,11 @@ class EligibilityBasisPublicationGate:
                 decoded = decode_stored_rule(basis.reachability, context.fact_definitions)
                 if decoded.predicate is None:
                     failures.extend(
-                        PublicationDiagnostic(self.name, diagnostic.code, f"{owner_id}:reachability")
+                        PublicationDiagnostic(
+                            self.name,
+                            diagnostic.code,
+                            f"{owner_id}:reachability",
+                        )
                         for diagnostic in decoded.diagnostics
                     )
                 else:
@@ -349,7 +359,11 @@ class EligibilityBasisPublicationGate:
                 decoded = decode_stored_rule(basis.qualification, context.fact_definitions)
                 if decoded.predicate is None:
                     failures.extend(
-                        PublicationDiagnostic(self.name, diagnostic.code, f"{owner_id}:qualification")
+                        PublicationDiagnostic(
+                            self.name,
+                            diagnostic.code,
+                            f"{owner_id}:qualification",
+                        )
                         for diagnostic in decoded.diagnostics
                     )
                 else:
@@ -426,7 +440,10 @@ class EligibilityBasisPublicationGate:
 def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
     basis_rows = list(
         EligibilityBasis.objects.filter(
-            procedure_version__state__in=(ProcedureVersion.State.PUBLISHED, ProcedureVersion.State.WITHDRAWN)
+            procedure_version__state__in=(
+                ProcedureVersion.State.PUBLISHED,
+                ProcedureVersion.State.WITHDRAWN,
+            )
         )
         .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
         .values(

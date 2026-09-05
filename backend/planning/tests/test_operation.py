@@ -164,28 +164,35 @@ class PublicPlanningOperationTests(unittest.TestCase):
         )
         version = replace(base.procedure_versions[0], checklist_items=(claim,))
         with_claim = KnowledgeSnapshot(base.fact_definitions, base.services, (version,))
-        self.assertEqual(
-            plan_stateless(with_claim, request({"answer": True})),
-            InconclusiveResult("checklist_trust_inconclusive"),
-        )
+        result = plan_stateless(with_claim, request({"answer": True}))
+        self.assertIsInstance(result, PlanResult)
+        assert isinstance(result, PlanResult)
+        self.assertEqual(result.checklist_items, ())
+        self.assertEqual(result.inconclusive_sections, ("checklist_items",))
 
     def test_step_uncertainty_is_not_silently_omitted(self) -> None:
         base = snapshot(version=True)
-        cases = (
-            (
-                step(applicability=Predicate("eq", "missing", True)),
-                "step_applicability_unknown",
-            ),
-            (step(verification_state="needs_reverification"), "step_trust_inconclusive"),
+
+        unknown = step(applicability=Predicate("eq", "missing", True))
+        unknown_version = replace(base.procedure_versions[0], steps=(unknown,))
+        unknown_knowledge = KnowledgeSnapshot(
+            base.fact_definitions, base.services, (unknown_version,)
         )
-        for guidance, reason in cases:
-            with self.subTest(reason=reason):
-                version = replace(base.procedure_versions[0], steps=(guidance,))
-                knowledge = KnowledgeSnapshot(base.fact_definitions, base.services, (version,))
-                self.assertEqual(
-                    plan_stateless(knowledge, request({"answer": True})),
-                    InconclusiveResult(reason),
-                )
+        self.assertEqual(
+            plan_stateless(unknown_knowledge, request({"answer": True})),
+            InconclusiveResult("step_applicability_unknown"),
+        )
+
+        untrusted = step(verification_state="needs_reverification")
+        untrusted_version = replace(base.procedure_versions[0], steps=(untrusted,))
+        untrusted_knowledge = KnowledgeSnapshot(
+            base.fact_definitions, base.services, (untrusted_version,)
+        )
+        result = plan_stateless(untrusted_knowledge, request({"answer": True}))
+        self.assertIsInstance(result, PlanResult)
+        assert isinstance(result, PlanResult)
+        self.assertEqual(result.steps, ())
+        self.assertEqual(result.inconclusive_sections, ("steps",))
 
     def test_unknown_basis_scope_is_configuration_invalid_after_basis_resolution(self) -> None:
         base = snapshot(version=True)

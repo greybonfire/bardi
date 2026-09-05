@@ -21,6 +21,7 @@ from planning.rules import Predicate
 
 TODAY = date(2026, 9, 5)
 TRUE = Predicate("eq", fact="route", value=True)
+FALSE = Predicate("eq", fact="route", value=False)
 
 
 def evidence(source_id: str) -> tuple[EvidenceLinkSnapshot, ...]:
@@ -81,7 +82,7 @@ class RoutingSelectionTests(unittest.TestCase):
                 "point-a",
                 LocalizedText("عنوان أ", "A address"),
                 "available",
-                None,
+                TODAY,
                 None,
                 "current",
                 TODAY,
@@ -167,6 +168,33 @@ class RoutingSelectionTests(unittest.TestCase):
             [source.id for source in result.verification_sources],
             ["association-unknown", "association-untrusted"],
         )
+
+    def test_untrusted_false_rule_cannot_exclude_a_route_authoritatively(self) -> None:
+        disputed = self.association(
+            "disputed-false",
+            "point-a.v1",
+            predicate=FALSE,
+            state="disputed",
+        )
+        expired = replace(
+            self.association("expired-false", "point-a.v1", predicate=FALSE),
+            reverify_on=TODAY - timedelta(days=1),
+        )
+        for association in (disputed, expired):
+            with self.subTest(association=association.semantic_id):
+                snapshot, version = self.snapshot((association,))
+                result = select_service_points(
+                    snapshot,
+                    version,
+                    PreparedFacts({"route": True}, frozenset({"route"}), {}),
+                    TODAY,
+                )
+                self.assertEqual(result.status, "unresolved")
+                self.assertEqual(result.destinations, ())
+                self.assertEqual(
+                    [source.id for source in result.verification_sources],
+                    [f"association-{association.semantic_id}"],
+                )
 
     def test_future_provenance_is_not_back_projected_as_a_verification_path(self) -> None:
         association = self.association(

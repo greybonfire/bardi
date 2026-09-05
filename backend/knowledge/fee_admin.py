@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
-
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import ValidationError

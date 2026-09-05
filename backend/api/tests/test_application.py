@@ -67,6 +67,7 @@ class ApplicationBoundaryTests(SimpleTestCase):
                 "title": "خطة",
                 "eligibility_bases": [],
                 "inconclusive_basis_ids": [],
+                "inconclusive_sections": [],
                 "dependencies": [],
                 "checklist_items": [],
                 "steps": [],

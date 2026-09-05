@@ -7,6 +7,7 @@ from datetime import date
 from typing import cast
 
 from knowledge.domain import load_consistent_knowledge_snapshot
+from knowledge.evidence_workflow_temporal import load_consistent_knowledge_snapshot_as_of
 from planning import (
     InconclusiveResult,
     InvalidResult,
@@ -110,6 +111,7 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                 for item in result.eligibility_bases
             ],
             "inconclusive_basis_ids": list(result.inconclusive_basis_ids),
+            "inconclusive_sections": list(result.inconclusive_sections),
             "dependencies": [
                 {
                     "id": item.id,
@@ -214,10 +216,14 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
 def execute_planning(
     planning_input: PlanningInput,
     *,
-    snapshot_loader: SnapshotLoader = load_consistent_knowledge_snapshot,
+    snapshot_loader: SnapshotLoader | None = None,
     planner: Planner = plan_stateless,
 ) -> dict[str, object]:
-    snapshot = snapshot_loader()
+    snapshot = (
+        load_consistent_knowledge_snapshot_as_of(planning_input.evaluation_date)
+        if snapshot_loader is None
+        else snapshot_loader()
+    )
     detached_input = PlanningInput(
         planning_input.service_id,
         _decode_date_facts(planning_input.facts, snapshot),

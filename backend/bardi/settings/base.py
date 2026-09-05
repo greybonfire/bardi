@@ -114,6 +114,7 @@ PROCEDURE_VERSION_PUBLICATION_GATES = (
     "knowledge.eligibility_bases.EligibilityBasisPublicationGate",
     "knowledge.procedure_dependencies.ProcedureDependencyPublicationGate",
     "knowledge.service_point_routing.ServicePointRoutingPublicationGate",
+    "knowledge.evidence_workflow.EvidenceWorkflowPublicationGate",
 )
 
 MIDDLEWARE = [

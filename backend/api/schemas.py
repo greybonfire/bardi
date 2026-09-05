@@ -176,6 +176,7 @@ class PlanResponse(StrictSchema):
     title: str
     eligibility_bases: list[EligibilityBasisResponse]
     inconclusive_basis_ids: list[str]
+    inconclusive_sections: list[Literal["checklist_items", "steps"]]
     dependencies: list[ProcedureDependencyResponse]
     checklist_items: list[ChecklistItemResponse]
     steps: list[StepResponse]

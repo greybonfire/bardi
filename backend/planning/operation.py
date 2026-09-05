@@ -20,6 +20,7 @@ from .fees import select_fees
 from .public import (
     AnswerDefinition,
     InconclusiveResult,
+    InconclusiveSection,
     InvalidResult,
     NextQuestionResult,
     PlanningInput,
@@ -190,8 +191,6 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         return _configuration_invalid()
     if checklist.missing_facts:
         return InconclusiveResult("checklist_applicability_unknown")
-    if checklist.trust_inconclusive:
-        return InconclusiveResult("checklist_trust_inconclusive")
     steps = select_steps(
         resolution.version,
         preparation.prepared_facts,
@@ -202,8 +201,6 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         return _configuration_invalid()
     if steps.missing_facts:
         return InconclusiveResult("step_applicability_unknown")
-    if steps.trust_inconclusive:
-        return InconclusiveResult("step_trust_inconclusive")
     fees = select_fees(
         resolution.version,
         preparation.prepared_facts,
@@ -229,6 +226,11 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         for basis in bases.bases
     )
+    inconclusive_section_values: list[InconclusiveSection] = []
+    if checklist.trust_inconclusive:
+        inconclusive_section_values.append("checklist_items")
+    if steps.trust_inconclusive:
+        inconclusive_section_values.append("steps")
     return PlanResult(
         service.semantic_id,
         selection.procedure_semantic_id,
@@ -247,4 +249,5 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
             preparation.prepared_facts,
             planning_input.evaluation_date,
         ),
+        inconclusive_sections=tuple(inconclusive_section_values),
     )

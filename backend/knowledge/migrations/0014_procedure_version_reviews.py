@@ -396,13 +396,34 @@ class Migration(migrations.Migration):
                 condition=models.Q(
                     models.Q(
                         ("approval_kind", "dimension"),
-                        ("dimension__in", list(("evidence_source", "rule_logic", "scenario_behavior", "bilingual_semantic", "discrepancy"))),
+                        (
+                            "dimension__in",
+                            list(
+                                (
+                                    "evidence_source",
+                                    "rule_logic",
+                                    "scenario_behavior",
+                                    "bilingual_semantic",
+                                    "discrepancy",
+                                )
+                            ),
+                        ),
                         ("specialist_risk", ""),
                     ),
                     models.Q(
                         ("approval_kind", "specialist"),
                         ("dimension", ""),
-                        ("specialist_risk__in", list(("legal", "military", "custody_guardianship", "contested_identity"))),
+                        (
+                            "specialist_risk__in",
+                            list(
+                                (
+                                    "legal",
+                                    "military",
+                                    "custody_guardianship",
+                                    "contested_identity",
+                                )
+                            ),
+                        ),
                     ),
                     _connector="OR",
                 ),

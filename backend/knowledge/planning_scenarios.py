@@ -1,6 +1,6 @@
 """Named executable planning scenarios used as an atomic publication gate.
 
-Scenarios are editorial acceptance records owned by one Procedure Version.  They execute the
+Scenarios are editorial acceptance records owned by one Procedure Version. They execute the
 actual production snapshot adapters and pure planner; the frozen prototype is intentionally not
 an import or runtime dependency.
 """
@@ -20,6 +20,7 @@ from django.utils import timezone
 from planning import (
     InconclusiveResult,
     InvalidResult,
+    KnowledgeSnapshot,
     NextQuestionResult,
     PlanningInput,
     PlanningResult,
@@ -27,6 +28,7 @@ from planning import (
     plan_stateless,
 )
 from planning.facts import FactDefinition as DomainFactDefinition
+from planning.public import Locale
 
 from .domain import decode_stored_rule, referenced_fact_keys
 from .models import (
@@ -70,7 +72,13 @@ _RESULT_IDENTIFIER_KEYS: Mapping[str, frozenset[str]] = {
     "invalid": frozenset(),
 }
 _RULE_FIELD_NAMES = frozenset(
-    {"selection_predicate", "applicability", "reachability", "qualification"}
+    {
+        "selection_predicate",
+        "applicability",
+        "reachability",
+        "qualification",
+        "satisfied_when",
+    }
 )
 _SEMANTIC_HASH_EXCLUDED_FIELDS = frozenset(
     {
@@ -170,9 +178,7 @@ class PlanningScenario(models.Model):
             raw_date = context.get("evaluation_date")
             locale = context.get("locale")
             try:
-                evaluation_date = (
-                    date.fromisoformat(raw_date) if type(raw_date) is str else None
-                )
+                evaluation_date = date.fromisoformat(raw_date) if type(raw_date) is str else None
             except ValueError:
                 evaluation_date = None
             if evaluation_date is None or evaluation_date.isoformat() != raw_date:
@@ -224,16 +230,20 @@ class PlanningScenario(models.Model):
             errors["expected_result_family"] = "Contradictory scenarios must be invalid."
 
         if family == "plan":
-            expected_version = identifiers.get("procedure_version_id") if type(identifiers) is dict else None
+            expected_version = (
+                identifiers.get("procedure_version_id") if type(identifiers) is dict else None
+            )
             if expected_version != getattr(self.procedure_version, "semantic_id", None):
                 errors["expected_identifiers"] = (
                     "Plan scenarios must name this Procedure Version as procedure_version_id."
                 )
         elif family == "next_question":
-            if not isinstance(identifiers.get("question_id"), str) or not identifiers["question_id"].strip():
+            question_id = identifiers.get("question_id")
+            if not isinstance(question_id, str) or not question_id.strip():
                 errors["expected_identifiers"] = "Question scenarios must name question_id."
         elif family == "inconclusive":
-            if not isinstance(identifiers.get("reason"), str) or not identifiers["reason"].strip():
+            reason = identifiers.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
                 errors["expected_identifiers"] = "Inconclusive scenarios must name reason."
         elif family == "invalid" and not diagnostics:
             errors["expected_diagnostics"] = "Invalid scenarios must name expected diagnostics."
@@ -250,7 +260,9 @@ class PlanningScenario(models.Model):
         if stored is not None and stored.procedure_version_id != self.procedure_version_id:
             raise ValidationError("Scenario ownership cannot be reassigned.")
         if self.procedure_version.state != ProcedureVersion.State.DRAFT:
-            raise ValidationError("Planning scenarios are editable only while their version is draft.")
+            raise ValidationError(
+                "Planning scenarios are editable only while their version is draft."
+            )
         self.behavior_signature = planning_behavior_signature(self.procedure_version)
         self.full_clean()
         super().save(*args, **kwargs)
@@ -347,15 +359,20 @@ def _iter_authored_rules(version: ProcedureVersion) -> Iterable[object]:
 
     if version.applicability != {}:
         yield version.applicability
-    rows: tuple[models.Model, ...] = tuple(
-        ServiceProcedureCandidate.objects.filter(procedure=version.procedure).order_by("pk")
-    ) + tuple(ChecklistItem.objects.filter(procedure_version=version).order_by("pk")) + tuple(
-        EligibilityBasis.objects.filter(procedure_version=version).order_by("pk")
-    ) + tuple(Step.objects.filter(procedure_version=version).order_by("pk")) + tuple(
-        Warning.objects.filter(procedure_version=version).order_by("pk")
-    ) + tuple(Fee.objects.filter(procedure_version=version).order_by("pk")) + tuple(
-        ProcedureDependency.objects.filter(procedure_version=version).order_by("pk")
-    ) + tuple(ProcedureServicePointAssociation.objects.filter(procedure_version=version).order_by("pk"))
+    rows: tuple[models.Model, ...] = (
+        tuple(ServiceProcedureCandidate.objects.filter(procedure=version.procedure).order_by("pk"))
+        + tuple(ChecklistItem.objects.filter(procedure_version=version).order_by("pk"))
+        + tuple(EligibilityBasis.objects.filter(procedure_version=version).order_by("pk"))
+        + tuple(Step.objects.filter(procedure_version=version).order_by("pk"))
+        + tuple(Warning.objects.filter(procedure_version=version).order_by("pk"))
+        + tuple(Fee.objects.filter(procedure_version=version).order_by("pk"))
+        + tuple(ProcedureDependency.objects.filter(procedure_version=version).order_by("pk"))
+        + tuple(
+            ProcedureServicePointAssociation.objects.filter(procedure_version=version).order_by(
+                "pk"
+            )
+        )
+    )
     for row in rows:
         for field in row._meta.concrete_fields:
             if field.name not in _RULE_FIELD_NAMES or not isinstance(field, models.JSONField):
@@ -392,9 +409,14 @@ def required_scenario_kinds(
     temporal_edge = bool(version.effective_from or version.effective_to)
     if not temporal_edge:
         for model in (ChecklistItem, EligibilityBasis, Step, Warning, Fee):
-            if model.objects.filter(procedure_version=version).filter(
-                models.Q(effective_from__isnull=False) | models.Q(effective_to__isnull=False)
-            ).exists():
+            if (
+                model.objects.filter(procedure_version=version)
+                .filter(
+                    models.Q(effective_from__isnull=False)
+                    | models.Q(effective_to__isnull=False)
+                )
+                .exists()
+            ):
                 temporal_edge = True
                 break
     feature_edge = (
@@ -440,12 +462,17 @@ def _observed_result(result: PlanningResult) -> tuple[str, dict[str, object], li
             "warning_ids": [item.id for item in result.warnings],
             "fee_ids": [item.id for item in result.fees],
             "routing_status": result.routing.status,
-            "routing_association_ids": [item.association_id for item in result.routing.destinations],
+            "routing_association_ids": [
+                item.association_id for item in result.routing.destinations
+            ],
             "inconclusive_sections": list(result.inconclusive_sections),
         }
         return result.type, identifiers, []
     if isinstance(result, NextQuestionResult):
-        return result.type, {"service_id": result.service_id, "question_id": result.question.id}, []
+        return result.type, {
+            "service_id": result.service_id,
+            "question_id": result.question.id,
+        }, []
     if isinstance(result, InconclusiveResult):
         return result.type, {"reason": result.reason}, []
     assert isinstance(result, InvalidResult)
@@ -470,11 +497,11 @@ def _execute_scenarios(
     context: PublicationContext,
     scenarios: tuple[PlanningScenario, ...],
 ) -> tuple[PublicationDiagnostic, ...]:
-    """Expose the locked draft only inside a rollback-only savepoint, then run production planning."""
+    """Expose the draft in a rollback-only savepoint and run production planning."""
 
     if context.version.pk is None or context.actor.pk is None:
         return ()
-    # The structural temporal gate already owns the overlap diagnostic.  Avoid turning that
+    # The structural temporal gate already owns the overlap diagnostic. Avoid turning that
     # independent defect into a generic scenario execution failure as well.
     overlaps = ProcedureVersion.objects.filter(
         procedure_id=context.version.procedure_id,
@@ -511,18 +538,18 @@ def _execute_scenarios(
 
         from .evidence_workflow_temporal import load_knowledge_snapshot_as_of
 
-        snapshots: dict[date, Any] = {}
+        snapshots: dict[date, KnowledgeSnapshot] = {}
         for scenario in scenarios:
             raw_date = cast(str, scenario.evaluation_context["evaluation_date"])
             evaluation_date = date.fromisoformat(raw_date)
-            snapshot = snapshots.setdefault(
-                evaluation_date,
-                load_knowledge_snapshot_as_of(evaluation_date),
-            )
+            snapshot = snapshots.get(evaluation_date)
+            if snapshot is None:
+                snapshot = load_knowledge_snapshot_as_of(evaluation_date)
+                snapshots[evaluation_date] = snapshot
             planning_input = PlanningInput(
                 context.version.procedure.primary_service.semantic_id,
                 _decode_date_facts(scenario.source_facts, snapshot.fact_definitions),
-                cast(Any, scenario.evaluation_context["locale"]),
+                cast(Locale, scenario.evaluation_context["locale"]),
                 evaluation_date,
             )
             result = plan_stateless(snapshot, planning_input)

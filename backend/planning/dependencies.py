@@ -9,7 +9,7 @@ from .catalog import KnowledgeSnapshot, ProcedureDependencySnapshot, ProcedureVe
 from .evaluator import TruthValue, evaluate
 from .facts import PreparedFacts
 from .provenance import claim_sources, supporting_sources
-from .public import PublicProcedureDependency
+from .public import ProcedureDependencyStatus, PublicProcedureDependency
 from .trust import assess_trust
 from .versions import (
     ProcedureVersionConfigurationDefect,
@@ -58,7 +58,11 @@ def select_procedure_dependencies(
     ):
         if not _inside_effective_interval(dependency, evaluation_date):
             continue
-        if dependency.relation != "blocking_prerequisite" or dependency.satisfied_when is None:
+        if dependency.relation != "blocking_prerequisite":
+            configuration_invalid = True
+            continue
+        satisfied_when = dependency.satisfied_when
+        if satisfied_when is None:
             configuration_invalid = True
             continue
 
@@ -70,20 +74,24 @@ def select_procedure_dependencies(
             effective_from=dependency.effective_from,
             effective_to=dependency.effective_to,
         )
-        applicability = evaluate(
-            dependency.applicability,
-            facts.values,
-            submitted_keys=facts.submitted_keys,
+        applicability = (
+            None
+            if dependency.applicability is None
+            else evaluate(
+                dependency.applicability,
+                facts.values,
+                submitted_keys=facts.submitted_keys,
+            )
         )
 
         if trust.disposition != "assert_current":
-            if applicability.value is TruthValue.FALSE:
+            if applicability is not None and applicability.value is TruthValue.FALSE:
                 continue
             selected.append(
                 PublicProcedureDependency(
                     dependency.semantic_id,
                     dependency.text,
-                    dependency.relation,
+                    "blocking_prerequisite",
                     "inconclusive",
                     dependency.target_procedure_id,
                     dependency.target_procedure_text,
@@ -94,14 +102,15 @@ def select_procedure_dependencies(
             )
             continue
 
-        if applicability.value is TruthValue.FALSE:
-            continue
-        if applicability.value is TruthValue.UNKNOWN:
-            missing.update(applicability.missing_facts)
-            continue
+        if applicability is not None:
+            if applicability.value is TruthValue.FALSE:
+                continue
+            if applicability.value is TruthValue.UNKNOWN:
+                missing.update(applicability.missing_facts)
+                continue
 
         satisfied = evaluate(
-            dependency.satisfied_when,
+            satisfied_when,
             facts.values,
             submitted_keys=facts.submitted_keys,
         )
@@ -122,6 +131,7 @@ def select_procedure_dependencies(
         target_version_id = (
             target.version.semantic_id if isinstance(target, ProcedureVersionResolved) else None
         )
+        status: ProcedureDependencyStatus
         if satisfied.value is TruthValue.TRUE:
             status = "satisfied"
         elif isinstance(target, ProcedureVersionResolved):
@@ -135,7 +145,7 @@ def select_procedure_dependencies(
             PublicProcedureDependency(
                 dependency.semantic_id,
                 dependency.text,
-                dependency.relation,
+                "blocking_prerequisite",
                 status,
                 dependency.target_procedure_id,
                 dependency.target_procedure_text,

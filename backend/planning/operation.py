@@ -12,6 +12,7 @@ from .catalog import KnowledgeSnapshot
 from .checklists import select_checklist_items
 from .evaluator import TruthValue, evaluate
 from .facts import validate_submitted_facts
+from .fees import select_fees
 from .public import (
     AnswerDefinition,
     InconclusiveResult,
@@ -139,6 +140,13 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         return InconclusiveResult("step_applicability_unknown")
     if steps.trust_inconclusive:
         return InconclusiveResult("step_trust_inconclusive")
+    fees = select_fees(
+        resolution.version, preparation.prepared_facts, planning_input.evaluation_date
+    )
+    if fees.basis_resolution_required:
+        return InconclusiveResult("eligibility_basis_resolution_required")
+    if fees.missing_facts:
+        return InconclusiveResult("fee_applicability_unknown")
     warnings = select_warnings(
         resolution.version, preparation.prepared_facts, planning_input.evaluation_date
     )
@@ -147,7 +155,8 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         selection.procedure_semantic_id,
         resolution.version.semantic_id,
         resolution.version.text,
-        checklist.items,
-        steps.items,
-        warnings,
+        checklist_items=checklist.items,
+        steps=steps.items,
+        warnings=warnings,
+        fees=fees.items,
     )

@@ -15,6 +15,12 @@ from .trust import Freshness
 
 type Locale = Literal["ar", "en"]
 type FeeValueState = Literal["known", "range", "unknown", "unverified"]
+type ProcedureDependencyStatus = Literal[
+    "satisfied",
+    "blocking",
+    "unsupported_target",
+    "inconclusive",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,6 +166,22 @@ class PublicEligibilityBasis:
 
 
 @dataclass(frozen=True, slots=True)
+class PublicProcedureDependency:
+    id: str
+    text: LocalizedText
+    relation: Literal["blocking_prerequisite"]
+    status: ProcedureDependencyStatus
+    target_procedure_id: str
+    target_procedure: LocalizedText
+    target_procedure_version_id: str | None
+    sources: tuple[PublicSource, ...]
+    freshness: Freshness
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "sources", tuple(self.sources))
+
+
+@dataclass(frozen=True, slots=True)
 class PlanResult:
     service_id: str
     procedure_id: str
@@ -171,6 +193,7 @@ class PlanResult:
     fees: tuple[PublicFee, ...] = ()
     eligibility_bases: tuple[PublicEligibilityBasis, ...] = ()
     inconclusive_basis_ids: tuple[str, ...] = ()
+    dependencies: tuple[PublicProcedureDependency, ...] = ()
     type: Literal["plan"] = "plan"
 
     def __post_init__(self) -> None:
@@ -180,6 +203,7 @@ class PlanResult:
         object.__setattr__(self, "fees", tuple(self.fees))
         object.__setattr__(self, "eligibility_bases", tuple(self.eligibility_bases))
         object.__setattr__(self, "inconclusive_basis_ids", tuple(self.inconclusive_basis_ids))
+        object.__setattr__(self, "dependencies", tuple(self.dependencies))
 
 
 @dataclass(frozen=True, slots=True)

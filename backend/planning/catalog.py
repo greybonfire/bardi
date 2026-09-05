@@ -215,6 +215,27 @@ class WarningSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class ProcedureDependencySnapshot:
+    semantic_id: str
+    text: LocalizedText
+    target_procedure_id: str
+    target_procedure_text: LocalizedText
+    relation: str
+    applicability: Predicate | None
+    satisfied_when: Predicate | None
+    display_order: int
+    effective_from: date | None
+    effective_to: date | None
+    verification_state: VerificationState
+    verified_on: date | None
+    reverify_on: date | None
+    evidence_links: tuple[EvidenceLinkSnapshot, ...]
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "evidence_links", tuple(self.evidence_links))
+
+
+@dataclass(frozen=True, slots=True)
 class ProcedureVersionSnapshot:
     semantic_id: str
     procedure_semantic_id: str
@@ -231,6 +252,7 @@ class ProcedureVersionSnapshot:
     steps: tuple[StepSnapshot, ...] = ()
     warnings: tuple[WarningSnapshot, ...] = ()
     fees: tuple[FeeSnapshot, ...] = ()
+    dependencies: tuple[ProcedureDependencySnapshot, ...] = ()
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "checklist_items", tuple(self.checklist_items))
@@ -238,6 +260,7 @@ class ProcedureVersionSnapshot:
         object.__setattr__(self, "steps", tuple(self.steps))
         object.__setattr__(self, "warnings", tuple(self.warnings))
         object.__setattr__(self, "fees", tuple(self.fees))
+        object.__setattr__(self, "dependencies", tuple(self.dependencies))
 
 
 @dataclass(frozen=True, slots=True)

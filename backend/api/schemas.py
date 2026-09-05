@@ -92,6 +92,18 @@ class EligibilityBasisResponse(StrictSchema):
     freshness: FreshnessResponse
 
 
+class ProcedureDependencyResponse(StrictSchema):
+    id: str
+    text: str
+    relation: Literal["blocking_prerequisite"]
+    status: Literal["satisfied", "blocking", "unsupported_target", "inconclusive"]
+    target_procedure_id: str
+    target_procedure: str
+    target_procedure_version_id: str | None
+    sources: list[GuidanceSourceResponse]
+    freshness: FreshnessResponse
+
+
 class ChecklistItemResponse(StrictSchema):
     id: str
     text: str
@@ -146,6 +158,7 @@ class PlanResponse(StrictSchema):
     title: str
     eligibility_bases: list[EligibilityBasisResponse]
     inconclusive_basis_ids: list[str]
+    dependencies: list[ProcedureDependencyResponse]
     checklist_items: list[ChecklistItemResponse]
     steps: list[StepResponse]
     fees: list[FeeResponse]

@@ -61,6 +61,21 @@ def select_service_points(
             continue
         if association.effective_to and evaluation_date > association.effective_to:
             continue
+
+        association_trust = assess_trust(
+            association.verification_state,
+            evaluation_date=evaluation_date,
+            verified_on=association.verified_on,
+            reverify_on=association.reverify_on,
+            effective_from=association.effective_from,
+            effective_to=association.effective_to,
+        )
+        association_sources = supporting_sources(association.evidence_links, evaluation_date)
+        if association_trust.disposition != "assert_current" or association_sources is None:
+            unresolved = True
+            add_verification_sources(association.evidence_links)
+            continue
+
         applicability = evaluate(
             association.applicability, facts.values, submitted_keys=facts.submitted_keys
         )
@@ -83,14 +98,6 @@ def select_service_points(
             unresolved = True
             add_verification_sources(association.evidence_links, material.evidence_links)
             continue
-        association_trust = assess_trust(
-            association.verification_state,
-            evaluation_date=evaluation_date,
-            verified_on=association.verified_on,
-            reverify_on=association.reverify_on,
-            effective_from=association.effective_from,
-            effective_to=association.effective_to,
-        )
         material_trust = assess_trust(
             material.verification_state,
             evaluation_date=evaluation_date,
@@ -99,20 +106,14 @@ def select_service_points(
             effective_from=material.effective_from,
             effective_to=material.effective_to,
         )
-        association_sources = supporting_sources(association.evidence_links, evaluation_date)
         material_sources = supporting_sources(material.evidence_links, evaluation_date)
         if (
-            association_trust.disposition != "assert_current"
-            or material_trust.disposition != "assert_current"
-            or association_sources is None
+            material_trust.disposition != "assert_current"
             or material_sources is None
             or material.availability not in {"available", "unknown"}
         ):
             unresolved = True
-            if association_trust.disposition != "assert_current" or association_sources is None:
-                add_verification_sources(association.evidence_links)
-            if material_trust.disposition != "assert_current" or material_sources is None:
-                add_verification_sources(material.evidence_links)
+            add_verification_sources(material.evidence_links)
             continue
         sources = {source.id: source for source in (*material_sources, *association_sources)}
         destinations.append(

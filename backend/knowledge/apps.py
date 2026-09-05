@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from django.apps import AppConfig
 
 
@@ -9,13 +11,14 @@ class KnowledgeConfig(AppConfig):
     def import_models(self) -> None:
         # Focused feature modules extend the knowledge model graph during Django's model
         # loading phase so migrations, the app registry, and static analysis observe one
-        # final EvidenceLink owner union before models_ready is set.
+        # final EvidenceLink owner union before models_ready is set. Fee must install its
+        # owner before Eligibility Basis extends that owner union again.
         super().import_models()
-        from . import eligibility_bases as _eligibility_bases
-        from . import fees as _fees
+        fees = import_module(".fees", package=__package__)
+        eligibility_bases = import_module(".eligibility_bases", package=__package__)
 
-        assert _fees.Fee is not None
-        assert _eligibility_bases.EligibilityBasisPublicationGate is not None
+        assert fees.Fee is not None
+        assert eligibility_bases.EligibilityBasisPublicationGate is not None
 
     def ready(self) -> None:
         from . import eligibility_basis_admin as _eligibility_basis_admin

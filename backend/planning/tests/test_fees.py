@@ -160,14 +160,10 @@ class FeeSelectionTests(unittest.TestCase):
             verification_state="needs_reverification",
         )
 
-        current_selection = select_fees(
-            self.version(current), self.facts, date(2026, 2, 1)
-        )
+        current_selection = select_fees(self.version(current), self.facts, date(2026, 2, 1))
         self.assertEqual(current_selection.missing_facts, frozenset({"missing"}))
 
-        untrusted_selection = select_fees(
-            self.version(untrusted), self.facts, date(2026, 2, 1)
-        )
+        untrusted_selection = select_fees(self.version(untrusted), self.facts, date(2026, 2, 1))
         self.assertFalse(untrusted_selection.missing_facts)
         self.assertFalse(untrusted_selection.items)
 
@@ -179,15 +175,11 @@ class FeeSelectionTests(unittest.TestCase):
         self.assertTrue(unresolved.basis_resolution_required)
         self.assertFalse(unresolved.items)
 
-        excluded = select_fees(
-            version, self.facts, date(2026, 2, 1), matched_basis_ids=set()
-        )
+        excluded = select_fees(version, self.facts, date(2026, 2, 1), matched_basis_ids=set())
         self.assertFalse(excluded.basis_resolution_required)
         self.assertFalse(excluded.items)
 
-        included = select_fees(
-            version, self.facts, date(2026, 2, 1), matched_basis_ids={"basis"}
-        )
+        included = select_fees(version, self.facts, date(2026, 2, 1), matched_basis_ids={"basis"})
         self.assertEqual([item.id for item in included.items], ["basis-fee"])
 
 

@@ -1,21 +1,26 @@
 from __future__ import annotations
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 from typing import Any, cast
+from unittest.mock import patch
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TransactionTestCase
+from planning.trust import VerificationState
 
-from knowledge.domain import load_knowledge_snapshot
 from knowledge.evidence_workflow import (
     EvidenceDiscrepancy,
     EvidenceReverificationEvent,
     open_evidence_discrepancy,
     record_evidence_reverification,
     resolve_evidence_discrepancy,
+)
+from knowledge.evidence_workflow_temporal import (
+    EvidenceDiscrepancyTransition,
+    load_knowledge_snapshot_as_of,
 )
 from knowledge.fees import Fee
 from knowledge.models import (
@@ -35,10 +40,16 @@ from knowledge.models import (
 from knowledge.publication import PublicationRejected, publish_procedure_version
 from knowledge.services import set_evidence_link_sources
 
+BEFORE_WORKFLOW = date(2026, 9, 4)
 TODAY = date(2026, 9, 5)
+DURING_DISCREPANCY = date(2026, 9, 6)
+AFTER_RESOLUTION = date(2026, 9, 9)
 REVERIFY_DUE = date(2026, 9, 10)
 LATER = date(2026, 10, 1)
 RENEWED_DUE = date(2026, 12, 1)
+OPENED_AT = datetime(2026, 9, 5, 9, tzinfo=UTC)
+RESOLVED_AT = datetime(2026, 9, 8, 9, tzinfo=UTC)
+REVIEWED_AT = datetime(2026, 9, 5, 10, tzinfo=UTC)
 
 
 class EvidenceWorkflowTests(TransactionTestCase):
@@ -190,14 +201,73 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertEqual(response.status_code, 200)
         return cast(dict[str, Any], response.json())
 
+    def open_discrepancy(
+        self,
+        *,
+        anchor_evidence_link: EvidenceLink,
+        evidence_links: tuple[EvidenceLink, ...],
+        rationale: str,
+        outcome_state: VerificationState = "disputed",
+        occurred_at: datetime = OPENED_AT,
+    ) -> EvidenceDiscrepancy:
+        with patch("django.utils.timezone.now", return_value=occurred_at):
+            return open_evidence_discrepancy(
+                anchor_evidence_link=anchor_evidence_link,
+                evidence_links=evidence_links,
+                rationale=rationale,
+                actor=self.actor,
+                outcome_state=outcome_state,
+            )
+
+    def resolve_discrepancy(
+        self,
+        discrepancy: EvidenceDiscrepancy,
+        *,
+        outcome_state: VerificationState = "current",
+        resolution: str = "Confirmed existing public meaning.",
+        occurred_at: datetime = RESOLVED_AT,
+    ) -> EvidenceDiscrepancy:
+        with patch("django.utils.timezone.now", return_value=occurred_at):
+            return resolve_evidence_discrepancy(
+                discrepancy.pk,
+                outcome_state=outcome_state,
+                resolution=resolution,
+                actor=self.actor,
+            )
+
+    def record_review(
+        self,
+        *,
+        anchor_evidence_link: EvidenceLink,
+        reviewed_evidence_links: tuple[EvidenceLink, ...],
+        verification_state: VerificationState = "current",
+        verified_on: date = TODAY,
+        reverify_on: date | None = RENEWED_DUE,
+        rationale: str = "Rechecked the same public meaning.",
+        meaning_changed: bool = False,
+        successor_version: ProcedureVersion | None = None,
+        occurred_at: datetime = REVIEWED_AT,
+    ) -> EvidenceReverificationEvent:
+        with patch("django.utils.timezone.now", return_value=occurred_at):
+            return record_evidence_reverification(
+                anchor_evidence_link=anchor_evidence_link,
+                reviewed_evidence_links=reviewed_evidence_links,
+                verification_state=verification_state,
+                verified_on=verified_on,
+                reverify_on=reverify_on,
+                rationale=rationale,
+                actor=self.actor,
+                meaning_changed=meaning_changed,
+                successor_version=successor_version,
+            )
+
     def test_open_discrepancy_is_local_and_internal_rationale_never_leaks(self) -> None:
         self.publish()
         secret = "INTERNAL DISCREPANCY RATIONALE"
-        discrepancy = open_evidence_discrepancy(
+        discrepancy = self.open_discrepancy(
             anchor_evidence_link=self.checklist_evidence,
             evidence_links=(self.checklist_evidence,),
             rationale=secret,
-            actor=self.actor,
             outcome_state="disputed",
         )
 
@@ -215,32 +285,51 @@ class EvidenceWorkflowTests(TransactionTestCase):
             (self.checklist_evidence.pk,),
         )
 
-    def test_resolved_discrepancy_restores_shared_current_trust(self) -> None:
+    def test_discrepancy_history_is_applied_only_during_its_established_interval(self) -> None:
         self.publish()
-        discrepancy = open_evidence_discrepancy(
+        discrepancy = self.open_discrepancy(
             anchor_evidence_link=self.checklist_evidence,
             evidence_links=(self.checklist_evidence,),
             rationale="Official and field observations conflicted.",
-            actor=self.actor,
         )
-        resolved = resolve_evidence_discrepancy(
-            discrepancy.pk,
+        with self.assertRaises(ValidationError):
+            discrepancy.outcome_state = "unknown"
+            discrepancy.save()
+        discrepancy.refresh_from_db()
+        resolved = self.resolve_discrepancy(
+            discrepancy,
             outcome_state="current",
             resolution="Official source confirmed the existing wording.",
-            actor=self.actor,
         )
 
-        body = self.post()
+        before = self.post(BEFORE_WORKFLOW)
+        during = self.post(DURING_DISCREPANCY)
+        after = self.post(AFTER_RESOLUTION)
 
-        self.assertEqual(body["inconclusive_sections"], [])
         self.assertEqual(
-            [item["id"] for item in body["checklist_items"]],
+            [item["id"] for item in before["checklist_items"]],
             [self.checklist.semantic_id],
         )
+        self.assertEqual(before["inconclusive_sections"], [])
+        self.assertEqual(during["checklist_items"], [])
+        self.assertEqual(during["inconclusive_sections"], ["checklist_items"])
+        self.assertEqual(
+            [item["id"] for item in after["checklist_items"]],
+            [self.checklist.semantic_id],
+        )
+        self.assertEqual(after["inconclusive_sections"], [])
         self.assertEqual(resolved.status, EvidenceDiscrepancy.Status.RESOLVED)
         self.assertEqual(resolved.outcome_state, "current")
         self.assertIsNotNone(resolved.resolved_at)
         self.assertEqual(resolved.resolved_by, self.actor)
+        self.assertEqual(
+            list(
+                EvidenceDiscrepancyTransition.objects.filter(discrepancy=resolved).values_list(
+                    "event_type", "verification_state"
+                )
+            ),
+            [("opened", "disputed"), ("resolved", "current")],
+        )
         with self.assertRaises(ValidationError):
             resolved.delete()
 
@@ -253,15 +342,19 @@ class EvidenceWorkflowTests(TransactionTestCase):
             "verification_state", "verified_on", "reverify_on", "passage"
         ).get(pk=self.checklist_evidence.pk)
         self.assertEqual(self.post(LATER)["inconclusive_sections"], ["checklist_items"])
+        historical_before_review = self.post(BEFORE_WORKFLOW)
+        self.assertEqual(
+            [item["id"] for item in historical_before_review["checklist_items"]],
+            [self.checklist.semantic_id],
+        )
 
-        event = record_evidence_reverification(
+        event = self.record_review(
             anchor_evidence_link=self.checklist_evidence,
             reviewed_evidence_links=(self.checklist_evidence,),
             verification_state="current",
             verified_on=TODAY,
             reverify_on=RENEWED_DUE,
             rationale="Rechecked the same requirement against the official source.",
-            actor=self.actor,
         )
 
         self.assertEqual(
@@ -282,7 +375,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
             [item["id"] for item in current["checklist_items"]],
             [self.checklist.semantic_id],
         )
-        snapshot = load_knowledge_snapshot()
+        snapshot = load_knowledge_snapshot_as_of(LATER)
         loaded_version = next(
             item
             for item in snapshot.procedure_versions
@@ -296,21 +389,23 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertEqual(loaded_item.evidence_links[0].reverify_on, RENEWED_DUE)
         self.assertEqual(event.verification_state, "current")
 
-        historical = self.post(date(2026, 9, 4))
-        self.assertEqual(historical["checklist_items"], [])
-        self.assertEqual(historical["inconclusive_sections"], ["checklist_items"])
+        historical = self.post(BEFORE_WORKFLOW)
+        self.assertEqual(
+            [item["id"] for item in historical["checklist_items"]],
+            [self.checklist.semantic_id],
+        )
+        self.assertEqual(historical["inconclusive_sections"], [])
 
     def test_meaning_change_requires_distinct_draft_successor(self) -> None:
         self.publish()
         with self.assertRaises(ValidationError):
-            record_evidence_reverification(
+            self.record_review(
                 anchor_evidence_link=self.checklist_evidence,
                 reviewed_evidence_links=(self.checklist_evidence,),
                 verification_state="disputed",
                 verified_on=TODAY,
                 reverify_on=None,
                 rationale="The source now appears to require different public wording.",
-                actor=self.actor,
                 meaning_changed=True,
             )
 
@@ -321,14 +416,13 @@ class EvidenceWorkflowTests(TransactionTestCase):
             text_en="Successor version",
             applicability=self.rule,
         )
-        event = record_evidence_reverification(
+        event = self.record_review(
             anchor_evidence_link=self.checklist_evidence,
             reviewed_evidence_links=(self.checklist_evidence,),
             verification_state="disputed",
             verified_on=TODAY,
             reverify_on=None,
             rationale="Public meaning changed; edit the successor instead.",
-            actor=self.actor,
             meaning_changed=True,
             successor_version=successor,
         )
@@ -352,11 +446,10 @@ class EvidenceWorkflowTests(TransactionTestCase):
     def test_fee_discrepancy_hides_amount_without_erasing_reliable_sections(self) -> None:
         self.publish()
         secret = "PRIVATE FEE CONFLICT"
-        open_evidence_discrepancy(
+        self.open_discrepancy(
             anchor_evidence_link=self.fee_evidence,
             evidence_links=(self.fee_evidence,),
             rationale=secret,
-            actor=self.actor,
             outcome_state="needs_reverification",
         )
 
@@ -376,11 +469,10 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertNotIn(secret, json.dumps(body))
 
     def test_publication_rejects_open_discrepancy_on_draft_material(self) -> None:
-        open_evidence_discrepancy(
+        self.open_discrepancy(
             anchor_evidence_link=self.checklist_evidence,
             evidence_links=(self.checklist_evidence,),
             rationale="Resolve before publishing.",
-            actor=self.actor,
         )
 
         with self.assertRaises(PublicationRejected) as caught:
@@ -395,22 +487,20 @@ class EvidenceWorkflowTests(TransactionTestCase):
 
     def test_workflow_rejects_cross_subject_evidence_and_admin_history(self) -> None:
         with self.assertRaises(ValidationError):
-            open_evidence_discrepancy(
+            self.open_discrepancy(
                 anchor_evidence_link=self.checklist_evidence,
                 evidence_links=(self.checklist_evidence, self.step_evidence),
                 rationale="These are different subjects.",
-                actor=self.actor,
             )
 
         self.publish()
-        event = record_evidence_reverification(
+        event = self.record_review(
             anchor_evidence_link=self.step_evidence,
             reviewed_evidence_links=(self.step_evidence,),
             verification_state="current",
             verified_on=TODAY,
             reverify_on=RENEWED_DUE,
             rationale="Step wording remains accurate.",
-            actor=self.actor,
         )
         self.assertIn(EvidenceDiscrepancy, admin.site._registry)
         self.assertIn(EvidenceReverificationEvent, admin.site._registry)

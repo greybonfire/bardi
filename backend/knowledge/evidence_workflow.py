@@ -219,8 +219,7 @@ class EvidenceDiscrepancyEvidence(models.Model):
         super().save(*args, **kwargs)
 
     def delete(self, *args: Any, **kwargs: Any) -> tuple[int, dict[str, int]]:
-        status = cast(str, self.discrepancy.status)
-        if status != EvidenceDiscrepancy.Status.OPEN:
+        if self.discrepancy.status != EvidenceDiscrepancy.Status.OPEN:
             raise ValidationError("Resolved discrepancy evidence is immutable.")
         return super().delete(*args, **kwargs)
 

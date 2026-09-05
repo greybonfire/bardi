@@ -418,13 +418,10 @@ class FeeAdminTests(TestCase):
                 verification_state="disputed",
             ),
         )
-        ProcedureVersion.objects.filter(pk=self.version.pk).update(
-            state=ProcedureVersion.State.PUBLISHED
-        )
+        self.version.state = ProcedureVersion.State.PUBLISHED
 
         self.assertIn(FeeOwnerInline, ProcedureVersionAdmin.inlines)
-        for original in fees:
-            fee = Fee.objects.select_related("procedure_version").get(pk=original.pk)
+        for fee in fees:
             with self.subTest(value_state=fee.value_state):
                 self.assertEqual(
                     set(self.fee_admin.get_readonly_fields(self.request, fee)),

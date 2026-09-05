@@ -98,7 +98,7 @@ jobs:
         run: uv run ruff format --check backend
 
       - name: Type-check production backend
-        run: uv run mypy backend
+        run: uv run mypy --show-traceback backend
 
       - name: Compile project Python
         run: uv run python -m compileall -q backend prototype

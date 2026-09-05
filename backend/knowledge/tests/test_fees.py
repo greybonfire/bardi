@@ -219,7 +219,7 @@ class FeePublicationTests(TestCase):
             >= {"fee.publication.known", "fee.publication.range"}
         )
 
-    def test_publication_rejects_cross_version_basis_ownership_even_if_db_was_bypassed(self) -> None:
+    def test_publication_rejects_cross_version_basis_ownership(self) -> None:
         self.regeneration_warning()
         basis = EligibilityBasis.objects.create(
             procedure_version=self.version,

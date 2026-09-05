@@ -9,6 +9,17 @@ from .public import PublicSource
 from .trust import assess_trust
 
 
+def _public_source(source: SourceSnapshot) -> PublicSource:
+    return PublicSource(
+        source.semantic_id,
+        source.authority.semantic_id,
+        source.title,
+        source.locator,
+        source.classification,
+        source.retrieved_on,
+    )
+
+
 def source_is_current(source: SourceSnapshot, evaluation_date: date) -> bool:
     return (
         assess_trust(
@@ -26,7 +37,7 @@ def source_is_current(source: SourceSnapshot, evaluation_date: date) -> bool:
 def supporting_sources(
     links: tuple[EvidenceLinkSnapshot, ...], evaluation_date: date, *, official_only: bool = False
 ) -> tuple[PublicSource, ...] | None:
-    """Return sorted supporting sources, or None for contradiction/unsupported evidence."""
+    """Return sorted current supporting sources, or None for contradiction/unsupported evidence."""
     sources: dict[str, PublicSource] = {}
     contradiction = False
     for link in links:
@@ -53,14 +64,23 @@ def supporting_sources(
         ):
             continue
         for source in link.sources:
-            sources[source.semantic_id] = PublicSource(
-                source.semantic_id,
-                source.authority.semantic_id,
-                source.title,
-                source.locator,
-                source.classification,
-                source.retrieved_on,
-            )
+            sources[source.semantic_id] = _public_source(source)
     if contradiction or not sources:
         return None
+    return tuple(sources[key] for key in sorted(sources))
+
+
+def claim_sources(links: tuple[EvidenceLinkSnapshot, ...]) -> tuple[PublicSource, ...]:
+    """Project preserved supporting provenance without asserting that it is current.
+
+    Fees whose current value is inconclusive still benefit from compact provenance for the
+    researched prior/candidate value. Contradicting/context-only links are deliberately not
+    presented as support, and no editorial EvidenceLink fields cross this boundary.
+    """
+    sources: dict[str, PublicSource] = {}
+    for link in links:
+        if link.support_status != "supports":
+            continue
+        for source in link.sources:
+            sources[source.semantic_id] = _public_source(source)
     return tuple(sources[key] for key in sorted(sources))

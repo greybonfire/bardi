@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from django import forms
 from django.contrib import admin
-from django.contrib.admin.sites import NotRegistered
+from django.contrib.admin.sites import NotRegistered  # type: ignore[attr-defined]
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
 

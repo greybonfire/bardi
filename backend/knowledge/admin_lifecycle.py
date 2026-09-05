@@ -1,9 +1,9 @@
 """Safe lifecycle helpers used by the Django Admin editorial surface.
 
-Published Procedure Versions are never reopened for editing.  Successor creation copies the
+Published Procedure Versions are never reopened for editing. Successor creation copies the
 coherent version-owned semantic/evidence/scenario aggregate into new draft rows while preserving
 shared stable identities such as Sources, Authorities, Document Types, Procedures and Service
-Point material.  Historical workflow records are deliberately not copied.
+Point material. Historical workflow records are deliberately not copied.
 """
 
 from __future__ import annotations
@@ -22,7 +22,6 @@ from .models import (
     ChecklistItem,
     EligibilityBasis,
     EvidenceLink,
-    EvidenceLinkSource,
     ProcedureVersion,
     Step,
     Warning,
@@ -31,6 +30,7 @@ from .planning_scenarios import PlanningScenario
 from .procedure_dependencies import ProcedureDependency
 from .review_workflow import ProcedureVersionReviewPolicy
 from .service_point_routing import ProcedureServicePointAssociation
+from .services import set_evidence_link_sources
 
 _LIFECYCLE_FIELDS = frozenset(
     {
@@ -119,7 +119,7 @@ def clone_published_procedure_version(
 ) -> ProcedureVersion:
     """Clone one published Procedure Version into a fresh editable successor draft.
 
-    Stable shared identities remain shared.  Version-owned semantic material, claim Evidence
+    Stable shared identities remain shared. Version-owned semantic material, claim Evidence
     Links/source joins, named planning scenarios, and high-risk review-policy flags are copied.
     Discrepancy history, re-verification events, approvals, and publication audit rows remain
     attached to the historical version and are intentionally not copied.
@@ -266,14 +266,15 @@ def clone_published_procedure_version(
             assert evidence_link.pk is not None
             evidence_map[evidence_link.pk] = evidence_clone
 
-        for source_link in EvidenceLinkSource.objects.filter(
-            evidence_link_id__in=tuple(evidence_map)
-        ).order_by("evidence_link_id", "position", "pk"):
-            EvidenceLinkSource.objects.create(
-                evidence_link=evidence_map[source_link.evidence_link_id],
-                source_id=source_link.source_id,
-                position=source_link.position,
+        for original_id, evidence_clone in evidence_map.items():
+            original = EvidenceLink.objects.get(pk=original_id)
+            sources = tuple(
+                source_link.source
+                for source_link in original.source_links.select_related("source").order_by(
+                    "position", "pk"
+                )
             )
+            set_evidence_link_sources(evidence_clone, sources)
 
         for planning_scenario in PlanningScenario.objects.filter(procedure_version=source).order_by(
             "pk"

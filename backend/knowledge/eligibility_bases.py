@@ -372,7 +372,7 @@ class EligibilityBasisPublicationGate:
             links = list(basis.evidence_links.all())
             adequate_current_support = False
             for link in links:
-                sources = [row.source for row in link.source_links.all()]
+                sources = [source_link.source for source_link in link.source_links.all()]
                 detail = f"{owner_id}:{link.pk}"
                 complete = bool(
                     sources
@@ -466,7 +466,9 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
         return snapshot
 
     evidence_rows = list(
-        EvidenceLink.objects.filter(eligibility_basis_id__in=[row["id"] for row in basis_rows])
+        EvidenceLink.objects.filter(
+            eligibility_basis_id__in=[basis_row["id"] for basis_row in basis_rows]
+        )
         .order_by("id")
         .values(
             "id",
@@ -484,7 +486,9 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
         )
     )
     evidence_source_rows = list(
-        EvidenceLinkSource.objects.filter(evidence_link_id__in=[row["id"] for row in evidence_rows])
+        EvidenceLinkSource.objects.filter(
+            evidence_link_id__in=[evidence_row["id"] for evidence_row in evidence_rows]
+        )
         .order_by("evidence_link_id", "position", "source__semantic_id")
         .values(
             "evidence_link_id",
@@ -506,62 +510,66 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
     )
     source_snapshots: dict[str, SourceSnapshot] = {}
     sources_by_link: dict[int, list[SourceSnapshot]] = defaultdict(list)
-    for row in evidence_source_rows:
-        source_id = row["source__semantic_id"]
+    for source_row in evidence_source_rows:
+        source_id = source_row["source__semantic_id"]
         source = source_snapshots.setdefault(
             source_id,
             SourceSnapshot(
                 source_id,
                 AuthoritySnapshot(
-                    row["source__authority__semantic_id"],
+                    source_row["source__authority__semantic_id"],
                     LocalizedText(
-                        row["source__authority__name_ar"], row["source__authority__name_en"]
+                        source_row["source__authority__name_ar"],
+                        source_row["source__authority__name_en"],
                     ),
                 ),
-                row["source__title"],
-                row["source__locator"],
-                row["source__classification"],
-                row["source__retrieved_on"],
-                row["source__published_on"],
-                row["source__effective_from"],
-                row["source__effective_to"],
-                row["source__reverify_on"],
-                row["source__observation_date"],
-                row["source__observation_context"],
+                source_row["source__title"],
+                source_row["source__locator"],
+                source_row["source__classification"],
+                source_row["source__retrieved_on"],
+                source_row["source__published_on"],
+                source_row["source__effective_from"],
+                source_row["source__effective_to"],
+                source_row["source__reverify_on"],
+                source_row["source__observation_date"],
+                source_row["source__observation_context"],
             ),
         )
-        sources_by_link[row["evidence_link_id"]].append(source)
+        sources_by_link[source_row["evidence_link_id"]].append(source)
 
     evidence_by_basis: dict[int, list[EvidenceLinkSnapshot]] = defaultdict(list)
-    for row in cast(list[dict[str, Any]], evidence_rows):
-        evidence_by_basis[row["eligibility_basis_id"]].append(
+    for evidence_row in cast(list[dict[str, Any]], evidence_rows):
+        evidence_by_basis[evidence_row["eligibility_basis_id"]].append(
             EvidenceLinkSnapshot(
-                row["passage"],
-                row["location"],
-                row["applicability_context"],
-                row["support_status"],
-                cast(VerificationState, row["verification_state"]),
-                tuple(sources_by_link[row["id"]]),
-                row["effective_from"],
-                row["effective_to"],
-                row["retrieved_on"],
-                row["verified_on"],
-                row["reverify_on"],
+                evidence_row["passage"],
+                evidence_row["location"],
+                evidence_row["applicability_context"],
+                evidence_row["support_status"],
+                cast(VerificationState, evidence_row["verification_state"]),
+                tuple(sources_by_link[evidence_row["id"]]),
+                evidence_row["effective_from"],
+                evidence_row["effective_to"],
+                evidence_row["retrieved_on"],
+                evidence_row["verified_on"],
+                evidence_row["reverify_on"],
             )
         )
 
     failures: list[StoredRuleLoadDiagnostic] = []
     by_version: dict[str, list[EligibilityBasisSnapshot]] = defaultdict(list)
-    for row in cast(list[dict[str, Any]], basis_rows):
-        owner = f"eligibility_basis:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
+    for basis_row in cast(list[dict[str, Any]], basis_rows):
+        owner = (
+            f"eligibility_basis:{basis_row['procedure_version__semantic_id']}:"
+            f"{basis_row['semantic_id']}"
+        )
         reachability: Predicate | None = None
-        if row["reachability"] != {}:
-            decoded = decode_stored_rule(row["reachability"], snapshot.fact_definitions)
+        if basis_row["reachability"] != {}:
+            decoded = decode_stored_rule(basis_row["reachability"], snapshot.fact_definitions)
             if decoded.predicate is None:
                 failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
                 continue
             reachability = decoded.predicate
-        if row["qualification"] == {}:
+        if basis_row["qualification"] == {}:
             failures.append(
                 StoredRuleLoadDiagnostic(
                     owner,
@@ -569,14 +577,14 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 )
             )
             continue
-        decoded = decode_stored_rule(row["qualification"], snapshot.fact_definitions)
+        decoded = decode_stored_rule(basis_row["qualification"], snapshot.fact_definitions)
         if decoded.predicate is None:
             failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
             continue
-        links = tuple(evidence_by_basis[row["id"]])
+        links = tuple(evidence_by_basis[basis_row["id"]])
         invalid = (
-            not row["text_ar"].strip()
-            or not row["text_en"].strip()
+            not basis_row["text_ar"].strip()
+            or not basis_row["text_en"].strip()
             or not links
             or any(not link.sources for link in links)
         )
@@ -588,18 +596,18 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 )
             )
             continue
-        by_version[row["procedure_version__semantic_id"]].append(
+        by_version[basis_row["procedure_version__semantic_id"]].append(
             EligibilityBasisSnapshot(
-                row["semantic_id"],
-                LocalizedText(row["text_ar"], row["text_en"]),
+                basis_row["semantic_id"],
+                LocalizedText(basis_row["text_ar"], basis_row["text_en"]),
                 reachability,
                 decoded.predicate,
-                row["display_order"],
-                row["effective_from"],
-                row["effective_to"],
-                cast(VerificationState, row["verification_state"]),
-                row["verified_on"],
-                row["reverify_on"],
+                basis_row["display_order"],
+                basis_row["effective_from"],
+                basis_row["effective_to"],
+                cast(VerificationState, basis_row["verification_state"]),
+                basis_row["verified_on"],
+                basis_row["reverify_on"],
                 links,
             )
         )

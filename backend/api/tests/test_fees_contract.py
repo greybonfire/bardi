@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import json
 from datetime import date
+from typing import Any, Protocol
 
 from django.contrib.auth import get_user_model
-from django.http import HttpResponse
 from django.test import TransactionTestCase
 from knowledge.fees import Fee
 from knowledge.models import (
@@ -20,6 +20,13 @@ from knowledge.models import (
 )
 from knowledge.publication import publish_procedure_version
 from knowledge.services import set_evidence_link_sources
+
+
+class _TestClientResponse(Protocol):
+    status_code: int
+    content: bytes
+
+    def json(self) -> Any: ...
 
 
 class FeePlanningContractTests(TransactionTestCase):
@@ -46,7 +53,7 @@ class FeePlanningContractTests(TransactionTestCase):
             selection_predicate={"op": "eq", "fact": self.fact.key, "value": True},
         )
 
-    def _post(self, *, locale: str = "en") -> HttpResponse:
+    def _post(self, *, locale: str = "en") -> _TestClientResponse:
         return self.client.post(
             "/v1/planning",
             data=json.dumps(

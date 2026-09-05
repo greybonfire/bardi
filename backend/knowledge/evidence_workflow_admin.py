@@ -46,7 +46,9 @@ class EvidenceDiscrepancyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: EvidenceDiscrepancy | None = None,
     ) -> tuple[str, ...]:
-        return ("evidence_link",) if obj and obj.status == EvidenceDiscrepancy.Status.RESOLVED else ()
+        if obj and obj.status == EvidenceDiscrepancy.Status.RESOLVED:
+            return ("evidence_link",)
+        return ()
 
 
 @admin.register(EvidenceDiscrepancy)

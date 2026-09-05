@@ -98,11 +98,25 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
             "procedure_id": result.procedure_id,
             "procedure_version_id": result.procedure_version_id,
             "title": _localized(result.title, locale),
+            "eligibility_bases": [
+                {
+                    "id": item.id,
+                    "text": _localized(item.text, locale),
+                    "checklist_item_ids": list(item.checklist_item_ids),
+                    "step_ids": list(item.step_ids),
+                    "sources": [_project_source(source) for source in item.sources],
+                    "freshness": _project_freshness(item.freshness),
+                }
+                for item in result.eligibility_bases
+            ],
+            "inconclusive_basis_ids": list(result.inconclusive_basis_ids),
             "steps": [
                 {
                     "id": item.id,
                     "text": _localized(item.text, locale),
                     "phase": item.phase,
+                    "scope": item.scope,
+                    "eligibility_basis_id": item.eligibility_basis_id,
                     "sources": [_project_source(source) for source in item.sources],
                     "freshness": _project_freshness(item.freshness),
                 }
@@ -147,6 +161,7 @@ def project_result(result: PlanningResult, locale: Locale) -> dict[str, object]:
                     "copy_quantity": item.copy_quantity,
                     "document_type_id": item.document_type_id,
                     "scope": item.scope,
+                    "eligibility_basis_id": item.eligibility_basis_id,
                     "sources": [_project_source(source) for source in item.sources],
                     "freshness": _project_freshness(item.freshness),
                 }

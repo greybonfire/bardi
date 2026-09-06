@@ -89,6 +89,7 @@ class KnowledgeConfig(AppConfig):
             install_evidence_identity_validation,
             install_national_id_renewal_integrity_verification,
             install_passport_renewal_integrity_verification,
+            install_temporary_family_exemption_integrity_verification,
         )
 
         assert _fee_admin.FeeAdmin is not None
@@ -102,4 +103,5 @@ class KnowledgeConfig(AppConfig):
         install_evidence_identity_validation()
         install_passport_renewal_integrity_verification()
         install_national_id_renewal_integrity_verification()
+        install_temporary_family_exemption_integrity_verification()
         connect_aggregate_relation_guards()

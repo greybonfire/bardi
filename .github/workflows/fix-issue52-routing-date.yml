@@ -1,0 +1,54 @@
+name: Fix issue 52 routing date
+
+on:
+  push:
+    branches:
+      - feat/52-import-temporary-family-exemption
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/52-import-temporary-family-exemption
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.0.1
+      - run: uv sync --locked --extra dev
+      - name: Apply production routing-date contract
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          importer = Path("backend/knowledge/importers/temporary_family_exemption.py")
+          text = importer.read_text()
+          old = '''                "availability": ServicePointVersion.Availability.AVAILABLE,\n                "verified_on": RESEARCH_DATE,\n'''
+          new = '''                "availability": ServicePointVersion.Availability.AVAILABLE,\n                "effective_from": RESEARCH_DATE,\n                "verified_on": RESEARCH_DATE,\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one routing material value block, found {text.count(old)}")
+          importer.write_text(text.replace(old, new, 1))
+
+          integrity = Path("backend/knowledge/importers/temporary_family_exemption_integrity.py")
+          text = integrity.read_text()
+          old = '''            or row.address_en != address_en\n            or row.availability != ServicePointVersion.Availability.AVAILABLE\n'''
+          new = '''            or row.address_en != address_en\n            or row.effective_from != RESEARCH_DATE\n            or row.availability != ServicePointVersion.Availability.AVAILABLE\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f"expected one routing material integrity block, found {text.count(old)}")
+          integrity.write_text(text.replace(old, new, 1))
+          PY
+          uv run ruff format backend/knowledge/importers/temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+          uv run ruff check backend/knowledge/importers/temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+          uv run mypy backend/knowledge/importers/temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/knowledge/importers/temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+          git commit -m "Set temporary exemption routing effective date"
+          git push origin HEAD:feat/52-import-temporary-family-exemption

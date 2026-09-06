@@ -120,7 +120,7 @@ Deployment procedure:
 
 Do not run ad-hoc DDL against production. Do not blindly reverse migrations after a failed deploy: a syntactically reversible migration may still have lost or transformed data in a way that cannot be reconstructed. Restore from the pre-migration backup when the safe forward fix is not possible.
 
-CI deliberately rolls the project-owned `knowledge` migration chain back to zero on a disposable database and reapplies it. This proves mechanical reversibility of the current migration operations; it does **not** assert that production data rollback is always semantically safe.
+CI deliberately reverses the latest project-owned `knowledge` migration across one supported boundary (`0016` to `0015`) on a disposable database, reapplies it, and verifies the migration state. This proves that the current rollback boundary can execute on PostgreSQL; it does **not** assert that production data rollback is semantically safe. A teardown of the entire historical migration chain to zero is not a recovery strategy and is not treated as a release requirement.
 
 ## Backup policy
 

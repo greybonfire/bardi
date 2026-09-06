@@ -12,6 +12,7 @@ from knowledge.fees import Fee
 from knowledge.importers.national_id_renewal import VERSION_ID, import_national_id_renewal
 from knowledge.models import (
     ChecklistItem,
+    EvidenceLink,
     Procedure,
     ProcedureVersion,
     Service,
@@ -108,6 +109,33 @@ class NationalIdRenewalImportTests(TestCase):
         ).update(currency="USD")
 
         with self.assertRaisesMessage(ValidationError, "semantic conflict in planning behavior"):
+            import_national_id_renewal(author=author)
+
+    def test_rerun_rejects_scenario_semantic_drift(self) -> None:
+        author = get_user_model().objects.create_user(username="nid-scenario-conflict", is_staff=True)
+        version = import_national_id_renewal(author=author)
+        scenario = PlanningScenario.objects.get(
+            procedure_version=version,
+            name="nid.positive.expired_held_no_changes",
+        )
+        PlanningScenario.objects.filter(pk=scenario.pk).update(
+            expected_identifiers={"procedure_version_id": VERSION_ID}
+        )
+
+        with self.assertRaisesMessage(ValidationError, "semantic conflict in scenarios"):
+            import_national_id_renewal(author=author)
+
+    def test_rerun_rejects_evidence_semantic_drift(self) -> None:
+        author = get_user_model().objects.create_user(username="nid-evidence-conflict", is_staff=True)
+        version = import_national_id_renewal(author=author)
+        item = ChecklistItem.objects.get(
+            procedure_version=version,
+            semantic_id="nid.requirement.renew_after_expiry",
+        )
+        link = EvidenceLink.objects.get(checklist_item=item, semantic_id="EL-CIVIL-LAW-52")
+        EvidenceLink.objects.filter(pk=link.pk).update(passage="Conflicting Article 52 passage")
+
+        with self.assertRaisesMessage(ValidationError, "semantic conflict in evidence"):
             import_national_id_renewal(author=author)
 
     @override_settings(

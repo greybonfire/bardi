@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from io import StringIO
+from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -88,18 +89,19 @@ class TemporaryFamilyExemptionImportTests(TestCase):
             procedure_version=current,
             semantic_id="family.missing_war_or_terror_relative",
         )
-        self.assertNotIn("terrorist_operations", str(historical_missing.qualification))
-        self.assertIn("terrorist_operations", str(current_missing.qualification))
+        self.assertNotIn("terrorist_operations", str(cast(Any, historical_missing).qualification))
+        self.assertIn("terrorist_operations", str(cast(Any, current_missing).qualification))
 
         father_basis = EligibilityBasis.objects.get(
             procedure_version=current,
             semantic_id="family.support_father_or_incapable_brothers",
         )
         self.assertEqual(
-            father_basis.reachability, {"op": "eq", "fact": "father_alive", "value": True}
+            cast(Any, father_basis).reachability,
+            {"op": "eq", "fact": "father_alive", "value": True},
         )
         self.assertEqual(
-            father_basis.qualification,
+            cast(Any, father_basis).qualification,
             {
                 "op": "eq",
                 "fact": "father_unable_to_earn_status",

@@ -750,7 +750,7 @@ def _create_version(
 
     ProcedureVersionReviewPolicy.objects.create(
         procedure_version=version,
-        author=author,
+        author=cast(Any, author),
         legal_risk=True,
         military_risk=True,
     )
@@ -808,7 +808,7 @@ def _create_version(
         "residence_governorate": "giza",
     }
 
-    def basis_plan(basis_id, route_id=None):
+    def basis_plan(basis_id: str, route_id: str | None = None) -> dict[str, object]:
         return {
             "procedure_version_id": version_id,
             "eligibility_basis_ids": [basis_id],

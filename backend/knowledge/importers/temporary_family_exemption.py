@@ -348,7 +348,10 @@ def _create_version(
             "EL-LAW127-ART7-II-B",
             "غير القادر على الكسب",
             "Official Gazette scan page 14, Article 7/Second(b)",
-            "Only the researched father sub-route is modeled; incapable-brother semantics remain unresolved.",
+            (
+                "Only the researched father sub-route is modeled; "
+                "incapable-brother semantics remain unresolved."
+            ),
             ("SRC-LAW127-1980-GAZETTE",),
         ),
         (
@@ -500,7 +503,10 @@ def _create_version(
         "EL-MOD-SUPPORTING-DOCS",
         "بالمستندات التى تؤيد أحقيته",
         "Ministry of Defense recruitment operational announcement",
-        "Current high-level instruction to support an exemption/postponement/exception claim; not a basis-specific list.",
+        (
+            "Current high-level instruction to support an exemption/postponement/exception "
+            "claim; not a basis-specific list."
+        ),
         (sources["SRC-MOD-RECRUITMENT-OCT-2026"],),
     )
 
@@ -1082,7 +1088,10 @@ def import_temporary_family_exemption(
             "q.mil.father_capacity",
             "father_unable_to_earn_status",
             "هل لديك مستند أو حالة معتمدة تثبت أن والدك غير قادر على الكسب؟",
-            "Do you have an accepted document/status establishing that your father is unable to earn?",
+            (
+                "Do you have an accepted document/status establishing that your father is "
+                "unable to earn?"
+            ),
         ),
         (
             50,
@@ -1103,14 +1112,20 @@ def import_temporary_family_exemption(
             "q.mil.missing_category",
             "missing_relative_category",
             "إذا كان الطلب مرتبطًا بشخص مفقود، فما صفته المسجلة؟",
-            "If the request concerns a missing person, what recorded category applies to that relative?",
+            (
+                "If the request concerns a missing person, what recorded category applies to "
+                "that relative?"
+            ),
         ),
         (
             70,
             "q.mil.missing_cause",
             "missing_relative_cause",
             "إذا كان الطلب مرتبطًا بشخص مفقود، فما سبب الفقد المسجل؟",
-            "If the request concerns a missing person, what recorded cause of disappearance applies?",
+            (
+                "If the request concerns a missing person, what recorded cause of disappearance "
+                "applies?"
+            ),
         ),
         (
             72,
@@ -1124,28 +1139,40 @@ def import_temporary_family_exemption(
             "q.mil.largest_eligible_relative",
             "applicant_largest_eligible_relative_status",
             "هل لديك حالة معتمدة تثبت أنك القريب الأكبر المستوفي لوصف التجنيد المطلوب لهذا الأساس؟",
-            "Do you have an authority-recorded status establishing that you are the largest eligible conscription relative for this ground?",
+            (
+                "Do you have an authority-recorded status establishing that you are the largest "
+                "eligible conscription relative for this ground?"
+            ),
         ),
         (
             80,
             "q.mil.sibling_service",
             "sibling_service_status",
             "هل أحد إخوتك حالياً في الخدمة الإلزامية أو مستدعى للاحتياط؟",
-            "Is one of your brothers currently in compulsory service or called for qualifying reserve service?",
+            (
+                "Is one of your brothers currently in compulsory service or called for qualifying "
+                "reserve service?"
+            ),
         ),
         (
             85,
             "q.mil.eldest_remaining_brother",
             "applicant_eldest_remaining_brother_status",
             "هل لديك حالة معتمدة تثبت انطباق ترتيب الأخ الأكبر المتبقي عليك؟",
-            "Do you have an authority-recorded status establishing that the eldest-remaining-brother condition applies to you?",
+            (
+                "Do you have an authority-recorded status establishing that the "
+                "eldest-remaining-brother condition applies to you?"
+            ),
         ),
         (
             87,
             "q.mil.article7_third_exclusion",
             "article7_third_exclusion_status",
             "هل توجد حالة معتمدة تُظهر وجود أحد استبعادات المادة 7/ثالثاً؟",
-            "Is there an authority-recorded status showing that an Article 7/Third exclusion applies?",
+            (
+                "Is there an authority-recorded status showing that an Article 7/Third "
+                "exclusion applies?"
+            ),
         ),
         (
             90,

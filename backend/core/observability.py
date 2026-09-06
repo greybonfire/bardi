@@ -170,7 +170,7 @@ class RequestObservabilityMiddleware:
     def __call__(self, request: HttpRequest) -> HttpResponse:
         started = perf_counter()
         request_id = uuid4().hex
-        setattr(request, "_bardi_request_id", request_id)
+        request.__dict__["_bardi_request_id"] = request_id
         response = self.get_response(request)
         duration_ms = max(0, round((perf_counter() - started) * 1000))
         route = normalize_operational_route(request.path)

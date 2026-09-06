@@ -106,7 +106,5 @@ class NationalIdRenewalProductionPlanningTests(TestCase):
         )
         self.assertIsInstance(clamped, CasePreparationSuccess)
         assert isinstance(clamped, CasePreparationSuccess)
-        self.assertEqual(
-            clamped.prepared_facts.values["renewal_deadline_date"], date(2026, 8, 31)
-        )
+        self.assertEqual(clamped.prepared_facts.values["renewal_deadline_date"], date(2026, 8, 31))
         self.assertFalse(clamped.prepared_facts.values["renewal_deadline_passed"])

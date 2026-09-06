@@ -809,16 +809,27 @@ def _create_version(
     }
 
     def basis_plan(basis_id: str, route_id: str | None = None) -> dict[str, object]:
-        return {
+        identifiers: dict[str, object] = {
             "procedure_version_id": version_id,
             "eligibility_basis_ids": [basis_id],
             "inconclusive_basis_ids": [basis_id],
-            **(
-                {"routing_status": "resolved", "routing_association_ids": [route_id]}
-                if route_id
-                else {}
-            ),
         }
+        if amended and route_id:
+            identifiers.update(
+                {
+                    "routing_status": "resolved",
+                    "routing_association_ids": [route_id],
+                }
+            )
+        elif not amended:
+            identifiers.update(
+                {
+                    "routing_status": "unresolved",
+                    "routing_association_ids": [],
+                    "inconclusive_sections": ["checklist_items", "steps"],
+                }
+            )
+        return identifiers
 
     scenarios: list[tuple[Any, ...]] = [
         (
@@ -873,24 +884,73 @@ def _create_version(
             "mil.unknown.reachability_first",
             "unknown",
             {"application_location": "inside_egypt"},
-            "next_question",
-            {"question_id": "q.mil.father_alive"},
+            "next_question" if amended else "plan",
+            (
+                {"question_id": "q.mil.father_alive"}
+                if amended
+                else {
+                    "procedure_version_id": version_id,
+                    "eligibility_basis_ids": [],
+                    "inconclusive_basis_ids": [
+                        "family.missing_war_or_terror_relative",
+                        "family.only_son_living_father",
+                        "family.sibling_current_service",
+                        "family.support_father_or_incapable_brothers",
+                        "family.support_mother",
+                        "family.support_unmarried_sisters",
+                    ],
+                    "routing_status": "unresolved",
+                    "inconclusive_sections": ["checklist_items", "steps"],
+                }
+            ),
             [],
         ),
         (
             "mil.unknown.only_son_qualification",
             "unknown",
             {"application_location": "inside_egypt", "father_alive": True},
-            "next_question",
-            {"question_id": "q.mil.other_sons_count"},
+            "next_question" if amended else "plan",
+            (
+                {"question_id": "q.mil.other_sons_count"}
+                if amended
+                else {
+                    "procedure_version_id": version_id,
+                    "eligibility_basis_ids": [],
+                    "inconclusive_basis_ids": [
+                        "family.missing_war_or_terror_relative",
+                        "family.only_son_living_father",
+                        "family.sibling_current_service",
+                        "family.support_father_or_incapable_brothers",
+                        "family.support_mother",
+                        "family.support_unmarried_sisters",
+                    ],
+                    "routing_status": "unresolved",
+                    "inconclusive_sections": ["checklist_items", "steps"],
+                }
+            ),
             [],
         ),
         (
             "mil.unreachable.father_qualification_suppressed",
             "unknown",
             {"application_location": "inside_egypt", "father_alive": False},
-            "next_question",
-            {"question_id": "q.mil.mother_status"},
+            "next_question" if amended else "plan",
+            (
+                {"question_id": "q.mil.mother_status"}
+                if amended
+                else {
+                    "procedure_version_id": version_id,
+                    "eligibility_basis_ids": [],
+                    "inconclusive_basis_ids": [
+                        "family.missing_war_or_terror_relative",
+                        "family.sibling_current_service",
+                        "family.support_mother",
+                        "family.support_unmarried_sisters",
+                    ],
+                    "routing_status": "unresolved",
+                    "inconclusive_sections": ["checklist_items", "steps"],
+                }
+            ),
             [],
         ),
         (

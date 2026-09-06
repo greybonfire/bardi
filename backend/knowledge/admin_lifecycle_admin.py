@@ -11,7 +11,7 @@ from django.contrib.admin.helpers import ACTION_CHECKBOX_NAME
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from planning.trust import VERIFICATION_CHOICES
 
@@ -253,6 +253,66 @@ def _append_actions(existing: Iterable[str], *names: str) -> tuple[str, ...]:
     return tuple(dict.fromkeys((*existing, *names)))
 
 
+def _reject_unavailable_action(
+    model_admin: admin.ModelAdmin[Any],
+    request: HttpRequest,
+    protected_actions: frozenset[str],
+) -> HttpResponseRedirect | None:
+    if request.method != "POST":
+        return None
+    action_name = request.POST.get("action")
+    if action_name not in protected_actions or action_name in model_admin.get_actions(request):
+        return None
+    model_admin.message_user(
+        request,
+        "You do not have permission to perform that lifecycle action.",
+        level=messages.ERROR,
+    )
+    return HttpResponseRedirect(request.path)
+
+
+_original_procedure_version_changelist_view = ProcedureVersionAdmin.changelist_view
+
+
+def procedure_version_changelist_view(
+    model_admin: ProcedureVersionAdmin,
+    request: HttpRequest,
+    extra_context: dict[str, Any] | None = None,
+) -> HttpResponse:
+    rejected = _reject_unavailable_action(
+        model_admin,
+        request,
+        frozenset({"clone_selected_to_draft", "approve_selected_versions"}),
+    )
+    if rejected is not None:
+        return rejected
+    return cast(
+        HttpResponse,
+        _original_procedure_version_changelist_view(model_admin, request, extra_context),
+    )
+
+
+_original_evidence_link_changelist_view = EvidenceLinkAdmin.changelist_view
+
+
+def evidence_link_changelist_view(
+    model_admin: EvidenceLinkAdmin,
+    request: HttpRequest,
+    extra_context: dict[str, Any] | None = None,
+) -> HttpResponse:
+    rejected = _reject_unavailable_action(
+        model_admin,
+        request,
+        frozenset({"reverify_selected_evidence"}),
+    )
+    if rejected is not None:
+        return rejected
+    return cast(
+        HttpResponse,
+        _original_evidence_link_changelist_view(model_admin, request, extra_context),
+    )
+
+
 _procedure_version_admin = cast(Any, ProcedureVersionAdmin)
 _procedure_version_admin.clone_selected_to_draft = clone_selected_to_draft
 _procedure_version_admin.has_clone_procedureversion_permission = (
@@ -260,6 +320,7 @@ _procedure_version_admin.has_clone_procedureversion_permission = (
 )
 _procedure_version_admin.approve_selected_versions = approve_selected_versions
 _procedure_version_admin.has_review_version_permission = has_review_version_permission
+_procedure_version_admin.changelist_view = procedure_version_changelist_view
 _procedure_version_admin.actions = _append_actions(
     getattr(_procedure_version_admin, "actions", ()),
     "clone_selected_to_draft",
@@ -269,6 +330,7 @@ _procedure_version_admin.actions = _append_actions(
 _evidence_link_admin = cast(Any, EvidenceLinkAdmin)
 _evidence_link_admin.reverify_selected_evidence = reverify_selected_evidence
 _evidence_link_admin.has_reverify_evidence_permission = has_reverify_evidence_permission
+_evidence_link_admin.changelist_view = evidence_link_changelist_view
 _evidence_link_admin.actions = _append_actions(
     getattr(_evidence_link_admin, "actions", ()),
     "reverify_selected_evidence",

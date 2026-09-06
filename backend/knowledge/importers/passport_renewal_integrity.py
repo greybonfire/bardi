@@ -208,7 +208,7 @@ def _verify_evidence(version: ProcedureVersion) -> None:
         .distinct()
         .prefetch_related("source_links__source")
     )
-    rows = []
+    rows: list[dict[str, object]] = []
     for link in links:
         owner_kind, owner_id = _evidence_owner(link)
         rows.append(
@@ -232,7 +232,13 @@ def _verify_evidence(version: ProcedureVersion) -> None:
                 ],
             }
         )
-    rows.sort(key=lambda row: (row["owner_kind"], row["owner_id"], row["semantic_id"]))
+    rows.sort(
+        key=lambda row: (
+            str(row["owner_kind"]),
+            str(row["owner_id"]),
+            str(row["semantic_id"]),
+        )
+    )
     _require_digest("evidence", rows)
 
 
@@ -252,7 +258,9 @@ def verify_passport_renewal_import(version: ProcedureVersion) -> None:
     """Reject drift from the semantic state created by the deterministic importer."""
 
     if version.semantic_id != VERSION_ID:
-        raise ValidationError(f"Unexpected passport-renewal version identity: {version.semantic_id}.")
+        raise ValidationError(
+            f"Unexpected passport-renewal version identity: {version.semantic_id}."
+        )
     _verify_planning_signature(version)
     _verify_scenarios(version)
     _verify_shared_research_records()

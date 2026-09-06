@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
             model_name="evidencelink",
             constraint=models.CheckConstraint(
                 condition=models.Q(("semantic_id", ""))
-                | models.Q(("semantic_id__regex", r"\S")),
+                | models.Q(("semantic_id__regex", r".*[^[:space:]].*")),
                 name="evidence_semantic_id_blank_or_nonblank",
             ),
         ),

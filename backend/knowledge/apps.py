@@ -87,6 +87,7 @@ class KnowledgeConfig(AppConfig):
         from .aggregate_guard import connect_aggregate_relation_guards
         from .runtime_integrity import (
             install_evidence_identity_validation,
+            install_national_id_renewal_integrity_verification,
             install_passport_renewal_integrity_verification,
         )
 
@@ -100,4 +101,5 @@ class KnowledgeConfig(AppConfig):
         assert _admin_lifecycle_admin.clone_selected_to_draft is not None
         install_evidence_identity_validation()
         install_passport_renewal_integrity_verification()
+        install_national_id_renewal_integrity_verification()
         connect_aggregate_relation_guards()

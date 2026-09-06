@@ -51,6 +51,24 @@ discrepancy dimensions. An independent military specialist approves the military
 separate publisher finally uses the Procedure Version **publish selected** action. Import,
 review, specialist approval, and canonical publish are intentionally separate operations.
 
+## National-ID-renewal knowledge import and review
+
+Import or verify the researched ordinary domestic National ID-renewal draft with an existing
+staff author:
+
+```bash
+uv run python backend/manage.py import_national_id_renewal --author <username> \
+  --settings=bardi.settings.development
+```
+
+The command does not create users, approvals, or publication metadata. A rerun returns the
+identical draft and rejects planning, scenario, provenance, trust, source, and review-policy
+semantic drift. Independent staff review the normal evidence/source, rule/logic,
+scenario/behavior, and bilingual-semantic dimensions; a separate publisher then uses the
+canonical Procedure Version **publish selected** action. The imported ordinary fee remains an
+explicit unknown value, the previous-card research lead remains needs-reverification, and exact
+office routing remains unresolved until stronger current evidence is authored.
+
 Deployment-specific HTTPS redirect, proxy-header, and HSTS policy is intentionally deferred
 until the production ingress topology is selected and hardened under issue #54.
 

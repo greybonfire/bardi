@@ -49,7 +49,29 @@ def install_passport_renewal_integrity_verification() -> None:
     passport_renewal.import_passport_renewal = cast(Callable[..., Any], verified_import)
 
 
+def install_national_id_renewal_integrity_verification() -> None:
+    """Make every National ID-renewal importer call verify the imported semantic state."""
+
+    from .importers import national_id_renewal
+    from .importers.national_id_renewal_integrity import verify_national_id_renewal_import
+
+    current = national_id_renewal.import_national_id_renewal
+    if getattr(current, "_verifies_import_integrity", False):
+        return
+
+    @wraps(current)
+    @transaction.atomic
+    def verified_import(*args: Any, **kwargs: Any) -> Any:
+        version = current(*args, **kwargs)
+        verify_national_id_renewal_import(version)
+        return version
+
+    verified_import._verifies_import_integrity = True  # type: ignore[attr-defined]
+    national_id_renewal.import_national_id_renewal = cast(Callable[..., Any], verified_import)
+
+
 __all__ = (
     "install_evidence_identity_validation",
+    "install_national_id_renewal_integrity_verification",
     "install_passport_renewal_integrity_verification",
 )

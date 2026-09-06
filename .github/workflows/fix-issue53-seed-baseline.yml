@@ -1,0 +1,46 @@
+name: Fix issue 53 migration seed baseline
+
+on:
+  push:
+    branches:
+      - feat/53-cross-family-production-parity
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/53-cross-family-production-parity
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.0.1
+      - run: uv sync --locked --extra dev
+      - name: Preserve migration seed data between transactional tests
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('backend/api/tests/test_cross_family_production_parity.py')
+          text = path.read_text()
+          old = 'class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):\n    def setUp(self) -> None:'
+          new = 'class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):\n    serialized_rollback = True\n\n    def setUp(self) -> None:'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected class setup once, found {text.count(old)}')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          uv run ruff format backend/api/tests/test_cross_family_production_parity.py
+          uv run ruff check backend/api/tests/test_cross_family_production_parity.py
+          uv run mypy backend/api/tests/test_cross_family_production_parity.py
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/api/tests/test_cross_family_production_parity.py
+          git commit -m "Preserve seeded facts in parity acceptance tests"
+          git push origin HEAD:feat/53-cross-family-production-parity

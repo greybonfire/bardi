@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from django.conf import settings
 from django.db import connection
 from django.http import HttpRequest, JsonResponse
 from django.views.decorators.http import require_GET
@@ -42,15 +43,16 @@ def readiness(request: HttpRequest) -> JsonResponse:
         status_code = 503
         payload = {"status": "not_ready", "checks": {"database": "unavailable"}}
 
-    logger.info(
-        "readiness_check",
-        extra=operational_observability_metadata(
-            event="readiness_check",
-            method=request.method,
-            route="/health/ready",
-            status_code=status_code,
-            database_status=database_status,
-            request_id=getattr(request, "_bardi_request_id", ""),
-        ),
-    )
+    if getattr(settings, "OPERATIONAL_OBSERVABILITY_ENABLED", False) is True:
+        logger.info(
+            "readiness_check",
+            extra=operational_observability_metadata(
+                event="readiness_check",
+                method=request.method,
+                route="/health/ready",
+                status_code=status_code,
+                database_status=database_status,
+                request_id=getattr(request, "_bardi_request_id", ""),
+            ),
+        )
     return _no_store(JsonResponse(payload, status=status_code))

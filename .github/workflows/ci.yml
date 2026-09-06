@@ -115,8 +115,17 @@ jobs:
       - name: Verify migration state
         run: uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 
-      - name: Run all production backend tests
-        run: cd backend && uv run python manage.py test --settings=bardi.settings.test
+      - name: Run cross-family production acceptance suite
+        run: >-
+          cd backend && uv run python manage.py test
+          api.tests.test_cross_family_production_parity
+          --settings=bardi.settings.test
+
+      - name: Run all other production backend tests
+        run: >-
+          cd backend && uv run python manage.py test
+          --exclude-tag=production_acceptance
+          --settings=bardi.settings.test
 
   required:
     name: CI required

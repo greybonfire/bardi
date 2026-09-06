@@ -218,11 +218,13 @@ def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
 
     existing = ProcedureVersion.objects.select_for_update().filter(semantic_id=VERSION_ID).first()
     if existing is not None:
-        procedure = Procedure.objects.get(semantic_id="ordinary_domestic_national_id_renewal")
+        existing_procedure = Procedure.objects.get(
+            semantic_id="ordinary_domestic_national_id_renewal"
+        )
         _expected(
             existing,
             {
-                "procedure_id": procedure.pk,
+                "procedure_id": existing_procedure.pk,
                 "text_ar": "تجديد بطاقة الرقم القومي المنتهية داخل مصر دون تغيير البيانات",
                 "text_en": (
                     "Renew an expired Egyptian National ID inside Egypt without changing its "

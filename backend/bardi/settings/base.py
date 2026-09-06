@@ -118,8 +118,9 @@ DEBUG = env_bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 
-# The private-pilot abuse guard is deliberately disabled outside production unless a
-# test opts in. It is process-local and retains only HMAC client identifiers/counters.
+# Private-pilot operational features are opt-in outside production so tests and local
+# development remain deterministic and quiet unless they deliberately exercise them.
+OPERATIONAL_OBSERVABILITY_ENABLED = False
 PUBLIC_API_RATE_LIMIT_ENABLED = False
 PUBLIC_API_RATE_LIMIT_REQUESTS = 60
 PUBLIC_API_RATE_LIMIT_WINDOW_SECONDS = 60

@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import date
+from typing import Any
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
@@ -151,13 +152,13 @@ def _verify_shared_research_records() -> None:
     _require_digest("sources", sources)
 
 
-def _trust_row(model: str, row: object) -> dict[str, object]:
+def _trust_row(model: str, row: Any) -> dict[str, object]:
     return {
         "model": model,
-        "semantic_id": getattr(row, "semantic_id"),
-        "verified_on": getattr(row, "verified_on"),
-        "reverify_on": getattr(row, "reverify_on"),
-        "verification_state": getattr(row, "verification_state"),
+        "semantic_id": row.semantic_id,
+        "verified_on": row.verified_on,
+        "reverify_on": row.reverify_on,
+        "verification_state": row.verification_state,
     }
 
 

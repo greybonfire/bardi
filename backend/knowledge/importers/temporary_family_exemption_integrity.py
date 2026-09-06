@@ -379,6 +379,7 @@ def _verify_routing_material(version_id: str) -> None:
             row.service_point.semantic_id != point_id
             or row.address_ar != address_ar
             or row.address_en != address_en
+            or row.effective_from != RESEARCH_DATE
             or row.availability != ServicePointVersion.Availability.AVAILABLE
             or dynamic.verification_state != "current"
             or dynamic.verified_on != RESEARCH_DATE

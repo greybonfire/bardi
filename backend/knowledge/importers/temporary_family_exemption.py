@@ -1423,6 +1423,7 @@ def import_temporary_family_exemption(
                 "address_ar": address_ar,
                 "address_en": address_en,
                 "availability": ServicePointVersion.Availability.AVAILABLE,
+                "effective_from": RESEARCH_DATE,
                 "verified_on": RESEARCH_DATE,
                 "reverify_on": SHORT_REVERIFY,
                 "verification_state": "current",

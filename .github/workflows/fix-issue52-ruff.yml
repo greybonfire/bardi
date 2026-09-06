@@ -23,6 +23,21 @@ jobs:
       - run: uv sync --locked --extra dev
       - name: Apply Ruff fixes
         run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/knowledge/importers/temporary_family_exemption_integrity.py")
+          text = path.read_text()
+          old = '    procedure = Procedure.objects.get(semantic_id="temporary_family_exemption_from_military_service")\n'
+          new = (
+              '    procedure = Procedure.objects.get(\n'
+              '        semantic_id="temporary_family_exemption_from_military_service"\n'
+              '    )\n'
+          )
+          if old not in text:
+              raise SystemExit("expected long Procedure lookup line was not found")
+          path.write_text(text.replace(old, new, 1))
+          PY
           uv run ruff check --fix backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
           uv run ruff format backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
           uv run ruff check backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py

@@ -115,10 +115,10 @@ jobs:
       - name: Verify migration state
         run: uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 
-      - name: Exercise project migration rollback and reapply
+      - name: Exercise latest project migration rollback and reapply
         run: |
-          uv run python backend/manage.py migrate knowledge zero --noinput --settings=bardi.settings.test
-          uv run python backend/manage.py migrate --noinput --settings=bardi.settings.test
+          uv run python backend/manage.py migrate knowledge 0015 --noinput --settings=bardi.settings.test
+          uv run python backend/manage.py migrate knowledge 0016 --noinput --settings=bardi.settings.test
           uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 
       - name: Exercise PostgreSQL backup and restore

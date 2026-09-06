@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from time import perf_counter
 from uuid import uuid4
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 
 OPERATIONAL_OBSERVABILITY_FIELDS = frozenset(
@@ -78,12 +79,18 @@ def operational_observability_metadata(
 ) -> dict[str, str | int]:
     """Construct the complete scalar allow-list for one operational event."""
 
-    safe_event = event if isinstance(event, str) and event in _OPERATIONAL_EVENTS else "request_completed"
+    safe_event = (
+        event
+        if isinstance(event, str) and event in _OPERATIONAL_EVENTS
+        else "request_completed"
+    )
     candidate_method = method.upper() if isinstance(method, str) else "GET"
     safe_method = candidate_method if candidate_method in _OPERATIONAL_METHODS else "GET"
     safe_route = route if isinstance(route, str) and route in _OPERATIONAL_ROUTES else "other"
     safe_status = status_code if type(status_code) is int and 100 <= status_code <= 599 else 500
-    safe_duration = duration_ms if type(duration_ms) is int and 0 <= duration_ms <= 3_600_000 else 0
+    safe_duration = (
+        duration_ms if type(duration_ms) is int and 0 <= duration_ms <= 3_600_000 else 0
+    )
     safe_database_status = (
         database_status
         if isinstance(database_status, str) and database_status in _DATABASE_STATUSES
@@ -167,7 +174,10 @@ class RequestObservabilityMiddleware:
         response = self.get_response(request)
         duration_ms = max(0, round((perf_counter() - started) * 1000))
         route = normalize_operational_route(request.path)
-        if route != "other":
+        if (
+            getattr(settings, "OPERATIONAL_OBSERVABILITY_ENABLED", False) is True
+            and route != "other"
+        ):
             logger.info(
                 "request_completed",
                 extra=operational_observability_metadata(

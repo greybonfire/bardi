@@ -37,9 +37,7 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
     default=False,
 )
 SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
-if SECURE_HSTS_PRELOAD and (
-    SECURE_HSTS_SECONDS < 31_536_000 or not SECURE_HSTS_INCLUDE_SUBDOMAINS
-):
+if SECURE_HSTS_PRELOAD and (SECURE_HSTS_SECONDS < 31_536_000 or not SECURE_HSTS_INCLUDE_SUBDOMAINS):
     raise ImproperlyConfigured(
         "HSTS preload requires at least one year and SECURE_HSTS_INCLUDE_SUBDOMAINS=true"
     )

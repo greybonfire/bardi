@@ -232,7 +232,9 @@ def _verify_version(version: ProcedureVersion, *, amended: bool) -> None:
 
     bases = {
         row.semantic_id: row
-        for row in EligibilityBasis.objects.filter(procedure_version=version).order_by("semantic_id")
+        for row in EligibilityBasis.objects.filter(procedure_version=version).order_by(
+            "semantic_id"
+        )
     }
     for basis in bases.values():
         if cast(Any, basis).verification_state != "needs_reverification":
@@ -472,7 +474,9 @@ def _create_version(
             context,
             tuple(sources[source_id] for source_id in source_ids),
             effective_from=AMENDMENT_EFFECTIVE_DATE if amended and display_order == 50 else None,
-            effective_to=AMENDMENT_PUBLICATION_DATE if not amended and display_order == 50 else None,
+            effective_to=AMENDMENT_PUBLICATION_DATE
+            if not amended and display_order == 50
+            else None,
         )
 
     shared = _claim(
@@ -571,7 +575,9 @@ def _create_version(
                 "verification_state": "needs_reverification",
             },
         )
-        basis_evidence = EvidenceLink.objects.get(eligibility_basis=bases[basis_id], semantic_id=evidence_id)
+        basis_evidence = EvidenceLink.objects.get(
+            eligibility_basis=bases[basis_id], semantic_id=evidence_id
+        )
         _evidence(
             "checklist_item",
             item,
@@ -579,7 +585,12 @@ def _create_version(
             basis_evidence.passage,
             basis_evidence.location,
             basis_evidence.applicability_context,
-            tuple(link.source for link in basis_evidence.source_links.select_related("source").order_by("position")),
+            tuple(
+                link.source
+                for link in basis_evidence.source_links.select_related("source").order_by(
+                    "position"
+                )
+            ),
             effective_from=basis_evidence.effective_from,
             effective_to=basis_evidence.effective_to,
         )
@@ -790,16 +801,19 @@ def _create_version(
         "article7_third_exclusion_status": "none_documented",
         "residence_governorate": "giza",
     }
-    basis_plan = lambda basis_id, route_id=None: {
-        "procedure_version_id": version_id,
-        "eligibility_basis_ids": [basis_id],
-        "inconclusive_basis_ids": [basis_id],
-        **(
-            {"routing_status": "resolved", "routing_association_ids": [route_id]}
-            if route_id
-            else {}
-        ),
-    }
+
+    def basis_plan(basis_id, route_id=None):
+        return {
+            "procedure_version_id": version_id,
+            "eligibility_basis_ids": [basis_id],
+            "inconclusive_basis_ids": [basis_id],
+            **(
+                {"routing_status": "resolved", "routing_association_ids": [route_id]}
+                if route_id
+                else {}
+            ),
+        }
+
     scenarios: list[tuple[Any, ...]] = [
         (
             "mil.basis.only_son.positive_candidate",
@@ -960,9 +974,9 @@ def _create_version(
             name=name,
             kind=kind,
             evaluation_context={
-                "evaluation_date": date_override[0] if date_override else (
-                    "2026-08-26" if amended else "2026-03-24"
-                ),
+                "evaluation_date": date_override[0]
+                if date_override
+                else ("2026-08-26" if amended else "2026-03-24"),
                 "locale": "en",
             },
             source_facts=source_facts,
@@ -1027,7 +1041,9 @@ def import_temporary_family_exemption(
     assert isinstance(procedure, Procedure)
 
     boundary = _eq("application_location", "inside_egypt")
-    candidate = ServiceProcedureCandidate.objects.filter(service=service, procedure=procedure).first()
+    candidate = ServiceProcedureCandidate.objects.filter(
+        service=service, procedure=procedure
+    ).first()
     if candidate is None:
         save_candidate(
             ServiceProcedureCandidate(
@@ -1040,20 +1056,104 @@ def import_temporary_family_exemption(
         _expected(candidate, {"selection_predicate": boundary}, str(candidate))
 
     question_specs = (
-        (10, "q.mil.application_location", "application_location", "هل ستتعامل مع موقفك التجنيدي من داخل مصر أم من خارجها؟", "Will you handle your military-service status from inside or outside Egypt?"),
-        (20, "q.mil.father_alive", "father_alive", "هل والدك على قيد الحياة؟", "Is your father alive?"),
-        (30, "q.mil.other_sons_count", "other_living_sons_of_father_count", "كم عدد الأبناء الذكور الآخرين الأحياء لوالدك؟", "How many other living sons does your father have?"),
-        (40, "q.mil.father_capacity", "father_unable_to_earn_status", "هل لديك مستند أو حالة معتمدة تثبت أن والدك غير قادر على الكسب؟", "Do you have an accepted document/status establishing that your father is unable to earn?"),
-        (50, "q.mil.mother_status", "mother_family_status", "ما الحالة العائلية ذات الصلة لوالدتك؟", "What is your mother's relevant family status?"),
-        (60, "q.mil.unmarried_sisters", "unmarried_sisters_requiring_support_count", "كم عدد أخواتك غير المتزوجات اللاتي تدخل حالتهن في طلب الإعفاء؟", "How many unmarried sisters are relevant to the exemption request?"),
-        (65, "q.mil.missing_category", "missing_relative_category", "إذا كان الطلب مرتبطًا بشخص مفقود، فما صفته المسجلة؟", "If the request concerns a missing person, what recorded category applies to that relative?"),
-        (70, "q.mil.missing_cause", "missing_relative_cause", "إذا كان الطلب مرتبطًا بشخص مفقود، فما سبب الفقد المسجل؟", "If the request concerns a missing person, what recorded cause of disappearance applies?"),
-        (72, "q.mil.missing_alive_status", "missing_relative_alive_status", "ما الحالة المسجلة حاليًا للشخص المفقود؟", "What is the currently recorded status of the missing relative?"),
-        (75, "q.mil.largest_eligible_relative", "applicant_largest_eligible_relative_status", "هل لديك حالة معتمدة تثبت أنك القريب الأكبر المستوفي لوصف التجنيد المطلوب لهذا الأساس؟", "Do you have an authority-recorded status establishing that you are the largest eligible conscription relative for this ground?"),
-        (80, "q.mil.sibling_service", "sibling_service_status", "هل أحد إخوتك حالياً في الخدمة الإلزامية أو مستدعى للاحتياط؟", "Is one of your brothers currently in compulsory service or called for qualifying reserve service?"),
-        (85, "q.mil.eldest_remaining_brother", "applicant_eldest_remaining_brother_status", "هل لديك حالة معتمدة تثبت انطباق ترتيب الأخ الأكبر المتبقي عليك؟", "Do you have an authority-recorded status establishing that the eldest-remaining-brother condition applies to you?"),
-        (87, "q.mil.article7_third_exclusion", "article7_third_exclusion_status", "هل توجد حالة معتمدة تُظهر وجود أحد استبعادات المادة 7/ثالثاً؟", "Is there an authority-recorded status showing that an Article 7/Third exclusion applies?"),
-        (90, "q.mil.governorate", "residence_governorate", "ما محافظة محل الإقامة المستخدمة في معاملتك التجنيدية؟", "Which governorate of residence is used for your recruitment transaction?"),
+        (
+            10,
+            "q.mil.application_location",
+            "application_location",
+            "هل ستتعامل مع موقفك التجنيدي من داخل مصر أم من خارجها؟",
+            "Will you handle your military-service status from inside or outside Egypt?",
+        ),
+        (
+            20,
+            "q.mil.father_alive",
+            "father_alive",
+            "هل والدك على قيد الحياة؟",
+            "Is your father alive?",
+        ),
+        (
+            30,
+            "q.mil.other_sons_count",
+            "other_living_sons_of_father_count",
+            "كم عدد الأبناء الذكور الآخرين الأحياء لوالدك؟",
+            "How many other living sons does your father have?",
+        ),
+        (
+            40,
+            "q.mil.father_capacity",
+            "father_unable_to_earn_status",
+            "هل لديك مستند أو حالة معتمدة تثبت أن والدك غير قادر على الكسب؟",
+            "Do you have an accepted document/status establishing that your father is unable to earn?",
+        ),
+        (
+            50,
+            "q.mil.mother_status",
+            "mother_family_status",
+            "ما الحالة العائلية ذات الصلة لوالدتك؟",
+            "What is your mother's relevant family status?",
+        ),
+        (
+            60,
+            "q.mil.unmarried_sisters",
+            "unmarried_sisters_requiring_support_count",
+            "كم عدد أخواتك غير المتزوجات اللاتي تدخل حالتهن في طلب الإعفاء؟",
+            "How many unmarried sisters are relevant to the exemption request?",
+        ),
+        (
+            65,
+            "q.mil.missing_category",
+            "missing_relative_category",
+            "إذا كان الطلب مرتبطًا بشخص مفقود، فما صفته المسجلة؟",
+            "If the request concerns a missing person, what recorded category applies to that relative?",
+        ),
+        (
+            70,
+            "q.mil.missing_cause",
+            "missing_relative_cause",
+            "إذا كان الطلب مرتبطًا بشخص مفقود، فما سبب الفقد المسجل؟",
+            "If the request concerns a missing person, what recorded cause of disappearance applies?",
+        ),
+        (
+            72,
+            "q.mil.missing_alive_status",
+            "missing_relative_alive_status",
+            "ما الحالة المسجلة حاليًا للشخص المفقود؟",
+            "What is the currently recorded status of the missing relative?",
+        ),
+        (
+            75,
+            "q.mil.largest_eligible_relative",
+            "applicant_largest_eligible_relative_status",
+            "هل لديك حالة معتمدة تثبت أنك القريب الأكبر المستوفي لوصف التجنيد المطلوب لهذا الأساس؟",
+            "Do you have an authority-recorded status establishing that you are the largest eligible conscription relative for this ground?",
+        ),
+        (
+            80,
+            "q.mil.sibling_service",
+            "sibling_service_status",
+            "هل أحد إخوتك حالياً في الخدمة الإلزامية أو مستدعى للاحتياط؟",
+            "Is one of your brothers currently in compulsory service or called for qualifying reserve service?",
+        ),
+        (
+            85,
+            "q.mil.eldest_remaining_brother",
+            "applicant_eldest_remaining_brother_status",
+            "هل لديك حالة معتمدة تثبت انطباق ترتيب الأخ الأكبر المتبقي عليك؟",
+            "Do you have an authority-recorded status establishing that the eldest-remaining-brother condition applies to you?",
+        ),
+        (
+            87,
+            "q.mil.article7_third_exclusion",
+            "article7_third_exclusion_status",
+            "هل توجد حالة معتمدة تُظهر وجود أحد استبعادات المادة 7/ثالثاً؟",
+            "Is there an authority-recorded status showing that an Article 7/Third exclusion applies?",
+        ),
+        (
+            90,
+            "q.mil.governorate",
+            "residence_governorate",
+            "ما محافظة محل الإقامة المستخدمة في معاملتك التجنيدية؟",
+            "Which governorate of residence is used for your recruitment transaction?",
+        ),
     )
     facts: dict[str, FactDefinition] = {}
     for priority, semantic_id, fact_key, text_ar, text_en in question_specs:
@@ -1153,16 +1253,80 @@ def import_temporary_family_exemption(
         assert isinstance(authority, Authority)
 
     source_specs: tuple[tuple[Any, ...], ...] = (
-        ("SRC-LAW127-1980-GAZETTE", official_gazette, "Military and National Service Law No. 127 of 1980", "https://manshurat.org/node/12230", "official", date(1980, 7, 10), date(1980, 7, 11)),
-        ("SRC-LAW2-2026-GAZETTE-METADATA", sis, "Law No. 2 of 2026 — Official Gazette metadata", "https://mediadr.sis.gov.eg/xmlui/handle/123456789/125126?locale-attribute=en", "official", date(2026, 3, 24), date(2026, 3, 25)),
-        ("SRC-LAW2-2026-TEXT", mks, "Law No. 2 of 2026 amending Military and National Service Law", "https://mksegypt.org/ar/laws/24662", "secondary", date(2026, 3, 24), date(2026, 3, 25)),
-        ("SRC-PARLIAMENT-LAW2-2026", parliament, "Parliamentary approval of Law No. 2 of 2026 military-service amendment", "https://www.parliament.gov.eg/News_Show.aspx?frm=5692", "official", date(2026, 2, 16), None),
-        ("SRC-MOD-RECRUITMENT-OCT-2026", mod, "Recruitment operational announcement", "https://www.mod.gov.eg/modwebsite/NewsDetailsAr.aspx?id=45878", "official", None, None),
-        ("SRC-TAGNED-REGIONS", recruitment, "Recruitment regions directory", "https://tagned.mod.gov.eg/tagneedPlaces.aspx", "official", None, None),
-        ("SRC-TAGNED-CERTIFICATE-SERVICE", recruitment, "Exemption certificate service", "https://tagned.mod.gov.eg/16militaryServiceExemptionC.aspx", "official", None, None),
+        (
+            "SRC-LAW127-1980-GAZETTE",
+            official_gazette,
+            "Military and National Service Law No. 127 of 1980",
+            "https://manshurat.org/node/12230",
+            "official",
+            date(1980, 7, 10),
+            date(1980, 7, 11),
+        ),
+        (
+            "SRC-LAW2-2026-GAZETTE-METADATA",
+            sis,
+            "Law No. 2 of 2026 — Official Gazette metadata",
+            "https://mediadr.sis.gov.eg/xmlui/handle/123456789/125126?locale-attribute=en",
+            "official",
+            date(2026, 3, 24),
+            date(2026, 3, 25),
+        ),
+        (
+            "SRC-LAW2-2026-TEXT",
+            mks,
+            "Law No. 2 of 2026 amending Military and National Service Law",
+            "https://mksegypt.org/ar/laws/24662",
+            "secondary",
+            date(2026, 3, 24),
+            date(2026, 3, 25),
+        ),
+        (
+            "SRC-PARLIAMENT-LAW2-2026",
+            parliament,
+            "Parliamentary approval of Law No. 2 of 2026 military-service amendment",
+            "https://www.parliament.gov.eg/News_Show.aspx?frm=5692",
+            "official",
+            date(2026, 2, 16),
+            None,
+        ),
+        (
+            "SRC-MOD-RECRUITMENT-OCT-2026",
+            mod,
+            "Recruitment operational announcement",
+            "https://www.mod.gov.eg/modwebsite/NewsDetailsAr.aspx?id=45878",
+            "official",
+            None,
+            None,
+        ),
+        (
+            "SRC-TAGNED-REGIONS",
+            recruitment,
+            "Recruitment regions directory",
+            "https://tagned.mod.gov.eg/tagneedPlaces.aspx",
+            "official",
+            None,
+            None,
+        ),
+        (
+            "SRC-TAGNED-CERTIFICATE-SERVICE",
+            recruitment,
+            "Exemption certificate service",
+            "https://tagned.mod.gov.eg/16militaryServiceExemptionC.aspx",
+            "official",
+            None,
+            None,
+        ),
     )
     sources: dict[str, Source] = {}
-    for semantic_id, authority, title, locator, classification, published_on, source_effective in source_specs:
+    for (
+        semantic_id,
+        authority,
+        title,
+        locator,
+        classification,
+        published_on,
+        source_effective,
+    ) in source_specs:
         source = _shared(
             Source,
             {"semantic_id": semantic_id},
@@ -1191,9 +1355,30 @@ def import_temporary_family_exemption(
     assert isinstance(supporting_documents_type, DocumentType)
 
     point_specs = (
-        ("sp.recruitment_region_giza", "منطقة تجنيد وتعبئة الجيزة", "Giza Recruitment and Mobilization Region", "spv.recruitment_region_giza.research-2026-08-26", "الهرم، الجيزة", "Haram, Giza"),
-        ("sp.recruitment_region_mansoura", "منطقة تجنيد وتعبئة المنصورة", "Mansoura Recruitment and Mobilization Region", "spv.recruitment_region_mansoura.research-2026-08-26", "سندوب، المنصورة", "Sandoub, Mansoura"),
-        ("sp.recruitment_region_zagazig", "منطقة تجنيد وتعبئة الزقازيق", "Zagazig Recruitment and Mobilization Region", "spv.recruitment_region_zagazig.research-2026-08-26", "تل بسطا، الزقازيق", "Tel Basta, Zagazig"),
+        (
+            "sp.recruitment_region_giza",
+            "منطقة تجنيد وتعبئة الجيزة",
+            "Giza Recruitment and Mobilization Region",
+            "spv.recruitment_region_giza.research-2026-08-26",
+            "الهرم، الجيزة",
+            "Haram, Giza",
+        ),
+        (
+            "sp.recruitment_region_mansoura",
+            "منطقة تجنيد وتعبئة المنصورة",
+            "Mansoura Recruitment and Mobilization Region",
+            "spv.recruitment_region_mansoura.research-2026-08-26",
+            "سندوب، المنصورة",
+            "Sandoub, Mansoura",
+        ),
+        (
+            "sp.recruitment_region_zagazig",
+            "منطقة تجنيد وتعبئة الزقازيق",
+            "Zagazig Recruitment and Mobilization Region",
+            "spv.recruitment_region_zagazig.research-2026-08-26",
+            "تل بسطا، الزقازيق",
+            "Tel Basta, Zagazig",
+        ),
     )
     routing_material: dict[str, ServicePointVersion] = {}
     for point_id, name_ar, name_en, material_id, address_ar, address_en in point_specs:

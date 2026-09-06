@@ -95,7 +95,9 @@ class TemporaryFamilyExemptionImportTests(TestCase):
             procedure_version=current,
             semantic_id="family.support_father_or_incapable_brothers",
         )
-        self.assertEqual(father_basis.reachability, {"op": "eq", "fact": "father_alive", "value": True})
+        self.assertEqual(
+            father_basis.reachability, {"op": "eq", "fact": "father_alive", "value": True}
+        )
         self.assertEqual(
             father_basis.qualification,
             {
@@ -117,7 +119,9 @@ class TemporaryFamilyExemptionImportTests(TestCase):
 
         call_command("import_temporary_family_exemption", author=author.username, stdout=output)
 
-        versions = ProcedureVersion.objects.filter(semantic_id__in=(HISTORICAL_VERSION_ID, CURRENT_VERSION_ID))
+        versions = ProcedureVersion.objects.filter(
+            semantic_id__in=(HISTORICAL_VERSION_ID, CURRENT_VERSION_ID)
+        )
         self.assertEqual(versions.count(), 2)
         self.assertTrue(all(version.state == ProcedureVersion.State.DRAFT for version in versions))
         self.assertTrue(all(version.published_by is None for version in versions))

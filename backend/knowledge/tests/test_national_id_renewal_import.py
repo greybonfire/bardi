@@ -39,7 +39,9 @@ class NationalIdRenewalImportTests(TestCase):
         self.assertFalse(first.dependencies.exists())
         self.assertFalse(first.service_point_associations.exists())
         self.assertFalse(Service.objects.filter(semantic_id="goal.national_id").exists())
-        self.assertFalse(Procedure.objects.filter(semantic_id="procedure.national_id_renewal").exists())
+        self.assertFalse(
+            Procedure.objects.filter(semantic_id="procedure.national_id_renewal").exists()
+        )
 
         fee = Fee.objects.get(procedure_version=first, semantic_id="nid.fee.ordinary")
         self.assertEqual(fee.value_state, Fee.ValueState.UNKNOWN)

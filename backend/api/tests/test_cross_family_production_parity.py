@@ -5,7 +5,7 @@ from datetime import date
 from typing import Any
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings, tag
+from django.test import TransactionTestCase, override_settings, tag
 from knowledge.evidence_workflow_temporal import load_knowledge_snapshot_as_of
 from knowledge.importers.national_id_renewal import (
     import_national_id_renewal,
@@ -73,9 +73,8 @@ MILITARY_ONLY_SON_FACTS: dict[str, object] = {
     PLANNING_SCENARIOS_REQUIRED=False,
     PROCEDURE_VERSION_REVIEWS_REQUIRED=False,
 )
-class CrossFamilyProductionParityAcceptanceTests(TestCase):
-    @classmethod
-    def setUpTestData(cls) -> None:
+class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):
+    def setUp(self) -> None:
         author = get_user_model().objects.create_user(
             username="cross-family-acceptance-author",
             is_staff=True,

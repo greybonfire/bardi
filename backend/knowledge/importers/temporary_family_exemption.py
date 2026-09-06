@@ -964,7 +964,7 @@ def _create_version(
         scenarios.append(
             (
                 "mil.temporal.terrorist_not_active_march_24",
-                "negative",
+                "supported_edge",
                 terrorist_false,
                 "inconclusive",
                 {"reason": "no_applicable_eligibility_basis"},

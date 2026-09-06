@@ -286,10 +286,7 @@ def procedure_version_changelist_view(
     )
     if rejected is not None:
         return rejected
-    return cast(
-        HttpResponse,
-        _original_procedure_version_changelist_view(model_admin, request, extra_context),
-    )
+    return _original_procedure_version_changelist_view(model_admin, request, extra_context)
 
 
 _original_evidence_link_changelist_view = EvidenceLinkAdmin.changelist_view
@@ -307,10 +304,7 @@ def evidence_link_changelist_view(
     )
     if rejected is not None:
         return rejected
-    return cast(
-        HttpResponse,
-        _original_evidence_link_changelist_view(model_admin, request, extra_context),
-    )
+    return _original_evidence_link_changelist_view(model_admin, request, extra_context)
 
 
 _procedure_version_admin = cast(Any, ProcedureVersionAdmin)

@@ -1176,6 +1176,9 @@ class EvidenceLink(VersionOwnedModel):
         CONTEXT = "context", "Context only"
         CONTRADICTS = "contradicts", "Contradicts"
 
+    # Stable claim-specific identity. Blank remains permitted for legacy/editorial rows;
+    # production importers must provide an identifier.
+    semantic_id = models.CharField(max_length=128, blank=True, default="")
     checklist_item = models.ForeignKey(
         ChecklistItem,
         null=True,
@@ -1218,6 +1221,21 @@ class EvidenceLink(VersionOwnedModel):
                 ),
                 name="evidence_exactly_one_owner",
             ),
+            models.UniqueConstraint(
+                fields=("checklist_item", "semantic_id"),
+                condition=Q(checklist_item__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_checklist_owner",
+            ),
+            models.UniqueConstraint(
+                fields=("step", "semantic_id"),
+                condition=Q(step__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_step_owner",
+            ),
+            models.UniqueConstraint(
+                fields=("warning", "semantic_id"),
+                condition=Q(warning__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_warning_owner",
+            ),
             models.CheckConstraint(
                 condition=Q(
                     verification_state__in=[
@@ -1255,6 +1273,8 @@ class EvidenceLink(VersionOwnedModel):
         return self.owner.procedure_version
 
     def clean(self) -> None:
+        if self.semantic_id and not self.semantic_id.strip():
+            raise ValidationError({"semantic_id": "Evidence identity cannot be whitespace."})
         owner_ids = (self.checklist_item_id, self.step_id, self.warning_id)
         if self.pk is not None:
             stored = (
@@ -1277,7 +1297,8 @@ class EvidenceLink(VersionOwnedModel):
             raise ValidationError({"effective_to": "Effective interval is not ordered."})
 
     def __str__(self) -> str:
-        return f"evidence:{self.owner}:{self.pk or 'new'}"
+        identity = self.semantic_id or str(self.pk or "new")
+        return f"evidence:{self.owner}:{identity}"
 
 
 class EvidenceLinkSource(VersionOwnedModel):

@@ -101,6 +101,8 @@ class EvidenceLinkSnapshot:
     retrieved_on: date | None = None
     verified_on: date | None = None
     reverify_on: date | None = None
+    # Internal stable provenance identity; public projections intentionally ignore it.
+    semantic_id: str = ""
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "sources", tuple(self.sources))

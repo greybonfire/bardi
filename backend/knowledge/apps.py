@@ -38,6 +38,43 @@ class KnowledgeConfig(AppConfig):
         assert planning_scenarios.PlanningScenario is not None
         assert review_workflow.ProcedureVersionReviewApproval is not None
 
+        # Evidence identifiers are intentionally owner-scoped. Feature modules install
+        # additional owner fields dynamically, so their constraints can only be attached
+        # after the complete owner union has loaded.
+        from django.db import models
+        from django.db.models import Q
+
+        from .models import NONBLANK_PATTERN, EvidenceLink
+
+        existing = {constraint.name for constraint in EvidenceLink._meta.constraints}
+        if "evidence_semantic_id_blank_or_nonblank" not in existing:
+            EvidenceLink._meta.constraints = [
+                *EvidenceLink._meta.constraints,
+                models.CheckConstraint(
+                    condition=Q(semantic_id="") | Q(semantic_id__regex=NONBLANK_PATTERN),
+                    name="evidence_semantic_id_blank_or_nonblank",
+                ),
+            ]
+        for field_name, constraint_name in (
+            ("fee", "unique_evidence_id_fee_owner"),
+            ("eligibility_basis", "unique_evidence_id_basis_owner"),
+            ("procedure_dependency", "unique_evidence_id_dependency_owner"),
+            ("service_point_version", "unique_evidence_id_point_version_owner"),
+            (
+                "procedure_service_point_association",
+                "unique_evidence_id_point_association_owner",
+            ),
+        ):
+            if constraint_name not in existing:
+                EvidenceLink._meta.constraints = [
+                    *EvidenceLink._meta.constraints,
+                    models.UniqueConstraint(
+                        fields=(field_name, "semantic_id"),
+                        condition=Q(**{f"{field_name}__isnull": False}) & ~Q(semantic_id=""),
+                        name=constraint_name,
+                    ),
+                ]
+
     def ready(self) -> None:
         from . import admin_lifecycle_admin as _admin_lifecycle_admin
         from . import eligibility_basis_admin as _eligibility_basis_admin
@@ -48,6 +85,10 @@ class KnowledgeConfig(AppConfig):
         from . import review_workflow_admin as _review_workflow_admin
         from . import service_point_routing_admin as _service_point_routing_admin
         from .aggregate_guard import connect_aggregate_relation_guards
+        from .runtime_integrity import (
+            install_evidence_identity_validation,
+            install_passport_renewal_integrity_verification,
+        )
 
         assert _fee_admin.FeeAdmin is not None
         assert _eligibility_basis_admin.EligibilityBasisAdmin is not None
@@ -57,4 +98,6 @@ class KnowledgeConfig(AppConfig):
         assert _planning_scenario_admin.PlanningScenarioAdmin is not None
         assert _review_workflow_admin.ProcedureVersionReviewPolicyAdmin is not None
         assert _admin_lifecycle_admin.clone_selected_to_draft is not None
+        install_evidence_identity_validation()
+        install_passport_renewal_integrity_verification()
         connect_aggregate_relation_guards()

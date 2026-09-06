@@ -533,6 +533,7 @@ def _evidence_snapshot(link: EvidenceLink) -> EvidenceLinkSnapshot:
         link.retrieved_on,
         link.verified_on,
         link.reverify_on,
+        semantic_id=link.semantic_id,
     )
 
 

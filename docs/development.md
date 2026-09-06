@@ -34,6 +34,23 @@ credentials in `.env.example` must never be used for a deployed database.
 
 The development settings include only local-safe defaults. Production settings fail
 closed and require every secret, host, origin, and PostgreSQL value to be provided.
+
+## Passport-renewal knowledge import and review
+
+Import or verify the production draft with an existing staff author (the command never creates
+users, approvals, or publication metadata):
+
+```bash
+uv run python backend/manage.py import_passport_renewal --author <username> \
+  --settings=bardi.settings.development
+```
+
+A rerun returns the identical draft and rejects semantic conflicts. In Admin, independent staff
+approve evidence/source, rule/logic, scenario/behavior, bilingual-semantic, and applicable
+discrepancy dimensions. An independent military specialist approves the military risk. A
+separate publisher finally uses the Procedure Version **publish selected** action. Import,
+review, specialist approval, and canonical publish are intentionally separate operations.
+
 Deployment-specific HTTPS redirect, proxy-header, and HSTS policy is intentionally deferred
 until the production ingress topology is selected and hardened under issue #54.
 

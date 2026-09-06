@@ -109,9 +109,11 @@ INSTALLED_APPS = [
 
 # Mandatory feature-specific publication readiness gates extend the non-replaceable
 # structural core defined by knowledge.publication.
+SELECTION_QUESTIONS_REQUIRED = True
 PLANNING_SCENARIOS_REQUIRED = True
 PROCEDURE_VERSION_REVIEWS_REQUIRED = True
 PROCEDURE_VERSION_PUBLICATION_GATES = (
+    "knowledge.selection_questions.SelectionQuestionPublicationGate",
     "knowledge.fees.FeePublicationGate",
     "knowledge.eligibility_bases.EligibilityBasisPublicationGate",
     "knowledge.procedure_dependencies.ProcedureDependencyPublicationGate",

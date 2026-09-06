@@ -71,9 +71,40 @@ def validation_error(request: HttpRequest, exc: ValidationError):  # type: ignor
     return api.create_response(request, {"type": "invalid", "diagnostics": diagnostics}, status=422)
 
 
+@api.exception_handler(Exception)
+def unexpected_api_error(request: HttpRequest, _exc: Exception):  # type: ignore[no-untyped-def]
+    path = request.path.rstrip("/")
+    if path == "/v1/planning":
+        metadata = planning_observability_metadata(
+            method=request.method,
+            status_code=500,
+            error_code="internal_error",
+        )
+    else:
+        metadata = {
+            "method": "GET" if request.method == "GET" else "POST",
+            "route": "/v1/services" if path == "/v1/services" else "/v1/public",
+            "status_code": 500,
+            "error_code": "internal_error",
+        }
+    # Never log the exception object or request. The response contract is deliberately
+    # stable even under DEBUG so traceback locals cannot expose anonymous Facts.
+    logger.error("public api request failed", extra=metadata)
+    return api.create_response(
+        request,
+        {"type": "invalid", "diagnostics": [{"code": "internal_error", "path": []}]},
+        status=500,
+    )
+
+
 @api.get(
     "/services",
-    response={200: NavigationResponse, 500: InvalidResponse, 503: InconclusiveResponse},
+    response={
+        200: NavigationResponse,
+        429: InvalidResponse,
+        500: InvalidResponse,
+        503: InconclusiveResponse,
+    },
 )
 def services(request: HttpRequest):  # type: ignore[no-untyped-def]
     try:
@@ -92,6 +123,7 @@ def services(request: HttpRequest):  # type: ignore[no-untyped-def]
         200: PlanningResponse,
         400: InvalidResponse,
         422: InvalidResponse,
+        429: InvalidResponse,
         500: InvalidResponse,
         503: InconclusiveResponse,
     },
@@ -111,18 +143,3 @@ def planning(request: HttpRequest, payload: PlanningRequest):  # type: ignore[no
         )
     except DatabaseError:
         return 503, project_result(InconclusiveResult("knowledge_unavailable"), payload.locale)
-    except Exception:
-        # This is the outer privacy boundary. In particular, never delegate this failure
-        # to Ninja's DEBUG exception rendering, which can serialize traceback locals.
-        logger.error(
-            "planning request failed",
-            extra=planning_observability_metadata(
-                method=request.method,
-                status_code=500,
-                error_code="internal_error",
-            ),
-        )
-        return 500, {
-            "type": "invalid",
-            "diagnostics": [{"code": "internal_error", "path": []}],
-        }

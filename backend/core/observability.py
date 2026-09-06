@@ -80,17 +80,13 @@ def operational_observability_metadata(
     """Construct the complete scalar allow-list for one operational event."""
 
     safe_event = (
-        event
-        if isinstance(event, str) and event in _OPERATIONAL_EVENTS
-        else "request_completed"
+        event if isinstance(event, str) and event in _OPERATIONAL_EVENTS else "request_completed"
     )
     candidate_method = method.upper() if isinstance(method, str) else "GET"
     safe_method = candidate_method if candidate_method in _OPERATIONAL_METHODS else "GET"
     safe_route = route if isinstance(route, str) and route in _OPERATIONAL_ROUTES else "other"
     safe_status = status_code if type(status_code) is int and 100 <= status_code <= 599 else 500
-    safe_duration = (
-        duration_ms if type(duration_ms) is int and 0 <= duration_ms <= 3_600_000 else 0
-    )
+    safe_duration = duration_ms if type(duration_ms) is int and 0 <= duration_ms <= 3_600_000 else 0
     safe_database_status = (
         database_status
         if isinstance(database_status, str) and database_status in _DATABASE_STATUSES

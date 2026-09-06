@@ -70,8 +70,34 @@ def install_national_id_renewal_integrity_verification() -> None:
     national_id_renewal.import_national_id_renewal = cast(Callable[..., Any], verified_import)
 
 
+def install_temporary_family_exemption_integrity_verification() -> None:
+    """Make every temporary family-exemption import verify its complete semantic state."""
+
+    from .importers import temporary_family_exemption
+    from .importers.temporary_family_exemption_integrity import (
+        verify_temporary_family_exemption_import,
+    )
+
+    current = temporary_family_exemption.import_temporary_family_exemption
+    if getattr(current, "_verifies_import_integrity", False):
+        return
+
+    @wraps(current)
+    @transaction.atomic
+    def verified_import(*args: Any, **kwargs: Any) -> Any:
+        versions = current(*args, **kwargs)
+        verify_temporary_family_exemption_import(versions)
+        return versions
+
+    verified_import._verifies_import_integrity = True  # type: ignore[attr-defined]
+    temporary_family_exemption.import_temporary_family_exemption = cast(
+        Callable[..., Any], verified_import
+    )
+
+
 __all__ = (
     "install_evidence_identity_validation",
     "install_national_id_renewal_integrity_verification",
     "install_passport_renewal_integrity_verification",
+    "install_temporary_family_exemption_integrity_verification",
 )

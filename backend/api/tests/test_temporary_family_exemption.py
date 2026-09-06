@@ -4,7 +4,6 @@ from datetime import date
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
-
 from knowledge.evidence_workflow_temporal import load_knowledge_snapshot_as_of
 from knowledge.importers.temporary_family_exemption import (
     CURRENT_VERSION_ID,

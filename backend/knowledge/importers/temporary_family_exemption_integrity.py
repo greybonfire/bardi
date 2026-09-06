@@ -8,7 +8,17 @@ from typing import Any, cast
 from django.core.exceptions import ValidationError
 
 from knowledge.fees import Fee
-from knowledge.models import Authority, ChecklistItem, EligibilityBasis, Procedure, ProcedureVersion, Service, Source, Step, Warning
+from knowledge.models import (
+    Authority,
+    ChecklistItem,
+    EligibilityBasis,
+    Procedure,
+    ProcedureVersion,
+    Service,
+    Source,
+    Step,
+    Warning,
+)
 from knowledge.planning_scenarios import PlanningScenario, planning_behavior_signature
 from knowledge.review_workflow import ProcedureVersionReviewPolicy
 from knowledge.service_point_routing import ProcedureServicePointAssociation, ServicePointVersion
@@ -197,7 +207,9 @@ def _verify_shared_records(version_id: str) -> None:
     ):
         _conflict(version_id, "service")
 
-    procedure = Procedure.objects.get(semantic_id="temporary_family_exemption_from_military_service")
+    procedure = Procedure.objects.get(
+        semantic_id="temporary_family_exemption_from_military_service"
+    )
     if (
         procedure.primary_service_id != service.pk
         or procedure.text_ar != "طلب الإعفاء المؤقت من الخدمة العسكرية لأسباب عائلية"
@@ -245,8 +257,7 @@ def _verify_version(version: ProcedureVersion) -> None:
         _conflict(version_id, "version contract")
 
     basis_rows = {
-        row.semantic_id: row
-        for row in EligibilityBasis.objects.filter(procedure_version=version)
+        row.semantic_id: row for row in EligibilityBasis.objects.filter(procedure_version=version)
     }
     if set(basis_rows) != _BASIS_IDS:
         _conflict(version_id, "Eligibility Bases")
@@ -355,8 +366,9 @@ def _verify_version(version: ProcedureVersion) -> None:
 def _verify_routing_material(version_id: str) -> None:
     rows = {
         row.semantic_id: row
-        for row in ServicePointVersion.objects.filter(semantic_id__in=_SERVICE_POINT_VERSIONS)
-        .select_related("service_point")
+        for row in ServicePointVersion.objects.filter(
+            semantic_id__in=_SERVICE_POINT_VERSIONS
+        ).select_related("service_point")
     }
     if set(rows) != set(_SERVICE_POINT_VERSIONS):
         _conflict(version_id, "routing material")

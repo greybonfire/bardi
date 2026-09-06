@@ -1,0 +1,35 @@
+name: Fix issue 52 Ruff
+
+on:
+  push:
+    branches:
+      - feat/52-import-temporary-family-exemption
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/52-import-temporary-family-exemption
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.0.1
+      - run: uv sync --locked --extra dev
+      - name: Apply Ruff fixes
+        run: |
+          uv run ruff check --fix backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+          uv run ruff format backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+          uv run ruff check backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/api/tests/test_temporary_family_exemption.py backend/knowledge/importers/temporary_family_exemption_integrity.py
+          git commit -m "Fix issue 52 Ruff violations"
+          git push origin HEAD:feat/52-import-temporary-family-exemption

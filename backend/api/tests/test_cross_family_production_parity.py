@@ -74,6 +74,8 @@ MILITARY_ONLY_SON_FACTS: dict[str, object] = {
     PROCEDURE_VERSION_REVIEWS_REQUIRED=False,
 )
 class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):
+    serialized_rollback = True
+
     def setUp(self) -> None:
         author = get_user_model().objects.create_user(
             username="cross-family-acceptance-author",

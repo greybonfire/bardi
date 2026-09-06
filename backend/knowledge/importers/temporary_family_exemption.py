@@ -921,7 +921,7 @@ def _create_version(
     scenarios.append(
         (
             "mil.bases.multiple_support_candidates",
-            "positive",
+            "supported_edge",
             multiple,
             "plan",
             {
@@ -964,7 +964,7 @@ def _create_version(
         scenarios.append(
             (
                 "mil.temporal.terrorist_not_active_march_24",
-                "supported_edge",
+                "negative",
                 terrorist_false,
                 "inconclusive",
                 {"reason": "no_applicable_eligibility_basis"},

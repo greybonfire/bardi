@@ -1,0 +1,56 @@
+name: Fix issue 52 long literals
+
+on:
+  push:
+    branches:
+      - feat/52-import-temporary-family-exemption
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/52-import-temporary-family-exemption
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.0.1
+      - run: uv sync --locked --extra dev
+      - name: Split long literals without changing values
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/knowledge/importers/temporary_family_exemption.py")
+          text = path.read_text()
+          replacements = {
+              '"Only the researched father sub-route is modeled; incapable-brother semantics remain unresolved.",': '("Only the researched father sub-route is modeled; "\n             "incapable-brother semantics remain unresolved."),',
+              '"Current high-level instruction to support an exemption/postponement/exception claim; not a basis-specific list.",': '("Current high-level instruction to support an exemption/postponement/exception "\n         "claim; not a basis-specific list."),',
+              '"Do you have an accepted document/status establishing that your father is unable to earn?",': '("Do you have an accepted document/status establishing that your father is "\n             "unable to earn?"),',
+              '"If the request concerns a missing person, what recorded category applies to that relative?",': '("If the request concerns a missing person, what recorded category applies to "\n             "that relative?"),',
+              '"If the request concerns a missing person, what recorded cause of disappearance applies?",': '("If the request concerns a missing person, what recorded cause of disappearance "\n             "applies?"),',
+              '"Do you have an authority-recorded status establishing that you are the largest eligible conscription relative for this ground?",': '("Do you have an authority-recorded status establishing that you are the largest "\n             "eligible conscription relative for this ground?"),',
+              '"Is one of your brothers currently in compulsory service or called for qualifying reserve service?",': '("Is one of your brothers currently in compulsory service or called for qualifying "\n             "reserve service?"),',
+              '"Do you have an authority-recorded status establishing that the eldest-remaining-brother condition applies to you?",': '("Do you have an authority-recorded status establishing that the "\n             "eldest-remaining-brother condition applies to you?"),',
+              '"Is there an authority-recorded status showing that an Article 7/Third exclusion applies?",': '("Is there an authority-recorded status showing that an Article 7/Third "\n             "exclusion applies?"),',
+          }
+          for old, new in replacements.items():
+              if old not in text:
+                  raise SystemExit(f"missing expected literal: {old}")
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+          PY
+          uv run ruff format backend/knowledge/importers/temporary_family_exemption.py
+          uv run ruff check backend/knowledge/importers/temporary_family_exemption.py
+      - name: Commit fix
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add backend/knowledge/importers/temporary_family_exemption.py
+          git commit -m "Split temporary exemption long literals"
+          git push origin HEAD:feat/52-import-temporary-family-exemption

@@ -8,21 +8,25 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings, tag
 from knowledge.evidence_workflow_temporal import load_knowledge_snapshot_as_of
 from knowledge.importers.national_id_renewal import (
-    VERSION_ID as NATIONAL_ID_VERSION_ID,
     import_national_id_renewal,
 )
 from knowledge.importers.passport_renewal import (
     VERSION_ID as PASSPORT_VERSION_ID,
+)
+from knowledge.importers.passport_renewal import (
     import_passport_renewal,
 )
 from knowledge.importers.temporary_family_exemption import (
     CURRENT_VERSION_ID as MILITARY_CURRENT_VERSION_ID,
+)
+from knowledge.importers.temporary_family_exemption import (
     HISTORICAL_VERSION_ID as MILITARY_HISTORICAL_VERSION_ID,
+)
+from knowledge.importers.temporary_family_exemption import (
     import_temporary_family_exemption,
 )
 from knowledge.publication import publish_procedure_version
 from planning import CasePreparationSuccess, prepare_case
-
 
 PASSPORT_SERVICE_ID = "get_egyptian_passport"
 PASSPORT_PROCEDURE_ID = "ordinary_domestic_passport_renewal"
@@ -149,9 +153,7 @@ class CrossFamilyProductionParityAcceptanceTests(TestCase):
             "eligibility_basis_ids": [item["id"] for item in body["eligibility_bases"]],
             "inconclusive_basis_ids": body["inconclusive_basis_ids"],
             "routing_status": routing["status"],
-            "routing_association_ids": [
-                item["association_id"] for item in routing["destinations"]
-            ],
+            "routing_association_ids": [item["association_id"] for item in routing["destinations"]],
             "routing_service_point_ids": [
                 item["service_point_id"] for item in routing["destinations"]
             ],
@@ -179,7 +181,7 @@ class CrossFamilyProductionParityAcceptanceTests(TestCase):
         self.assertEqual(self.semantic_projection(arabic), self.semantic_projection(english))
         return arabic, english
 
-    def test_active_services_and_all_public_result_families_are_cross_family_bilingual(self) -> None:
+    def test_public_result_families_are_cross_family_bilingual(self) -> None:
         services_response = self.client.get("/v1/services")
         self.assertEqual(services_response.status_code, 200)
         self.assertEqual(

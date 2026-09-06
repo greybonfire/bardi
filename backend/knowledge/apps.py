@@ -39,6 +39,7 @@ class KnowledgeConfig(AppConfig):
         assert review_workflow.ProcedureVersionReviewApproval is not None
 
     def ready(self) -> None:
+        from . import admin_lifecycle_admin as _admin_lifecycle_admin
         from . import eligibility_basis_admin as _eligibility_basis_admin
         from . import evidence_workflow_admin as _evidence_workflow_admin
         from . import fee_admin as _fee_admin
@@ -55,4 +56,5 @@ class KnowledgeConfig(AppConfig):
         assert _evidence_workflow_admin.EvidenceDiscrepancyAdmin is not None
         assert _planning_scenario_admin.PlanningScenarioAdmin is not None
         assert _review_workflow_admin.ProcedureVersionReviewPolicyAdmin is not None
+        assert _admin_lifecycle_admin.clone_selected_to_draft is not None
         connect_aggregate_relation_guards()

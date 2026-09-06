@@ -165,7 +165,18 @@ class EvidenceReverificationEventAdmin(admin.ModelAdmin):  # type: ignore[type-a
         "occurred_at",
     )
     list_filter = ("verification_state", "meaning_changed", "occurred_at")
-    search_fields = ("rationale", "successor_version__semantic_id")
+    search_fields = (
+        "rationale",
+        "successor_version__semantic_id",
+        "anchor_evidence_link__checklist_item__semantic_id",
+        "anchor_evidence_link__step__semantic_id",
+        "anchor_evidence_link__warning__semantic_id",
+        "anchor_evidence_link__fee__semantic_id",
+        "anchor_evidence_link__eligibility_basis__semantic_id",
+        "anchor_evidence_link__procedure_dependency__semantic_id",
+        "anchor_evidence_link__procedure_service_point_association__semantic_id",
+        "anchor_evidence_link__service_point_version__semantic_id",
+    )
     inlines = (EvidenceReverificationEvidenceInline,)
 
     @admin.display(description="Reviewed material")
@@ -180,6 +191,7 @@ class EvidenceReverificationEventAdmin(admin.ModelAdmin):  # type: ignore[type-a
         return tuple(field.name for field in self.model._meta.fields)
 
     def has_add_permission(self, request: HttpRequest) -> bool:
+        # Re-verification creation is exposed as a service-backed Evidence Link Admin action.
         return False
 
     def has_change_permission(
@@ -187,7 +199,7 @@ class EvidenceReverificationEventAdmin(admin.ModelAdmin):  # type: ignore[type-a
         request: HttpRequest,
         obj: EvidenceReverificationEvent | None = None,
     ) -> bool:
-        return bool(obj is not None)
+        return False
 
     def has_delete_permission(
         self,

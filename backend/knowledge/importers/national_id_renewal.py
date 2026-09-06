@@ -509,10 +509,7 @@ def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
         "خلال ثلاثة أشهر من تاريخ انتهاء مدة سريانها",
         "Civil Status Law, Article 52; Official Gazette scan page 18",
         "National ID cardholder renewal; original Article 52 wording.",
-        (
-            sources["SRC-CIVIL-LAW-143-GAZETTE"],
-            sources["SRC-CIVIL-LAW-CONSOLIDATED-2022"],
-        ),
+        (sources["SRC-CIVIL-LAW-143-GAZETTE"],),
     )
 
     previous_card = _claim(

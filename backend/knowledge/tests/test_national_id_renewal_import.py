@@ -112,7 +112,9 @@ class NationalIdRenewalImportTests(TestCase):
             import_national_id_renewal(author=author)
 
     def test_rerun_rejects_scenario_semantic_drift(self) -> None:
-        author = get_user_model().objects.create_user(username="nid-scenario-conflict", is_staff=True)
+        author = get_user_model().objects.create_user(
+            username="nid-scenario-conflict", is_staff=True
+        )
         version = import_national_id_renewal(author=author)
         scenario = PlanningScenario.objects.get(
             procedure_version=version,
@@ -126,7 +128,9 @@ class NationalIdRenewalImportTests(TestCase):
             import_national_id_renewal(author=author)
 
     def test_rerun_rejects_evidence_semantic_drift(self) -> None:
-        author = get_user_model().objects.create_user(username="nid-evidence-conflict", is_staff=True)
+        author = get_user_model().objects.create_user(
+            username="nid-evidence-conflict", is_staff=True
+        )
         version = import_national_id_renewal(author=author)
         item = ChecklistItem.objects.get(
             procedure_version=version,

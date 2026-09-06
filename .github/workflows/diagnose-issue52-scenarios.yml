@@ -1,0 +1,67 @@
+name: Diagnose issue 52 scenarios
+
+on:
+  push:
+    branches:
+      - feat/52-import-temporary-family-exemption
+
+permissions:
+  contents: read
+
+env:
+  POSTGRES_DB: bardi_ci
+  POSTGRES_USER: bardi_ci
+  POSTGRES_PASSWORD: bardi-ci-postgres-password-only
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+  DJANGO_SECRET_KEY: ci-only-strong-django-secret-key-9f5e3d2c1b7a6e4d8c0f
+  DJANGO_DEBUG: 0
+  DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
+  CSRF_TRUSTED_ORIGINS: https://ci.example.test
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: bardi_ci
+          POSTGRES_USER: bardi_ci
+          POSTGRES_PASSWORD: bardi-ci-postgres-password-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U bardi_ci -d bardi_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/52-import-temporary-family-exemption
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - uses: astral-sh/setup-uv@v10.0.1
+      - run: uv sync --locked --extra dev
+      - run: uv run python backend/manage.py migrate --noinput --settings=bardi.settings.test
+      - name: Instrument scenario mismatches
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("backend/knowledge/planning_scenarios.py")
+          text = path.read_text()
+          old = '''            if not _scenario_matches(scenario, result):\n                failures.append(\n'''
+          new = '''            if not _scenario_matches(scenario, result):\n                print(\n                    "SCENARIO_MISMATCH",\n                    scenario.name,\n                    "expected=",\n                    (scenario.expected_result_family, scenario.expected_identifiers, scenario.expected_diagnostics),\n                    "observed=",\n                    _observed_result(result),\n                    flush=True,\n                )\n                failures.append(\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f"expected matcher site once, found {text.count(old)}")
+          path.write_text(text.replace(old, new, 1))
+          PY
+      - name: Run focused publication test
+        run: |
+          cd backend
+          uv run python manage.py test \
+            knowledge.tests.test_temporary_family_exemption_import.TemporaryFamilyExemptionImportTests.test_both_versions_pass_normal_review_and_specialist_publication_gates \
+            --settings=bardi.settings.test -v 2

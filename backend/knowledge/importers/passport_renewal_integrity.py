@@ -177,9 +177,7 @@ def _verify_trust_metadata(version: ProcedureVersion) -> None:
         )
     rows.extend(
         _trust_row("service_point_version", row)
-        for row in ServicePointVersion.objects.filter(
-            associations__procedure_version=version
-        )
+        for row in ServicePointVersion.objects.filter(associations__procedure_version=version)
         .distinct()
         .order_by("semantic_id")
     )

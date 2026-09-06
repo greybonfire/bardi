@@ -169,7 +169,9 @@ class SettingsTests(SimpleTestCase):
 
         self.assertFalse(production.DEBUG)
         self.assertNotIn("*", production.ALLOWED_HOSTS)
-        self.assertTrue(all(origin.startswith("https://") for origin in production.CSRF_TRUSTED_ORIGINS))
+        self.assertTrue(
+            all(origin.startswith("https://") for origin in production.CSRF_TRUSTED_ORIGINS)
+        )
 
         self.assertTrue(production.SECURE_SSL_REDIRECT)
         self.assertEqual(

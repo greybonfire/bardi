@@ -15,6 +15,7 @@ Not every piece of product copy needs an Evidence Link. This file records proven
 - **Type:** official government source
 - **Authority/publisher:** Egyptian Ministry of Interior — General Administration of Passports, Immigration and Nationality
 - **Context:** Ministry passport requirements/instructions page
+- **Preserved locator:** https://moi.gov.eg/content/PPAr.htm
 - **Retrieved:** 2026-08-25
 - **Use:** identity branch, student document, military-status document, photographs, originals/copies, passport validity/nature, Form 29, base fee
 - **Current authority:** high for ordinary domestic passport requirements as published by the competent authority
@@ -38,6 +39,7 @@ The pack uses reviewed English paraphrases rather than presenting these fragment
 - **Type:** official government source
 - **Authority/publisher:** Egyptian Ministry of Interior
 - **Context:** Ministry passport service announcements describing urgent and premium processing
+- **Preserved locator:** https://moi.gov.eg/News/Index?sectionId=1
 - **Retrieved:** 2026-08-25
 - **Use:** accelerated-service fees, timing and jurisdiction behavior
 - **Current authority:** high for the service categories as published
@@ -56,6 +58,7 @@ The exact effective-from date was not exposed in the retrieved text, so fee/serv
 - **Type:** official government source
 - **Authority/publisher:** Egyptian Ministry of Interior
 - **Context:** passport-office/police-directory entries
+- **Preserved locator:** https://moi.gov.eg/home/directorypolice
 - **Retrieved:** 2026-08-25
 - **Use:** stable Service Point identities, locations and example territorial coverage
 
@@ -72,6 +75,7 @@ The evidence pack intentionally does not create a comprehensive nationwide direc
 - **Type:** official government service-directory source
 - **Publisher:** Egyptian Public Services / service directory
 - **Context:** service titled as obtaining a passport in place of an expired or page-full passport
+- **Preserved locator:** https://psm.gov.eg/providers/1/services
 - **Retrieved:** 2026-08-25
 - **Use:** confirms that expired/page-full replacement is a distinct Procedure within the broader passport Goal
 - **Limit:** service-directory content contains older administrative details in places and must not outrank newer competent-authority material on changed thresholds or fees
@@ -94,6 +98,7 @@ Historical domestic guidance also identified the old passport as part of renewal
 - **Type:** official government source, wrong jurisdiction for direct domestic use
 - **Authority/publisher:** Egyptian Ministry of Foreign Affairs / consular service
 - **Context:** passport issuance/renewal outside Egypt
+- **Preserved locator:** https://sis.gov.eg/ar/بوابة-معلومات-للمصريين-بالخارج/الخدمات-الحكومية/دليل-المعاملات-القنصلية/
 - **Retrieved:** 2026-08-25
 - **Use:** research corroboration for previous-passport and parent/guardian concepts only
 - **Applicability:** consular / overseas; not sufficient on its own to support a domestic claim

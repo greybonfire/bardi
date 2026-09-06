@@ -296,6 +296,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
         .order_by("id")
         .values(
             "id",
+            "semantic_id",
             "checklist_item_id",
             "step_id",
             "fee_id",
@@ -440,6 +441,7 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
                 evidence_row["retrieved_on"],
                 evidence_row["verified_on"],
                 evidence_row["reverify_on"],
+                semantic_id=evidence_row["semantic_id"],
             )
         )
     checklist_by_version: dict[str, list[ChecklistItemSnapshot]] = defaultdict(list)

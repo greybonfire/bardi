@@ -32,6 +32,9 @@ from .models import (
     Procedure,
     ProcedureVersion,
     ProcedureVersionAuditEvent,
+    ServiceProcedureCandidate,
+    ServiceQuestion,
+    ServiceQuestionResolvedFact,
     Source,
     Step,
     Warning,
@@ -510,7 +513,28 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .select_related("procedure")
                 .get(pk=version_id)
             )
-            Procedure.objects.select_for_update().get(pk=version.procedure_id)
+            procedure = (
+                Procedure.objects.select_for_update()
+                .select_related("primary_service")
+                .get(pk=version.procedure_id)
+            )
+            # Lock shared pre-selection semantics before signatures and gates.
+            list(
+                ServiceProcedureCandidate.objects.select_for_update()
+                .filter(procedure=procedure, service=procedure.primary_service)
+                .order_by("pk")
+            )
+            question_ids = list(
+                ServiceQuestion.objects.select_for_update()
+                .filter(service=procedure.primary_service)
+                .order_by("pk")
+                .values_list("pk", flat=True)
+            )
+            list(
+                ServiceQuestionResolvedFact.objects.select_for_update()
+                .filter(question_id__in=question_ids)
+                .order_by("pk")
+            )
             # Lock the complete version-owned aggregate and reusable provenance before gates.
             basis_ids = list(
                 EligibilityBasis.objects.select_for_update()

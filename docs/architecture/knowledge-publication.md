@@ -15,13 +15,12 @@ configured gates fail closed. Ordinary model and Admin writes cannot perform lif
 transitions or alter published semantics; successful transitions record the actor and an
 immutable audit event in the same transaction.
 
-The default policy is deliberately **core-only**. This issue does not establish production
-public-readiness. Mandatory evidence, scenario, review, and specialist gates remain work for
-#47–#49 and must register through this same publication path; they must not introduce an
-alternate publisher. No researched fixtures, claims, evidence, scenarios, review records,
-specialist classification, feature-readiness policy, service-point versions, or complete plan
-orchestration are added or implied here. Procedure selection remains independent of date and
-version applicability; later orchestration resolves the selected Procedure separately.
+Production now registers the evidence/discrepancy, scenario, independent review, and
+specialist-review gates through this canonical publication path. Procedure-selection Question
+coverage is checked before scenario and review gates. Publication locks the selected candidate,
+Service Questions and their resolved-Fact links so gate results and review signatures cannot
+race editorial changes. Procedure selection remains independent of date and version
+applicability; orchestration resolves the selected Procedure separately.
 
 Issue #37's request snapshot materializes all Fact definitions, Services (including inactive
 ones), candidates, Questions, contradictions, and published/withdrawn Procedure Versions in
@@ -199,6 +198,14 @@ Django Admin is the initial editorial surface. It should make unsafe states diff
 - review and publication history is visible to staff.
 
 A custom CMS may be introduced later only if Django Admin becomes a demonstrated bottleneck.
+
+## Production import lifecycle
+
+Supported importers create or verify drafts only. Staff run the importer with an existing
+accountable author, complete independent dimension and applicable specialist approvals in
+Admin, and publish only with the canonical Procedure Version Admin action. Rerunning an importer
+returns an identical draft (or verifies an already finalized identity) and rejects semantic
+conflicts; it never manufactures users, approvals, publisher identity, or publication dates.
 
 ## Migrating the researched fixtures
 

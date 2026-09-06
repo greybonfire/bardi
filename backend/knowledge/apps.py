@@ -38,6 +38,35 @@ class KnowledgeConfig(AppConfig):
         assert planning_scenarios.PlanningScenario is not None
         assert review_workflow.ProcedureVersionReviewApproval is not None
 
+        # Evidence identifiers are intentionally owner-scoped. Feature modules install
+        # additional owner fields dynamically, so their constraints can only be attached
+        # after the complete owner union has loaded.
+        from django.db import models
+        from django.db.models import Q
+
+        from .models import EvidenceLink
+
+        existing = {constraint.name for constraint in EvidenceLink._meta.constraints}
+        for field_name, constraint_name in (
+            ("fee", "unique_evidence_id_fee_owner"),
+            ("eligibility_basis", "unique_evidence_id_basis_owner"),
+            ("procedure_dependency", "unique_evidence_id_dependency_owner"),
+            ("service_point_version", "unique_evidence_id_point_version_owner"),
+            (
+                "procedure_service_point_association",
+                "unique_evidence_id_point_association_owner",
+            ),
+        ):
+            if constraint_name not in existing:
+                EvidenceLink._meta.constraints = [
+                    *EvidenceLink._meta.constraints,
+                    models.UniqueConstraint(
+                        fields=(field_name, "semantic_id"),
+                        condition=Q(**{f"{field_name}__isnull": False}) & ~Q(semantic_id=""),
+                        name=constraint_name,
+                    ),
+                ]
+
     def ready(self) -> None:
         from . import admin_lifecycle_admin as _admin_lifecycle_admin
         from . import eligibility_basis_admin as _eligibility_basis_admin

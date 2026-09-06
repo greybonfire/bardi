@@ -420,6 +420,7 @@ class EvidenceOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     form = EvidenceLinkForm
     fields = (
         "id",
+        "semantic_id",
         "passage",
         "location",
         "applicability_context",
@@ -579,8 +580,14 @@ class EvidenceSourceInline(admin.TabularInline):  # type: ignore[type-arg]
 @admin.register(EvidenceLink)
 class EvidenceLinkAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = EvidenceLinkForm
-    list_display = ("id", "owner_display", "support_status", "verification_state")
+    list_display = (
+        "semantic_id",
+        "owner_display",
+        "support_status",
+        "verification_state",
+    )
     search_fields = (
+        "semantic_id",
         "checklist_item__semantic_id",
         "step__semantic_id",
         "warning__semantic_id",

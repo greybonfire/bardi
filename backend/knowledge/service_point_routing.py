@@ -681,6 +681,7 @@ def _routing_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
             .order_by("id")
             .values(
                 "id",
+                "semantic_id",
                 "procedure_service_point_association_id",
                 "service_point_version_id",
                 "passage",
@@ -738,6 +739,7 @@ def _routing_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
             row["retrieved_on"],
             row["verified_on"],
             row["reverify_on"],
+            semantic_id=row["semantic_id"],
         )
         target = (
             evidence_assoc

@@ -472,6 +472,7 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
         .order_by("id")
         .values(
             "id",
+            "semantic_id",
             "eligibility_basis_id",
             "passage",
             "location",
@@ -552,6 +553,7 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 evidence_row["retrieved_on"],
                 evidence_row["verified_on"],
                 evidence_row["reverify_on"],
+                semantic_id=evidence_row["semantic_id"],
             )
         )
 

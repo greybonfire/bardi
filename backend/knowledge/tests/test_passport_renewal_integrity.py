@@ -84,12 +84,13 @@ class PassportRenewalIntegrityTests(TestCase):
             procedure_version=self.version,
             semantic_id="passport.fee.base",
         )
+        link = EvidenceLink(
+            fee=fee,
+            semantic_id="   ",
+            passage="Passage",
+            location="Section",
+            applicability_context="Context",
+        )
 
         with self.assertRaises(IntegrityError), transaction.atomic():
-            EvidenceLink.objects.create(
-                fee=fee,
-                semantic_id="   ",
-                passage="Passage",
-                location="Section",
-                applicability_context="Context",
-            )
+            EvidenceLink.objects.bulk_create([link])

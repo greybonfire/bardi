@@ -25,7 +25,7 @@ class PassportRenewalIntegrityTests(TestCase):
             semantic_id="passport.fee.base",
         ).update(amount=999)
 
-        with self.assertRaisesMessage(ValidationError, "passport.fee.base"):
+        with self.assertRaisesMessage(ValidationError, "semantic conflict in planning behavior"):
             import_passport_renewal(author=self.author)
 
     def test_rerun_rejects_candidate_semantic_drift(self) -> None:
@@ -49,7 +49,7 @@ class PassportRenewalIntegrityTests(TestCase):
             expected_identifiers={"procedure_version_id": self.version.semantic_id}
         )
 
-        with self.assertRaisesMessage(ValidationError, "passport.fee.urgent"):
+        with self.assertRaisesMessage(ValidationError, "semantic conflict in scenarios"):
             import_passport_renewal(author=self.author)
 
     def test_rerun_rejects_evidence_semantic_drift(self) -> None:
@@ -60,7 +60,7 @@ class PassportRenewalIntegrityTests(TestCase):
         link = EvidenceLink.objects.get(fee=fee, semantic_id="EL-MOI-FEE-01")
         EvidenceLink.objects.filter(pk=link.pk).update(passage="Conflicting fee evidence")
 
-        with self.assertRaisesMessage(ValidationError, "EL-MOI-FEE-01"):
+        with self.assertRaisesMessage(ValidationError, "semantic conflict in evidence"):
             import_passport_renewal(author=self.author)
 
     def test_whitespace_evidence_identity_is_rejected_after_owner_installation(self) -> None:

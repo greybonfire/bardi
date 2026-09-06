@@ -69,6 +69,33 @@ canonical Procedure Version **publish selected** action. The imported ordinary f
 explicit unknown value, the previous-card research lead remains needs-reverification, and exact
 office routing remains unresolved until stronger current evidence is authored.
 
+## Temporary family-exemption knowledge import and review
+
+Import or verify both researched temporary family-exemption drafts with an existing staff
+author:
+
+```bash
+uv run python backend/manage.py import_temporary_family_exemption --author <username> \
+  --settings=bardi.settings.development
+```
+
+The command creates neither approvals nor publication metadata. It preserves two immutable
+Procedure Versions around the 2026 amendment boundary: the historical version is applicable
+through March 24, 2026, and the amended version begins March 25, 2026. Both versions carry the
+same six non-ranked, reachability-first Eligibility Bases, and every imported Basis remains
+`needs_reverification`. A matched untrusted Basis may therefore be shown as a candidate but
+cannot unlock Basis-scoped current guidance; shared trusted operating guidance and researched
+jurisdiction routing remain independent.
+
+The import deliberately preserves the research limits: it does not invent the unresolved
+incapable-brother semantics, exact Basis-specific document lists, a fee amount, nationwide or
+nearest-region routing, a direct prerequisite, or compatibility aliases. The only imported
+jurisdiction mappings are the researched Giza, Mansoura, and Zagazig recruitment regions.
+Independent staff review evidence/source, rule/logic, scenario/behavior, and bilingual-semantic
+dimensions. Because the review policy flags both legal and military risk, independent legal and
+military specialist approvals are also required before a separate publisher uses the canonical
+Procedure Version **publish selected** action.
+
 Deployment-specific HTTPS redirect, proxy-header, and HSTS policy is intentionally deferred
 until the production ingress topology is selected and hardened under issue #54.
 

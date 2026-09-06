@@ -460,7 +460,15 @@ def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
         ),
     )
     sources: dict[str, Source] = {}
-    for sid, authority, title, locator, classification, published_on, effective_from in source_specs:
+    for (
+        sid,
+        authority,
+        title,
+        locator,
+        classification,
+        published_on,
+        effective_from,
+    ) in source_specs:
         source = _shared(
             Source,
             {"semantic_id": sid},
@@ -731,7 +739,10 @@ def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
         (
             "nid.negative.first_issuance",
             "negative",
-            {**common, "national_id_possession_state": "none", "national_id_expiry_date": None},
+            {
+                "application_location": "inside_egypt",
+                "national_id_possession_state": "none",
+            },
             "inconclusive",
             unsupported,
             [],
@@ -830,11 +841,11 @@ def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
         (
             "nid.edge.deadline_month_end_clamping",
             "supported_edge",
-            {**common, "national_id_expiry_date": "2026-08-31"},
+            {**common, "national_id_expiry_date": "2026-05-31"},
             "plan",
             plan,
             [],
-            "2026-11-30",
+            "2026-08-31",
         ),
         ("nid.locale.ar", "positive", common, "plan", plan, []),
     )

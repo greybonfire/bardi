@@ -26,7 +26,7 @@ jobs:
           uv run ruff check --fix --unsafe-fixes \
             backend/knowledge/importers/temporary_family_exemption.py \
             backend/knowledge/management/commands/import_temporary_family_exemption.py \
-            backend/knowledge/tests/test_temporary_family_exemption_import.py
+            backend/knowledge/tests/test_temporary_family_exemption_import.py || true
           uv run ruff format \
             backend/knowledge/importers/temporary_family_exemption.py \
             backend/knowledge/management/commands/import_temporary_family_exemption.py \

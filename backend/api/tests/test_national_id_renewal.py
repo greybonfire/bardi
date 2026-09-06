@@ -70,7 +70,14 @@ class NationalIdRenewalProductionPlanningTests(TestCase):
         self.assertTrue(fee.current_value_unknown)
         self.assertEqual(english.routing.status, "unresolved")
         self.assertEqual(english.routing.destinations, ())
-        self.assertTrue(english.routing.verification_sources)
+        self.assertEqual(english.routing.verification_sources, ())
+        route_step = next(
+            item for item in english.steps if item.id == "nid.step.resolve_service_location"
+        )
+        self.assertEqual(
+            [source.id for source in route_step.sources],
+            ["SRC-PSM-CIVIL-STATUS-SERVICES"],
+        )
 
     def test_imported_deadline_scenarios_use_exact_calendar_month_semantics(self) -> None:
         snapshot = self.publish_snapshot()

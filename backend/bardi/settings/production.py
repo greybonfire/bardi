@@ -32,7 +32,10 @@ SECURE_HSTS_SECONDS = env_int(
     minimum=300,
     maximum=31_536_000,
 )
-SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool(
+    "DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS",
+    default=False,
+)
 SECURE_HSTS_PRELOAD = env_bool("DJANGO_SECURE_HSTS_PRELOAD", default=False)
 if SECURE_HSTS_PRELOAD and (
     SECURE_HSTS_SECONDS < 31_536_000 or not SECURE_HSTS_INCLUDE_SUBDOMAINS
@@ -58,6 +61,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_REFERRER_POLICY = "same-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+
+OPERATIONAL_OBSERVABILITY_ENABLED = True
 
 # Initial private-pilot abuse guard. Counters are process-local and keyed by an HMAC of
 # the client address supplied by the trusted ingress; neither addresses nor request Facts

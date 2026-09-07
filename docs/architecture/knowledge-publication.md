@@ -207,6 +207,15 @@ Admin, and publish only with the canonical Procedure Version Admin action. Rerun
 returns an identical draft (or verifies an already finalized identity) and rejects semantic
 conflicts; it never manufactures users, approvals, publisher identity, or publication dates.
 
+The passport importer recognizes the exact scenario seal from before the empty-routing
+status correction. After all research integrity checks pass, rerunning it upgrades only
+the three affected expectations on an existing draft, atomically, through normal scenario
+validation. Changed scenario content invalidates prior review signatures; publication still
+requires fresh approvals. Exact legacy published or withdrawn imports remain verifiable
+without rewriting their scenarios. Any other scenario drift is rejected, including partial
+upgrades. Fresh imports use the corrected expectations. This compatibility path does not
+change claims, evidence, lifecycle state, or publication history.
+
 ## Migrating the researched fixtures
 
 The three evidence packs and frozen prototype fixtures are migration/reference inputs, not production runtime dependencies.

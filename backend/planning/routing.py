@@ -138,11 +138,7 @@ def select_service_points(
         )
     )
     status = (
-        "partially_resolved"
-        if destinations and unresolved
-        else "unresolved"
-        if unresolved
-        else "resolved"
+        "unresolved" if not destinations else "partially_resolved" if unresolved else "resolved"
     )
     return PublicRouting(
         cast(RoutingStatus, status),

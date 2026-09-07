@@ -41,6 +41,8 @@ class PlanningScenarioAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         request: HttpRequest,
         obj: PlanningScenario | None = None,
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == obj.procedure_version.State.DRAFT)
 
 

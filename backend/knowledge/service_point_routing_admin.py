@@ -72,12 +72,18 @@ class RoutingEvidenceInline(admin.TabularInline):  # type: ignore[type-arg]
         return not _material_is_preserved(obj)
 
     def has_add_permission(self, request: HttpRequest, obj: object | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return obj is not None and self._draft(obj)
 
     def has_change_permission(self, request: HttpRequest, obj: object | None = None) -> bool:
+        if not super().has_change_permission(request, obj):
+            return False
         return self._draft(obj)
 
     def has_delete_permission(self, request: HttpRequest, obj: object | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return obj is not None and self._draft(obj)
 
 
@@ -105,6 +111,8 @@ class ServicePointAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         )
 
     def has_delete_permission(self, request: HttpRequest, obj: ServicePoint | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return not (obj and _point_is_preserved(obj))
 
 
@@ -136,6 +144,8 @@ class ServicePointVersionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def has_delete_permission(
         self, request: HttpRequest, obj: ServicePointVersion | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return not (obj and _material_is_preserved(obj))
 
 
@@ -172,6 +182,8 @@ class ProcedureServicePointAssociationAdmin(admin.ModelAdmin):  # type: ignore[t
     def has_delete_permission(
         self, request: HttpRequest, obj: ProcedureServicePointAssociation | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return not (obj and obj.procedure_version.state != ProcedureVersion.State.DRAFT)
 
 
@@ -183,11 +195,15 @@ class ProcedureServicePointAssociationInline(admin.TabularInline):  # type: igno
     show_change_link = True
 
     def has_add_permission(self, request: HttpRequest, obj: ProcedureVersion | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj and obj.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
         self, request: HttpRequest, obj: ProcedureVersion | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj and obj.state == ProcedureVersion.State.DRAFT)
 
 

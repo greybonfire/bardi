@@ -25,12 +25,14 @@ class EvaluationContext(StrictSchema):
         return date.fromisoformat(value)
 
 
-type TransportValue = StrictBool | StrictInt | StrictStr | None
+type TransportValue = StrictBool | StrictInt | Annotated[StrictStr, Field(max_length=2048)] | None
 
 
 class PlanningRequest(StrictSchema):
     service_id: Annotated[str, Field(min_length=1, max_length=128, pattern=r".*\S.*")]
-    facts: dict[str, TransportValue]
+    facts: Annotated[
+        dict[Annotated[str, Field(max_length=128)], TransportValue], Field(max_length=128)
+    ]
     locale: Literal["ar", "en"]
     evaluation_context: EvaluationContext
 

@@ -341,6 +341,53 @@ class EvidenceReverificationEvidence(models.Model):
         raise ValidationError("Re-verification evidence history is immutable.")
 
 
+def _workflow_evidence_identity(
+    link: EvidenceLink,
+) -> tuple[tuple[str, str, str], int, frozenset[int]]:
+    return (
+        _owner_key(link),
+        link.owner.pk,
+        frozenset(version.pk for version in _owning_versions(link)),
+    )
+
+
+def _lock_workflow_evidence(
+    evidence_ids: set[int], *, successor_version_id: int | None = None
+) -> tuple[tuple[EvidenceLink, ...], tuple[ProcedureVersion, ...], ProcedureVersion | None]:
+    """Discover ownership, then lock and revalidate within the caller's atomic block."""
+
+    discovered = {
+        item.pk: _workflow_evidence_identity(item)
+        for item in EvidenceLink.objects.filter(pk__in=evidence_ids).order_by("pk")
+    }
+    if set(discovered) != evidence_ids or any(not state[2] for state in discovered.values()):
+        raise ValidationError("Workflow evidence must exist and belong to Procedure Versions.")
+    owner_version_ids = {pk for state in discovered.values() for pk in state[2]}
+    version_ids = owner_version_ids | (
+        {successor_version_id} if successor_version_id is not None else set()
+    )
+    # Shared with publication: all versions (including successors) before any evidence.
+    versions = {
+        item.pk: item
+        for item in ProcedureVersion.objects.select_for_update()
+        .filter(pk__in=version_ids)
+        .order_by("pk")
+    }
+    if set(versions) != version_ids:
+        raise ValidationError("Workflow Procedure Versions could not be locked.")
+    locked = tuple(
+        EvidenceLink.objects.select_for_update().filter(pk__in=evidence_ids).order_by("pk")
+    )
+    if {item.pk: _workflow_evidence_identity(item) for item in locked} != discovered:
+        # Never acquire a newly discovered version lock while holding evidence locks.
+        raise ValidationError("Evidence ownership changed; reload before retrying the workflow.")
+    return (
+        locked,
+        tuple(versions[pk] for pk in sorted(owner_version_ids)),
+        versions.get(successor_version_id) if successor_version_id is not None else None,
+    )
+
+
 def open_evidence_discrepancy(
     *,
     anchor_evidence_link: EvidenceLink,
@@ -366,24 +413,12 @@ def open_evidence_discrepancy(
         raise ValidationError("Open discrepancies must use an inconclusive shared trust state.")
 
     with transaction.atomic():
-        locked = tuple(
-            EvidenceLink.objects.select_for_update().filter(pk__in=sorted(by_id)).order_by("pk")
-        )
-        if len(locked) != len(by_id):
-            raise ValidationError("Discrepancy evidence could not be locked.")
-        version_ids = sorted(
-            {
-                version.pk
-                for item in locked
-                for version in _owning_versions(item)
-                if version.pk is not None
-            }
-        )
-        tuple(
-            ProcedureVersion.objects.select_for_update().filter(pk__in=version_ids).order_by("pk")
-        )
+        locked, _, _ = _lock_workflow_evidence(set(by_id))
+        if any(_owner_key(item) != owner_key for item in locked):
+            raise ValidationError("Discrepancy evidence must belong to one affected subject.")
+        locked_anchor = next(item for item in locked if item.pk == anchor_evidence_link.pk)
         discrepancy = EvidenceDiscrepancy(
-            anchor_evidence_link=anchor_evidence_link,
+            anchor_evidence_link=locked_anchor,
             outcome_state=outcome_state,
             rationale=rationale,
             created_by=actor,
@@ -445,8 +480,15 @@ def record_evidence_reverification(
     if meaning_changed != (successor_version is not None):
         raise ValidationError("Meaning-changing review requires a successor Procedure Version.")
 
+    if successor_version is not None and (
+        successor_version.pk is None or successor_version._state.adding
+    ):
+        raise ValidationError("Successor Procedure Version must be saved.")
+
     reviewed = tuple(reviewed_evidence_links)
-    reviewed_by_id = {item.pk: item for item in reviewed if item.pk is not None}
+    if not reviewed or any(item.pk is None for item in reviewed):
+        raise ValidationError("Reviewed evidence must be saved.")
+    reviewed_by_id = {item.pk: item for item in reviewed}
     owner_key = _owner_key(anchor_evidence_link)
     if any(_owner_key(item) != owner_key for item in reviewed_by_id.values()):
         raise ValidationError("Reviewed evidence must belong to one affected subject.")
@@ -458,16 +500,18 @@ def record_evidence_reverification(
             raise ValidationError(
                 "Re-verification must review the subject's complete evidence set."
             )
-        locked = tuple(
-            EvidenceLink.objects.select_for_update()
-            .filter(pk__in=sorted(expected_ids))
-            .order_by("pk")
+        locked, locked_versions, successor_version = _lock_workflow_evidence(
+            expected_ids,
+            successor_version_id=successor_version.pk if successor_version is not None else None,
         )
-        versions = _owning_versions(anchor_evidence_link)
-        version_ids = sorted(item.pk for item in versions if item.pk is not None)
-        locked_versions = tuple(
-            ProcedureVersion.objects.select_for_update().filter(pk__in=version_ids).order_by("pk")
-        )
+        if any(_owner_key(item) != owner_key for item in locked):
+            raise ValidationError("Reviewed evidence must belong to one affected subject.")
+        locked_anchor = next(item for item in locked if item.pk == anchor_evidence_link.pk)
+        if {item.pk for item in _owner_evidence(locked_anchor)} != expected_ids:
+            raise ValidationError(
+                "Re-verification must review the subject's complete evidence set."
+            )
+        version_ids = {item.pk for item in locked_versions}
         if not locked_versions or all(
             item.state == ProcedureVersion.State.DRAFT for item in locked_versions
         ):
@@ -476,9 +520,6 @@ def record_evidence_reverification(
             )
         if meaning_changed:
             assert successor_version is not None
-            successor_version = ProcedureVersion.objects.select_for_update().get(
-                pk=successor_version.pk
-            )
             procedures = {item.procedure_id for item in locked_versions}
             if len(procedures) != 1:
                 raise ValidationError(
@@ -494,7 +535,7 @@ def record_evidence_reverification(
                 )
 
         event = EvidenceReverificationEvent(
-            anchor_evidence_link=anchor_evidence_link,
+            anchor_evidence_link=locked_anchor,
             verification_state=verification_state,
             verified_on=verified_on,
             reverify_on=reverify_on,

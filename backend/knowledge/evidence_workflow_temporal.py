@@ -22,6 +22,12 @@ from planning.trust import VERIFICATION_CHOICES, VerificationState
 from . import domain as knowledge_domain
 from . import evidence_workflow as workflow
 
+_OPEN_DISCREPANCY_PRECEDENCE: tuple[VerificationState, ...] = (
+    "disputed",
+    "needs_reverification",
+    "unknown",
+)
+
 
 class EvidenceDiscrepancyTransition(models.Model):
     class EventType(models.TextChoices):
@@ -170,12 +176,23 @@ def _workflow_overlays_as_of(
         timeline.append((review.occurred_at, 1, review.pk, "reverification", review))
 
     overlays: dict[tuple[str, str, str], workflow._TrustOverlay] = {}
+    open_discrepancies: dict[tuple[str, str, str], dict[int, VerificationState]] = {}
     for occurred, _, _, kind, raw in sorted(timeline, key=lambda item: item[:3]):
         if kind == "discrepancy":
             transition = cast(EvidenceDiscrepancyTransition, raw)
             key = workflow._owner_key(transition.discrepancy.anchor_evidence_link)
+            state = cast(VerificationState, transition.verification_state)
+            if transition.event_type == EvidenceDiscrepancyTransition.EventType.OPENED:
+                open_discrepancies.setdefault(key, {})[transition.discrepancy_id] = state
+            elif transition.event_type == EvidenceDiscrepancyTransition.EventType.RESOLVED:
+                owner_open_discrepancies = open_discrepancies.get(key)
+                if owner_open_discrepancies is not None:
+                    owner_open_discrepancies.pop(transition.discrepancy_id, None)
+                    if not owner_open_discrepancies:
+                        del open_discrepancies[key]
+
             overlay = overlays.setdefault(key, workflow._TrustOverlay())
-            overlay.state = cast(VerificationState, transition.verification_state)
+            overlay.state = state
             overlay.owner_verified_on = workflow._max_date(
                 overlay.owner_verified_on, occurred.date()
             )
@@ -192,6 +209,12 @@ def _workflow_overlays_as_of(
         overlay.evidence_state = cast(VerificationState, review.verification_state)
         overlay.evidence_verified_on = established_on
         overlay.evidence_reverify_on = review.reverify_on
+
+    for key, owner_open_discrepancies in open_discrepancies.items():
+        open_states = set(owner_open_discrepancies.values())
+        overlays[key].state = next(
+            state for state in _OPEN_DISCREPANCY_PRECEDENCE if state in open_states
+        )
     return overlays
 
 

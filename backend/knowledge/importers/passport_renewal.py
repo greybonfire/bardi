@@ -939,7 +939,7 @@ def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
             {
                 **plan,
                 "fee_ids": ["passport.fee.base", "passport.fee.urgent_service"],
-                "routing_status": "resolved",
+                "routing_status": "unresolved",
                 "routing_association_ids": [],
             },
         ),
@@ -951,7 +951,7 @@ def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
             {
                 **plan,
                 "fee_ids": ["passport.fee.base", "passport.fee.premium_service"],
-                "routing_status": "resolved",
+                "routing_status": "unresolved",
                 "routing_association_ids": [],
             },
         ),
@@ -967,7 +967,7 @@ def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
             "supported_edge",
             {**common, "residence_police_jurisdiction": "unresearched"},
             "plan",
-            {**plan, "routing_status": "resolved", "routing_association_ids": []},
+            {**plan, "routing_status": "unresolved", "routing_association_ids": []},
         ),
         ("passport.locale.ar", "positive", common, "plan", plan),
     )

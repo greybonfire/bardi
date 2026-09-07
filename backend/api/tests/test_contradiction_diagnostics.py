@@ -14,9 +14,19 @@ from knowledge.services import set_contradiction_facts
 
 
 class ContradictionDiagnosticContractTests(TransactionTestCase):
+    def setUp(self) -> None:
+        self.influential, _ = FactDefinition.objects.get_or_create(
+            key="is_student",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
+        self.omitted, _ = FactDefinition.objects.get_or_create(
+            key="has_current_enrollment_certificate",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
+
     def test_omitted_dominated_fact_is_not_reported_for_true_contradiction(self) -> None:
-        influential = FactDefinition.objects.get(key="is_student")
-        omitted = FactDefinition.objects.get(key="has_current_enrollment_certificate")
+        influential = self.influential
+        omitted = self.omitted
         service = Service.objects.create(
             semantic_id="contract.contradiction-dominance",
             text_ar="خدمة",

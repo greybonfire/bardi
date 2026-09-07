@@ -21,7 +21,6 @@ from django.utils import timezone
 from planning.catalog import KnowledgeSnapshot
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
-from . import domain as knowledge_domain
 from .models import EvidenceLink, ProcedureVersion, _required
 from .publication import PublicationContext, PublicationDiagnostic
 
@@ -700,16 +699,6 @@ def _apply_workflow_overlays(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
         procedure_versions=versions,
         service_point_versions=service_point_versions,
     )
-
-
-_original_materialize = knowledge_domain._materialize_knowledge_snapshot
-
-
-def _materialize_with_evidence_workflow() -> KnowledgeSnapshot:
-    return _apply_workflow_overlays(_original_materialize())
-
-
-knowledge_domain._materialize_knowledge_snapshot = _materialize_with_evidence_workflow
 
 
 __all__ = (

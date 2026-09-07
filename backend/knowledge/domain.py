@@ -847,9 +847,17 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
 
 
 def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
-    """Compatibility entry point retained for the current feature-wrapper chain."""
+    """Compose the complete semantic snapshot, without temporal workflow overlays."""
 
-    return _materialize_core_knowledge_snapshot()
+    # Import at call time to avoid cycles during Django's feature-model registration.
+    from .eligibility_bases import _basis_snapshots
+    from .procedure_dependencies import _dependency_snapshots
+    from .service_point_routing import _routing_snapshots
+
+    snapshot = _materialize_core_knowledge_snapshot()
+    snapshot = _basis_snapshots(snapshot)
+    snapshot = _dependency_snapshots(snapshot)
+    return _routing_snapshots(snapshot)
 
 
 def load_knowledge_snapshot() -> KnowledgeSnapshot:

@@ -8,6 +8,7 @@ from datetime import date
 from typing import Any
 
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 
 from knowledge.fees import Fee
@@ -29,6 +30,13 @@ from knowledge.service_point_routing import (
 )
 
 VERSION_ID = "ordinary_domestic_passport_renewal.research-2026-08-25"
+
+_LEGACY_SCENARIO_DIGEST = "1299e2c32df5567b20a4018ab7fce7a58f42da6c5567b1dcaac1ba9d77807f24"
+_ROUTING_SCENARIO_NAMES = (
+    "passport.fee.urgent",
+    "passport.fee.premium",
+    "passport.routing.unresearched_district",
+)
 
 _EXPECTED = {
     "authorities": "7c1a974234b6d3bba73247af9070129e029609ce7e3b7d0a7fea0c89f30a0de5",
@@ -103,9 +111,12 @@ def _verify_planning_signature(version: ProcedureVersion) -> None:
         raise ValidationError(f"{VERSION_ID}: semantic conflict in planning behavior.")
 
 
-def _verify_scenarios(version: ProcedureVersion) -> None:
+def _verify_scenarios(version: ProcedureVersion, *, allow_legacy: bool = False) -> bool:
+    """Validate the complete scenario seal and report an exact legacy match."""
+
     rows = list(
-        PlanningScenario.objects.filter(procedure_version=version)
+        PlanningScenario.objects.select_for_update()
+        .filter(procedure_version=version)
         .order_by("name")
         .values(
             "name",
@@ -117,7 +128,10 @@ def _verify_scenarios(version: ProcedureVersion) -> None:
             "expected_diagnostics",
         )
     )
+    if allow_legacy and _digest(rows) == _LEGACY_SCENARIO_DIGEST:
+        return True
     _require_digest("scenarios", rows)
+    return False
 
 
 def _verify_shared_research_records() -> None:
@@ -253,19 +267,36 @@ def _verify_review_policy(version: ProcedureVersion) -> None:
     _require_digest("policy", rows)
 
 
+@transaction.atomic
 def verify_passport_renewal_import(version: ProcedureVersion) -> None:
-    """Reject drift from the semantic state created by the deterministic importer."""
+    """Verify sealed research and upgrade only exact legacy draft routing expectations."""
 
+    version = ProcedureVersion.objects.select_for_update().get(pk=version.pk)
     if version.semantic_id != VERSION_ID:
         raise ValidationError(
             f"Unexpected passport-renewal version identity: {version.semantic_id}."
         )
     _verify_planning_signature(version)
-    _verify_scenarios(version)
+    legacy_scenarios = _verify_scenarios(version, allow_legacy=True)
     _verify_shared_research_records()
     _verify_trust_metadata(version)
     _verify_evidence(version)
     _verify_review_policy(version)
+
+    # Validate every seal before changing any draft rows. Finalized scenarios remain
+    # immutable history, and only their exact old or new seal is accepted above.
+    if legacy_scenarios and version.state == ProcedureVersion.State.DRAFT:
+        for scenario in PlanningScenario.objects.filter(
+            procedure_version=version, name__in=_ROUTING_SCENARIO_NAMES
+        ).order_by("name"):
+            scenario.expected_identifiers = {
+                **scenario.expected_identifiers,
+                "routing_status": "unresolved",
+            }
+            # Use the normal model path: ownership, validation, and signatures still apply.
+            # Existing review approvals become stale because they include scenario content.
+            scenario.save(update_fields=("expected_identifiers", "behavior_signature"))
+        _verify_scenarios(version)
 
 
 __all__ = ("verify_passport_renewal_import",)

@@ -88,6 +88,7 @@ def select_fees(
                 continue
 
         authored_state = cast(FeeValueState, item.value_state)
+        public_state: FeeValueState
         freshness = trust.freshness
         if trust.disposition == "assert_current":
             if authored_state in {"known", "range"}:

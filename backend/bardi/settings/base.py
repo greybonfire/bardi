@@ -158,6 +158,7 @@ MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "core.observability.RequestObservabilityMiddleware",
     "api.rate_limit.PublicApiRateLimitMiddleware",
+    "api.body_limit.PlanningBodyLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",

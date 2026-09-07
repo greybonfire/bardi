@@ -72,6 +72,25 @@ The limiter:
 
 The limit is an application safety net for a small single-process pilot, not a distributed denial-of-service control. A future multi-worker deployment must add an ingress-level global limit while keeping body logging disabled.
 
+### Planning request-body limit
+
+Configure trusted ingress to enforce **512 KiB (524,288 bytes)** for `POST /v1/planning`,
+including streamed/chunked bodies, and to reject ambiguous or invalid HTTP framing.
+Reject larger bodies with HTTP 413 and the same privacy-safe JSON response as the application:
+`{"type":"invalid","diagnostics":[{"code":"body_too_large","path":["body"]}]}`.
+Do not log bodies or attach request/exception details to that response. Leave Admin uploads
+and other routes under their existing limits; do not lower Django's global upload limit.
+
+The application checks declared oversized lengths before reading and reads at most 524,289
+bytes from the exposed stream to detect overflow before JSON decoding. Already cached
+bodies are checked by actual length. Missing or understated lengths do not bypass the
+check on bytes exposed by the server. WSGI servers define stream boundaries from HTTP
+framing; the application cannot inspect bytes they withhold. Django/ASGI or the server may
+already have buffered the body before middleware runs, so the application limit does not
+replace ingress enforcement or prevent that earlier buffering. Keep the body-limit middleware
+before body-consuming middleware and Ninja; it preserves Django's body cache for downstream
+consumers. Apply and verify the matching ingress configuration as part of deployment.
+
 ## Error behavior
 
 Public API parsing, schema validation, expected knowledge/database failures, rate limiting, and unexpected exceptions all return bounded public error/result shapes. Unexpected exceptions are handled even when Django `DEBUG` is accidentally enabled in a non-production test context; traceback locals and exception values are never serialized into the API response.

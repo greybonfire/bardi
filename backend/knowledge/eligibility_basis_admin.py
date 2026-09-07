@@ -51,16 +51,22 @@ class EligibilityBasisEvidenceInline(admin.TabularInline):  # type: ignore[type-
     show_change_link = True
 
     def has_add_permission(self, request: HttpRequest, obj: EligibilityBasis | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_change_permission(
         self, request: HttpRequest, obj: EligibilityBasis | None = None
     ) -> bool:
+        if not super().has_change_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
         self, request: HttpRequest, obj: EligibilityBasis | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def get_readonly_fields(
@@ -103,6 +109,8 @@ class EligibilityBasisAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def has_delete_permission(
         self, request: HttpRequest, obj: EligibilityBasis | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
 
@@ -114,11 +122,15 @@ class EligibilityBasisOwnerInline(admin.TabularInline):  # type: ignore[type-arg
     show_change_link = True
 
     def has_add_permission(self, request: HttpRequest, obj: ProcedureVersion | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
         self, request: HttpRequest, obj: ProcedureVersion | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
 

@@ -4,6 +4,7 @@ from datetime import date
 
 from django.contrib import admin
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.test import RequestFactory, TestCase, TransactionTestCase
@@ -152,6 +153,7 @@ class ServicePointRoutingTests(RoutingFixtureMixin, TestCase):
         self.material.refresh_from_db()
         self.point.refresh_from_db()
         request = RequestFactory().get("/admin/")
+        request.user = get_user_model().objects.create_superuser(username="routing-admin")
         point_admin = admin.site._registry[ServicePoint]
         material_admin = admin.site._registry[ServicePointVersion]
         association_admin = admin.site._registry[ProcedureServicePointAssociation]
@@ -162,6 +164,31 @@ class ServicePointRoutingTests(RoutingFixtureMixin, TestCase):
             set(material_admin.get_readonly_fields(request, self.material)),
             {field.name for field in ServicePointVersion._meta.fields},
         )
+
+    def test_draft_routing_deletion_requires_model_permission(self) -> None:
+        user = get_user_model().objects.create_user(username="routing-editor", is_staff=True)
+        request = RequestFactory().get("/admin/")
+        request.user = user
+        owners = (self.point, self.material, self.association)
+        for owner in owners:
+            model_admin = admin.site._registry[type(owner)]
+            with self.subTest(model=owner._meta.model_name, authorized=False):
+                self.assertFalse(model_admin.has_delete_permission(request, owner))
+                self.assertFalse(model_admin.has_delete_permission(request, None))
+
+        user.user_permissions.add(
+            *Permission.objects.filter(
+                content_type__app_label="knowledge",
+                codename__in=[f"delete_{owner._meta.model_name}" for owner in owners],
+            )
+        )
+        # Reload rather than reuse Django's cached permission set.
+        request.user = get_user_model().objects.get(pk=user.pk)
+        for owner in owners:
+            model_admin = admin.site._registry[type(owner)]
+            with self.subTest(model=owner._meta.model_name, authorized=True):
+                self.assertTrue(model_admin.has_delete_permission(request, owner))
+                self.assertTrue(model_admin.has_delete_permission(request, None))
 
     def test_service_point_material_requires_an_effective_start(self) -> None:
         invalid = ServicePointVersion(

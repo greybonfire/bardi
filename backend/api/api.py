@@ -122,6 +122,7 @@ def services(request: HttpRequest):  # type: ignore[no-untyped-def]
     response={
         200: PlanningResponse,
         400: InvalidResponse,
+        413: InvalidResponse,
         422: InvalidResponse,
         429: InvalidResponse,
         500: InvalidResponse,

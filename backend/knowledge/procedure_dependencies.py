@@ -22,7 +22,6 @@ from planning.diagnostics import ValidationDiagnostic
 from planning.rules import Predicate
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
-from . import domain as knowledge_domain
 from .domain import KnowledgeSnapshotLoadError, StoredRuleLoadDiagnostic, decode_stored_rule
 from .eligibility_bases import _source_fact_keys
 from .models import (
@@ -650,16 +649,6 @@ def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
             for version in snapshot.procedure_versions
         ),
     )
-
-
-_original_materialize = knowledge_domain._materialize_knowledge_snapshot
-
-
-def _materialize_with_dependencies() -> KnowledgeSnapshot:
-    return _dependency_snapshots(_original_materialize())
-
-
-knowledge_domain._materialize_knowledge_snapshot = _materialize_with_dependencies
 
 
 __all__ = ("ProcedureDependency", "ProcedureDependencyPublicationGate")

@@ -25,7 +25,6 @@ from planning.catalog import (
 from planning.diagnostics import ValidationDiagnostic
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
-from . import domain as knowledge_domain
 from .domain import KnowledgeSnapshotLoadError, StoredRuleLoadDiagnostic, decode_stored_rule
 from .models import (
     NONBLANK_PATTERN,
@@ -844,15 +843,6 @@ def _routing_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
         tuple(material_snapshots),
     )
 
-
-_original_materialize = knowledge_domain._materialize_knowledge_snapshot
-
-
-def _materialize_with_routing() -> KnowledgeSnapshot:
-    return _routing_snapshots(_original_materialize())
-
-
-knowledge_domain._materialize_knowledge_snapshot = _materialize_with_routing
 
 __all__ = (
     "ProcedureServicePointAssociation",

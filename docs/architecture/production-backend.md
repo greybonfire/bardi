@@ -82,6 +82,22 @@ The four public discriminators are `next_question`, `plan`, `inconclusive`, and 
 
 The web client keeps in-progress answers client-side and resubmits the current Fact set. A future saved-profile feature requires a separate privacy/product decision; it is not part of the initial backend contract. The first deployment assumes same-origin or reverse-proxied Next.js; cross-origin CORS policy is a separate deployment decision.
 
+## Snapshot composition
+
+`knowledge.domain` explicitly composes each semantic snapshot in this order: stable internal
+core materializer → Eligibility Basis snapshots → Procedure Dependency snapshots → Service
+Point routing snapshots. Feature transformations do not replace the materializer at import
+time. Runtime-local imports avoid model-registration cycles; Django's feature-model registration
+order is unchanged.
+
+The generic snapshot loaders return that complete semantic graph without latest-state workflow
+overlays. The explicit `*_as_of(evaluation_date)` loaders run the same semantic pipeline, then
+apply only the date-appropriate evidence-workflow overlay. Each stage executes once, eagerly,
+and preserves fail-closed catalog validation. The consistent loaders enclose all semantic and
+applicable workflow reads in one outermost read-only, repeatable-read transaction; they reject
+nested transactions. The non-consistent loaders impose no transaction policy. No ORM objects or
+lazy relations cross into planning.
+
 ## Privacy and observability
 
 - Do not persist raw Anonymous Case Facts in version 1.

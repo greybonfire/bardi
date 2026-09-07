@@ -246,7 +246,9 @@ def apply_evidence_workflow_as_of(
 def load_knowledge_snapshot_as_of(evaluation_date: date) -> KnowledgeSnapshot:
     """Load one detached snapshot and project workflow history at an explicit date."""
 
-    return apply_evidence_workflow_as_of(workflow._original_materialize(), evaluation_date)
+    return apply_evidence_workflow_as_of(
+        knowledge_domain._materialize_knowledge_snapshot(), evaluation_date
+    )
 
 
 def load_consistent_knowledge_snapshot_as_of(evaluation_date: date) -> KnowledgeSnapshot:
@@ -257,14 +259,9 @@ def load_consistent_knowledge_snapshot_as_of(evaluation_date: date) -> Knowledge
     with transaction.atomic():
         with connection.cursor() as cursor:
             cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
-        return apply_evidence_workflow_as_of(workflow._original_materialize(), evaluation_date)
-
-
-# The original issue-46 implementation installed a latest-state projection directly on the
-# generic loader. A generic snapshot has no evaluation date, so that hook cannot be temporally
-# correct. Restore the pre-workflow materializer; callers that need editorial trust state must
-# use one of the explicit ``*_as_of`` loaders above.
-knowledge_domain._materialize_knowledge_snapshot = workflow._original_materialize
+        return apply_evidence_workflow_as_of(
+            knowledge_domain._materialize_knowledge_snapshot(), evaluation_date
+        )
 
 
 __all__ = (

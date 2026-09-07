@@ -48,7 +48,7 @@ jobs:
   production:
     name: Production backend
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
       POSTGRES_DB: bardi_ci
       POSTGRES_USER: bardi_ci
@@ -115,15 +115,94 @@ jobs:
       - name: Verify migration state
         run: uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 
+      - name: Exercise latest project migration rollback and reapply
+        run: |
+          uv run python backend/manage.py migrate knowledge 0015 --noinput --settings=bardi.settings.test
+          uv run python backend/manage.py migrate knowledge 0016 --noinput --settings=bardi.settings.test
+          uv run python backend/manage.py migrate --check --settings=bardi.settings.test
+
+      - name: Exercise PostgreSQL backup and restore
+        run: |
+          mkdir -p .ci-recovery
+          docker run --rm --network host \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17 \
+            pg_dump \
+              --host=127.0.0.1 \
+              --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" \
+              --dbname="$POSTGRES_DB" \
+              --format=custom \
+              --no-owner \
+              > .ci-recovery/bardi.dump
+
+          docker run --rm --network host \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17 \
+            dropdb \
+              --if-exists \
+              --host=127.0.0.1 \
+              --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" \
+              bardi_ci_restore
+
+          docker run --rm --network host \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17 \
+            createdb \
+              --host=127.0.0.1 \
+              --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" \
+              bardi_ci_restore
+
+          docker run --rm --network host -i \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17 \
+            pg_restore \
+              --host=127.0.0.1 \
+              --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" \
+              --dbname=bardi_ci_restore \
+              --no-owner \
+              --no-privileges \
+              < .ci-recovery/bardi.dump
+
+          POSTGRES_DB=bardi_ci_restore \
+            uv run python backend/manage.py migrate --check --settings=bardi.settings.test
+
+          docker run --rm --network host \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17 \
+            psql \
+              --host=127.0.0.1 \
+              --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" \
+              --dbname=bardi_ci_restore \
+              --tuples-only \
+              --no-align \
+              --command="SELECT COUNT(*) FROM django_migrations;" \
+            | grep -Eq '^[1-9][0-9]*$'
+
+          docker run --rm --network host \
+            -e PGPASSWORD="$POSTGRES_PASSWORD" \
+            postgres:17 \
+            dropdb \
+              --host=127.0.0.1 \
+              --port="$POSTGRES_PORT" \
+              --username="$POSTGRES_USER" \
+              bardi_ci_restore
+          rm -rf .ci-recovery
+
       - name: Run cross-family production acceptance suite
         run: >-
           cd backend && uv run python manage.py test
           api.tests.test_cross_family_production_parity
           --settings=bardi.settings.test
 
-      - name: Run all other production backend tests
+      - name: Run domain, publication, API/privacy, Admin, and hardening suites
         run: >-
           cd backend && uv run python manage.py test
+          planning.tests knowledge.tests api.tests core.tests
           --exclude-tag=production_acceptance
           --settings=bardi.settings.test
 

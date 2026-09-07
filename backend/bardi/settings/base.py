@@ -22,6 +22,29 @@ def env_bool(name: str, *, default: bool = False) -> bool:
     raise ImproperlyConfigured(f"{name} must be one of 1, 0, true, false, yes, no, on, or off")
 
 
+def env_int(
+    name: str,
+    *,
+    default: int,
+    minimum: int | None = None,
+    maximum: int | None = None,
+) -> int:
+    """Read a bounded integer environment variable."""
+    value = os.environ.get(name)
+    if value is None:
+        parsed = default
+    else:
+        try:
+            parsed = int(value)
+        except ValueError as exc:
+            raise ImproperlyConfigured(f"{name} must be an integer") from exc
+    if minimum is not None and parsed < minimum:
+        raise ImproperlyConfigured(f"{name} must be at least {minimum}")
+    if maximum is not None and parsed > maximum:
+        raise ImproperlyConfigured(f"{name} must be at most {maximum}")
+    return parsed
+
+
 def env_list(name: str, *, default: Sequence[str] = ()) -> list[str]:
     """Read a comma-separated environment variable as a list of non-empty values."""
     value = os.environ.get(name)
@@ -95,6 +118,14 @@ DEBUG = env_bool("DJANGO_DEBUG", default=False)
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 
+# Private-pilot operational features are opt-in outside production so tests and local
+# development remain deterministic and quiet unless they deliberately exercise them.
+OPERATIONAL_OBSERVABILITY_ENABLED = False
+PUBLIC_API_RATE_LIMIT_ENABLED = False
+PUBLIC_API_RATE_LIMIT_REQUESTS = 60
+PUBLIC_API_RATE_LIMIT_WINDOW_SECONDS = 60
+PUBLIC_API_CLIENT_IP_HEADER = ""
+
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -125,6 +156,8 @@ PROCEDURE_VERSION_PUBLICATION_GATES = (
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.observability.RequestObservabilityMiddleware",
+    "api.rate_limit.PublicApiRateLimitMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -173,13 +206,22 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "formatters": {
+        "operational_json": {"()": "core.observability.StructuredOperationalFormatter"},
+    },
     "filters": {
         "planning_privacy": {"()": "api.privacy.PlanningPrivacyFilter"},
+        "operational_privacy": {"()": "core.observability.OperationalPrivacyFilter"},
     },
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
             "filters": ["planning_privacy"],
+        },
+        "operational_console": {
+            "class": "logging.StreamHandler",
+            "filters": ["operational_privacy"],
+            "formatter": "operational_json",
         },
     },
     "loggers": {
@@ -210,6 +252,12 @@ LOGGING = {
         "bardi.api": {
             "handlers": ["console"],
             "filters": ["planning_privacy"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "bardi.ops": {
+            "handlers": ["operational_console"],
+            "filters": ["operational_privacy"],
             "level": "INFO",
             "propagate": False,
         },

@@ -12,7 +12,7 @@ from .evaluator import TruthValue, evaluate
 from .facts import PreparedFacts
 from .provenance import claim_sources, supporting_sources
 from .public import FeeValueState, PublicFee
-from .trust import assess_trust
+from .trust import Freshness, assess_trust
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,20 +88,32 @@ def select_fees(
                 continue
 
         authored_state = cast(FeeValueState, item.value_state)
+        public_state: FeeValueState
+        freshness = trust.freshness
         if trust.disposition == "assert_current":
             if authored_state in {"known", "range"}:
                 sources = supporting_sources(item.evidence_links, evaluation_date)
                 if sources is None:
-                    # Publication/snapshot validation should make this unreachable. Fail
-                    # closed here rather than exposing a value without current support.
-                    continue
+                    sources = claim_sources(item.evidence_links)
+                    public_state = "unverified"
+                    amount = None
+                    minimum_amount = None
+                    maximum_amount = None
+                    current_value_unknown = True
+                    freshness = Freshness("unknown", item.verified_on, item.reverify_on)
+                else:
+                    public_state = authored_state
+                    amount = item.amount
+                    minimum_amount = item.minimum_amount
+                    maximum_amount = item.maximum_amount
+                    current_value_unknown = False
             else:
                 sources = claim_sources(item.evidence_links)
-            public_state = authored_state
-            amount = item.amount
-            minimum_amount = item.minimum_amount
-            maximum_amount = item.maximum_amount
-            current_value_unknown = authored_state == "unknown"
+                public_state = authored_state
+                amount = item.amount
+                minimum_amount = item.minimum_amount
+                maximum_amount = item.maximum_amount
+                current_value_unknown = authored_state == "unknown"
         else:
             sources = claim_sources(item.evidence_links)
             public_state = "unknown" if authored_state == "unknown" else "unverified"
@@ -122,7 +134,7 @@ def select_fees(
                 item.fee_type,
                 current_value_unknown,
                 sources,
-                trust.freshness,
+                freshness,
             )
         )
 

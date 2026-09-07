@@ -56,6 +56,8 @@ class ProcedureDependencyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: ProcedureDependency | None = None,
     ) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_change_permission(
@@ -63,6 +65,8 @@ class ProcedureDependencyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: ProcedureDependency | None = None,
     ) -> bool:
+        if not super().has_change_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
@@ -70,6 +74,8 @@ class ProcedureDependencyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: ProcedureDependency | None = None,
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def get_readonly_fields(
@@ -126,6 +132,8 @@ class ProcedureDependencyAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         request: HttpRequest,
         obj: ProcedureDependency | None = None,
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
 
@@ -147,6 +155,8 @@ class ProcedureDependencyOwnerInline(admin.TabularInline):  # type: ignore[type-
         request: HttpRequest,
         obj: ProcedureVersion | None = None,
     ) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
@@ -154,6 +164,8 @@ class ProcedureDependencyOwnerInline(admin.TabularInline):  # type: ignore[type-
         request: HttpRequest,
         obj: ProcedureVersion | None = None,
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
 

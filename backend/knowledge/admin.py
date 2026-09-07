@@ -801,6 +801,19 @@ class ContradictionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
             return
         super().save_formset(request, form, formset, change)
 
+    def get_queryset(self, request: HttpRequest) -> models.QuerySet[ServiceContradiction]:
+        queryset = super().get_queryset(request)
+        return queryset.prefetch_related(
+            models.Prefetch(
+                "fact_links",
+                queryset=ServiceContradictionFact.objects.select_related("fact").order_by(
+                    "position", "fact__key"
+                ),
+                to_attr="_ordered_fact_links",
+            )
+        )
+
     @admin.display(description="Facts")
     def ordered_fact_keys(self, obj: ServiceContradiction) -> str:
-        return ", ".join(obj.fact_keys)
+        links = cast(list[ServiceContradictionFact], obj._ordered_fact_links)  # type: ignore[attr-defined]
+        return ", ".join(link.fact.key for link in links)

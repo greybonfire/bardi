@@ -138,9 +138,9 @@ def select_service_points(
         )
     )
     status = (
-        "partially_resolved"
-        if destinations and unresolved
-        else "unresolved"
+        "unresolved"
+        if not destinations
+        else "partially_resolved"
         if unresolved
         else "resolved"
     )

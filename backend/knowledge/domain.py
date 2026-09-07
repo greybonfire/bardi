@@ -115,8 +115,12 @@ class KnowledgeSnapshotLoadError(Exception):
         super().__init__(", ".join(self.owner_ids))
 
 
-def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
-    """Fully evaluate ORM reads, then return an immutable, ORM-free catalog graph."""
+def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Build the internal ORM-free core graph, not a fully featured snapshot.
+
+    This stable callable excludes feature composition; use the public loaders for
+    complete snapshots and their documented transaction policies.
+    """
 
     from django.db.models import Q
 
@@ -840,6 +844,12 @@ def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
         for service_row in service_rows
     )
     return KnowledgeSnapshot(published_definitions, services, tuple(versions))
+
+
+def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
+    """Compatibility entry point retained for the current feature-wrapper chain."""
+
+    return _materialize_core_knowledge_snapshot()
 
 
 def load_knowledge_snapshot() -> KnowledgeSnapshot:

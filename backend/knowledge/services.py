@@ -43,6 +43,16 @@ def _materialize_facts(facts: Iterable[FactDefinition]) -> tuple[FactDefinition,
 def set_question_resolved_facts(
     question: ServiceQuestion, facts: Iterable[FactDefinition]
 ) -> ServiceQuestion:
+    """Serialize replacement on the owning row; rejection rolls back all child changes.
+
+    Parent fields are neither refreshed nor saved here. Callers editing those fields
+    must save them in the same outer transaction (as the Admin save flow does).
+    """
+
+    if question.pk is None or question._state.adding:
+        raise ValidationError("Questions must be saved before replacing resolved Facts.")
+    # Lock without discarding the caller's in-memory parent fields or return identity.
+    ServiceQuestion.objects.select_for_update().only("pk").get(pk=question.pk)
     values = _materialize_facts(facts)
     question.full_clean(exclude=("resolves_facts",))
     if any(fact.derived for fact in values):
@@ -64,6 +74,16 @@ def set_question_resolved_facts(
 def set_contradiction_facts(
     contradiction: ServiceContradiction, facts: Iterable[FactDefinition]
 ) -> ServiceContradiction:
+    """Serialize replacement on the owning row; rejection rolls back all child changes.
+
+    Parent fields are neither refreshed nor saved here. Callers editing those fields
+    must save them in the same outer transaction (as the Admin save flow does).
+    """
+
+    if contradiction.pk is None or contradiction._state.adding:
+        raise ValidationError("Contradictions must be saved before replacing declared Facts.")
+    # Lock without discarding the caller's in-memory parent fields or return identity.
+    ServiceContradiction.objects.select_for_update().only("pk").get(pk=contradiction.pk)
     values = _materialize_facts(facts)
     if len(values) < 2:
         raise ValidationError("A contradiction requires at least two declared Facts.")

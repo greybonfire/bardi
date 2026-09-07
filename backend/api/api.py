@@ -34,6 +34,8 @@ class PrivacySafeParser(Parser):
         return parsed
 
 
+MAX_SCHEMA_VALIDATION_DIAGNOSTICS = 20
+
 logger = logging.getLogger("bardi.api")
 
 
@@ -62,7 +64,7 @@ def body_error(request: HttpRequest, exc: HttpError):  # type: ignore[no-untyped
 @api.exception_handler(ValidationError)
 def validation_error(request: HttpRequest, exc: ValidationError):  # type: ignore[no-untyped-def]
     diagnostics = []
-    for error in exc.errors:
+    for error in exc.errors[:MAX_SCHEMA_VALIDATION_DIAGNOSTICS]:
         error_type = str(error.get("type", "invalid_request"))
         code = (
             error_type if error_type in {"invalid_json", "object_required"} else "invalid_request"

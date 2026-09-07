@@ -28,6 +28,8 @@ class EvidenceDiscrepancyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: EvidenceDiscrepancy | None = None,
     ) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.status == EvidenceDiscrepancy.Status.OPEN)
 
     def has_change_permission(
@@ -35,6 +37,8 @@ class EvidenceDiscrepancyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: EvidenceDiscrepancy | None = None,
     ) -> bool:
+        if not super().has_change_permission(request, obj):
+            return False
         return bool(obj is None or obj.status == EvidenceDiscrepancy.Status.OPEN)
 
     def has_delete_permission(
@@ -42,6 +46,8 @@ class EvidenceDiscrepancyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         request: HttpRequest,
         obj: EvidenceDiscrepancy | None = None,
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.status == EvidenceDiscrepancy.Status.OPEN)
 
     def get_readonly_fields(

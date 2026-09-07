@@ -176,9 +176,7 @@ def _workflow_overlays_as_of(
         timeline.append((review.occurred_at, 1, review.pk, "reverification", review))
 
     overlays: dict[tuple[str, str, str], workflow._TrustOverlay] = {}
-    open_discrepancies: dict[
-        tuple[str, str, str], dict[int, VerificationState]
-    ] = {}
+    open_discrepancies: dict[tuple[str, str, str], dict[int, VerificationState]] = {}
     for occurred, _, _, kind, raw in sorted(timeline, key=lambda item: item[:3]):
         if kind == "discrepancy":
             transition = cast(EvidenceDiscrepancyTransition, raw)

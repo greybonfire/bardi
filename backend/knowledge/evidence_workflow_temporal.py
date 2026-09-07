@@ -138,13 +138,24 @@ def _persist_discrepancy_transition(
         )
 
 
+def _owner_related_paths(anchor_path: str) -> tuple[str, ...]:
+    """Load exactly the owner relationships consumed by workflow._owner_key."""
+
+    return tuple(
+        f"{anchor_path}__{field}"
+        if kind == "service_point_version"
+        else f"{anchor_path}__{field}__procedure_version"
+        for kind, field in workflow._OWNER_FIELDS
+    )
+
+
 def _workflow_overlays_as_of(
     evaluation_date: date,
 ) -> dict[tuple[str, str, str], workflow._TrustOverlay]:
     timeline: list[tuple[datetime, int, int, str, object]] = []
     for transition in (
         EvidenceDiscrepancyTransition.objects.filter(occurred_at__date__lte=evaluation_date)
-        .select_related("discrepancy__anchor_evidence_link")
+        .select_related(*_owner_related_paths("discrepancy__anchor_evidence_link"))
         .order_by("occurred_at", "pk")
     ):
         timeline.append((transition.occurred_at, 0, transition.pk, "discrepancy", transition))
@@ -153,7 +164,7 @@ def _workflow_overlays_as_of(
             meaning_changed=False,
             occurred_at__date__lte=evaluation_date,
         )
-        .select_related("anchor_evidence_link")
+        .select_related(*_owner_related_paths("anchor_evidence_link"))
         .order_by("occurred_at", "pk")
     ):
         timeline.append((review.occurred_at, 1, review.pk, "reverification", review))

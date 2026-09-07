@@ -237,11 +237,15 @@ class GuidanceOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     show_change_link = True
 
     def has_add_permission(self, request: HttpRequest, obj: ProcedureVersion | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
         self, request: HttpRequest, obj: ProcedureVersion | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
 
@@ -266,11 +270,15 @@ class ChecklistItemOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     show_change_link = True
 
     def has_add_permission(self, request: HttpRequest, obj: ProcedureVersion | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(
         self, request: HttpRequest, obj: ProcedureVersion | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
 
@@ -367,6 +375,8 @@ class AuthorityAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: Authority | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return not (obj is not None and _authority_is_preserved(obj))
 
 
@@ -388,6 +398,8 @@ class DocumentTypeAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: DocumentType | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return not (
             obj is not None
             and obj.checklist_items.filter(
@@ -411,6 +423,8 @@ class SourceAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: Source | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return not (obj is not None and _source_is_preserved(obj))
 
 
@@ -432,12 +446,18 @@ class EvidenceOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
     show_change_link = True
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_change_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        if not super().has_change_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
     def get_readonly_fields(self, request: HttpRequest, obj: Any = None) -> tuple[str, ...]:
@@ -469,6 +489,8 @@ class ChecklistItemAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: ChecklistItem | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == ProcedureVersion.State.DRAFT)
 
 
@@ -480,6 +502,8 @@ class WarningEvidenceInline(EvidenceOwnerInline):
     fk_name = "warning"
 
     def has_add_permission(self, request: HttpRequest, obj: Any = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(
             obj
             and obj.kind == Warning.Kind.ADMINISTRATIVE
@@ -505,6 +529,8 @@ class EligibilityBasisAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     def has_delete_permission(
         self, request: HttpRequest, obj: EligibilityBasis | None = None
     ) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == "draft")
 
 
@@ -531,6 +557,8 @@ class StepAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         )
 
     def has_delete_permission(self, request: HttpRequest, obj: Step | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == "draft")
 
 
@@ -559,6 +587,8 @@ class WarningAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         )
 
     def has_delete_permission(self, request: HttpRequest, obj: Warning | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.procedure_version.state == "draft")
 
 
@@ -568,12 +598,18 @@ class EvidenceSourceInline(admin.TabularInline):  # type: ignore[type-arg]
     autocomplete_fields = ("source",)
 
     def has_add_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
+        if not super().has_add_permission(request, obj):
+            return False
         return bool(obj is None or obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
     def has_change_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
+        if not super().has_change_permission(request, obj):
+            return False
         return bool(obj is None or obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
     def has_delete_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is not None and obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
 
@@ -631,6 +667,8 @@ class EvidenceLinkAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         return ()
 
     def has_delete_permission(self, request: HttpRequest, obj: EvidenceLink | None = None) -> bool:
+        if not super().has_delete_permission(request, obj):
+            return False
         return bool(obj is None or obj.owning_version().state == ProcedureVersion.State.DRAFT)
 
 

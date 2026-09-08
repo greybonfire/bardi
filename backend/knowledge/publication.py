@@ -153,10 +153,46 @@ class ApplicabilityGate:
     name = "core.applicability"
 
     def validate(self, context: PublicationContext) -> Iterable[PublicationDiagnostic]:
+        # Feature modules import this publication interface during model registration.
+        from .eligibility_bases import _source_fact_keys
+
         decoded = decode_stored_rule(context.version.applicability, context.fact_definitions)
-        return tuple(
-            PublicationDiagnostic(self.name, diagnostic.code) for diagnostic in decoded.diagnostics
+        if decoded.predicate is None:
+            return tuple(
+                PublicationDiagnostic(self.name, diagnostic.code)
+                for diagnostic in decoded.diagnostics
+            )
+        required, defects = _source_fact_keys((decoded.predicate,), context)
+        failures = [
+            PublicationDiagnostic(self.name, "invalid_derived_fact_dependency", key)
+            for key in sorted(defects)
+        ]
+        covered: set[str] = set()
+        questions = context.version.procedure.primary_service.questions.prefetch_related(
+            "resolved_fact_links__fact", "fact"
         )
+        for question in questions:
+            links = tuple(question.resolved_fact_links.all())
+            keys = tuple(link.fact.key for link in links) if links else (question.fact.key,)
+            invalid_keys = {
+                key
+                for key in keys
+                if (definition := context.fact_definitions.get(key)) is None or definition.derived
+            }
+            if invalid_keys:
+                failures.extend(
+                    PublicationDiagnostic(
+                        self.name, "invalid_question_fact", f"{question.semantic_id}:{key}"
+                    )
+                    for key in sorted(invalid_keys)
+                )
+            else:
+                covered.update(keys)
+        failures.extend(
+            PublicationDiagnostic(self.name, "missing_service_question", key)
+            for key in sorted(required - covered)
+        )
+        return tuple(failures)
 
 
 class TemporalGate:

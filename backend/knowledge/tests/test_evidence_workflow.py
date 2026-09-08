@@ -33,6 +33,7 @@ from knowledge.models import (
     ProcedureVersion,
     Service,
     ServiceProcedureCandidate,
+    ServiceQuestion,
     Source,
     Step,
     Warning,
@@ -67,6 +68,14 @@ class EvidenceWorkflowTests(TransactionTestCase):
             text_ar="خدمة",
             text_en="Service",
             is_active=True,
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="workflow.service.question.applicability",
+            service=self.service,
+            fact=self.fact,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
         )
         self.procedure = Procedure.objects.create(
             semantic_id="workflow.procedure",

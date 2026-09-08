@@ -18,6 +18,7 @@ from knowledge.models import (
     ProcedureVersion,
     Service,
     ServiceProcedureCandidate,
+    ServiceQuestion,
     Source,
 )
 from knowledge.publication import PublicationRejected, publish_procedure_version
@@ -37,6 +38,14 @@ class RoutingFixtureMixin:
         self.rule = {"op": "eq", "fact": self.fact.key, "value": True}
         self.service = Service.objects.create(
             semantic_id="routing.service", text_ar="خدمة", text_en="Service"
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="routing.service.question.applicability",
+            service=self.service,
+            fact=self.fact,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
         )
         self.procedure = Procedure.objects.create(
             semantic_id="routing.procedure",

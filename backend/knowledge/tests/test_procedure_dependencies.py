@@ -51,10 +51,26 @@ class ProcedureDependencyKnowledgeTests(TestCase):
             text_ar="خدمة",
             text_en="Service",
         )
+        ServiceQuestion.objects.create(
+            semantic_id="dependency.service.question.applicability",
+            service=self.service,
+            fact=self.entry,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
+        )
         self.target_service = Service.objects.create(
             semantic_id="dependency.target-service",
             text_ar="خدمة مستهدفة",
             text_en="Target service",
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="dependency.target-service.question.applicability",
+            service=self.target_service,
+            fact=self.entry,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
         )
         self.procedure = Procedure.objects.create(
             semantic_id="dependency.procedure",

@@ -54,6 +54,14 @@ class ProcedureDependencyApiContractTests(TransactionTestCase):
             text_ar="خدمة المتطلب",
             text_en="Prerequisite service",
         )
+        ServiceQuestion.objects.create(
+            semantic_id="dependency.api.target-service.question.applicability",
+            service=self.target_service,
+            fact=self.entry,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
+        )
         self.procedure = Procedure.objects.create(
             semantic_id="dependency.api.procedure",
             text_ar="الإجراء الرئيسي",

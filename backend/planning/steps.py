@@ -20,6 +20,7 @@ class StepSelection:
     missing_facts: frozenset[str] = frozenset()
     trust_inconclusive: bool = False
     basis_resolution_required: bool = False
+    applicability_inconclusive: bool = False
 
 
 def select_steps(
@@ -35,6 +36,7 @@ def select_steps(
     consequential_missing: set[str] = set()
     trust_inconclusive = False
     basis_resolution_required = False
+    applicability_inconclusive = False
     for item in sorted(version.steps, key=lambda row: (row.phase_order, row.slot, row.semantic_id)):
         if item.scope not in {"procedure", "eligibility_basis"}:
             continue
@@ -54,14 +56,14 @@ def select_steps(
                 continue
             if item.eligibility_basis_id not in matched:
                 continue
+        pending_missing: frozenset[str] | None = None
         if item.applicability is not None:
             applicability = evaluate(
                 item.applicability, facts.values, submitted_keys=facts.submitted_keys
             )
             if applicability.value is TruthValue.UNKNOWN:
-                consequential_missing.update(applicability.missing_facts)
-                continue
-            if applicability.value is not TruthValue.TRUE:
+                pending_missing = applicability.missing_facts
+            elif applicability.value is not TruthValue.TRUE:
                 continue
         trust = assess_trust(
             item.verification_state,
@@ -70,11 +72,19 @@ def select_steps(
             reverify_on=item.reverify_on,
         )
         if trust.disposition != "assert_current":
+            if pending_missing is not None:
+                applicability_inconclusive = True
             trust_inconclusive = True
             continue
         sources = supporting_sources(item.evidence_links, evaluation_date)
         if sources is None:
+            if pending_missing is not None:
+                applicability_inconclusive = True
             trust_inconclusive = True
+            continue
+        if pending_missing is not None:
+            consequential_missing.update(pending_missing)
+            applicability_inconclusive |= not pending_missing
             continue
         selected.append(
             PublicStep(
@@ -92,4 +102,5 @@ def select_steps(
         frozenset(consequential_missing),
         trust_inconclusive,
         basis_resolution_required,
+        applicability_inconclusive,
     )

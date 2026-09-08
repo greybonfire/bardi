@@ -203,6 +203,17 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     if checklist.basis_resolution_required:
         return _configuration_invalid()
     if checklist.missing_facts:
+        question = pick_consequential_question(
+            snapshot,
+            service,
+            preparation.prepared_facts,
+            checklist.missing_facts,
+            diagnostic_prefix="missing_checklist_question",
+        )
+        if question.diagnostic_codes or question.question is None:
+            return _configuration_invalid()
+        return _question_result(snapshot, service.semantic_id, question.question)
+    if checklist.applicability_inconclusive:
         return InconclusiveResult("checklist_applicability_unknown")
     steps = select_steps(
         resolution.version,
@@ -213,6 +224,17 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     if steps.basis_resolution_required:
         return _configuration_invalid()
     if steps.missing_facts:
+        question = pick_consequential_question(
+            snapshot,
+            service,
+            preparation.prepared_facts,
+            steps.missing_facts,
+            diagnostic_prefix="missing_step_question",
+        )
+        if question.diagnostic_codes or question.question is None:
+            return _configuration_invalid()
+        return _question_result(snapshot, service.semantic_id, question.question)
+    if steps.applicability_inconclusive:
         return InconclusiveResult("step_applicability_unknown")
     fees = select_fees(
         resolution.version,

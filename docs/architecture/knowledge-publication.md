@@ -107,6 +107,8 @@ The production validator must cover at least the invariants proven or required b
 - referenced Fact keys exist and have valid literal types;
 - Procedure Version applicability has structural same-Service Question coverage, expanding
   derived Facts through pinned source dependencies, including future-effective versions;
+- official checklist and supported step applicability predicates in procedure/basis scopes have
+  the same structural source-Question coverage, including future/non-current material (ADR 0016);
 - every Question answer key exists and is non-derived, including all multi-Fact answers;
   version-applicability coverage is mandatory even when selection coverage is disabled;
 - Eligibility Bases have explicit qualification and valid reachability rules;
@@ -235,3 +237,12 @@ bilingual identity/address, unsupported availability, unordered/overlapping curr
 invalid verification metadata, incomplete support, current contradictions, and malformed Field
 Report provenance. Routing Facts need not have Service Questions because routing uncertainty is
 local and non-consequential.
+
+### Passport checklist Question compatibility
+
+The passport importer now authors `passport.student.unknown` as `next_question` for `q.is_student`.
+Its integrity verifier accepts only the current seal and the two exact previously supported
+pre-Question/pre-routing scenario sets. Once all other seals pass, a draft upgrades the student
+expectation and any required legacy routing expectations atomically via normal model saves.
+Published/withdrawn scenarios remain immutable; existing review signatures become stale after a
+draft scenario change. Direct and sequential upgrades retain prior compatibility and reject drift.

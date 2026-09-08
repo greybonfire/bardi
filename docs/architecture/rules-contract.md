@@ -142,6 +142,24 @@ future-effective versions and is independent of freshness or today's date. It re
 publication pipeline and locks, with no bypass setting. No new Question behavior is introduced
 for the later planning phases by this change.
 
+## Checklist and step applicability Questions
+
+[ADR 0016](../adr/0016-ask-source-questions-for-checklists-and-steps.md) extends the preceding
+Question policy to official checklist requirements and supported steps, in existing phase order.
+Only in-scope UNKNOWN items with assertable item trust and current supporting sources contribute
+missing source Facts. Official checklist requirements retain the official-source requirement.
+Optional practical preparation remains nonblocking. FALSE applicability still excludes an item
+before evidence assessment, and TRUE retains existing projection and local trust behavior.
+
+Askable Facts take precedence over blocked UNKNOWN items within the same phase. After askable
+Facts are resolved, blocked applicability or UNKNOWN with no actionable Facts retains the existing
+`checklist_applicability_unknown` / `step_applicability_unknown` reason. Missing Question coverage
+and invalid source dependencies return sanitized configuration-invalid responses. A shared Fact
+answered for the checklist is already available to steps on the next stateless request.
+
+These progression corrections apply to existing `v1` and historical evaluations without changing
+published rows or evaluator semantics. Fee and routing behavior is unchanged by this extension.
+
 ## Eligibility Basis evaluation
 
 Each Basis has reachability and qualification stages.

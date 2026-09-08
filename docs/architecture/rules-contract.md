@@ -120,6 +120,28 @@ Service-level selection predicates are version-independent. A current Procedure 
 - Withdrawn versions are excluded from new plans and may be addressed only by explicit historical evaluation.
 - Published semantics are pinned to a rules-contract version.
 
+## Procedure Version applicability Questions
+
+After temporal version resolution, TRUE applicability continues planning and FALSE returns
+`procedure_version_not_applicable`. For UNKNOWN, the existing Missing-Fact Picker uses only
+consequential missing Facts. Derived Facts expand to the prepared missing source dependencies;
+it never asks for a derived Fact directly. An authored same-Service Question returns the existing
+`next_question` shape. UNKNOWN with no actionable missing Facts retains
+`procedure_version_applicability_unknown`; unknown Facts, unsupported/missing source dependencies,
+or absent coverage instead return sanitized `invalid` / `knowledge_configuration_invalid`.
+
+All answer keys must exist and be source Facts, including every key of a multi-Fact Question.
+Priority then semantic identifier determines the single Question returned. Clients resubmit the
+current Facts statelessly. A partially answered multi-Fact Question may recur while it supplies
+a consequential missing Fact; a fully answered Question must not loop. Answers establish factual
+applicability only, never evidence quality, trust, a missing amount, or discrepancy resolution.
+
+Publication requires structural same-Service Question coverage for version applicability,
+expanding derived references to their pinned source dependencies. This mandatory check includes
+future-effective versions and is independent of freshness or today's date. It reuses the canonical
+publication pipeline and locks, with no bypass setting. No new Question behavior is introduced
+for the later planning phases by this change.
+
 ## Eligibility Basis evaluation
 
 Each Basis has reachability and qualification stages.
@@ -180,6 +202,15 @@ Public results do not expose raw rule ASTs, raw Facts, full Evaluation Traces, E
 ## Compatibility rule
 
 A published Procedure Version pins a rules-contract version. A future software release may add a new contract version, but it must retain compatible implementations required to reproduce published historical semantics. Changing a Fact's meaning requires a new Fact key rather than reinterpretation of old data.
+
+[ADR 0015](../adr/0015-ask-source-questions-for-version-applicability.md) explicitly corrects
+application progression for UNKNOWN version applicability under existing `v1` contracts, including
+historical evaluation dates: an incomplete case may now return `next_question` rather than the
+former inconclusive response. This does not change pinned evaluator/derivation behavior, Fact
+meaning, TRUE/FALSE results, or trust. Published and withdrawn rows are not rewritten. Older
+published knowledge without actionable Question coverage fails closed when that gap becomes
+consequential; new publication must satisfy coverage. This application correction is not an
+exception permitting future evaluator changes to silently reinterpret pinned contracts.
 
 ## Local routing semantics
 

@@ -22,6 +22,7 @@ Older ADRs predate the structured Status/Context/Decision/Consequences template;
 | [0012](0012-freeze-prototype-as-executable-reference.md) | Freeze the prototype as an executable reference, not a production dependency. |
 | [0013](0013-own-planning-questions-at-goal-level.md) | Author planning Questions on the stable Procedure grouping so they are available before Procedure selection; current production name: Service. |
 | [0014](0014-use-service-as-production-procedure-grouping.md) | Use Service / خدمة as the production name for the stable Procedure grouping; keep Goal only in the frozen prototype and historical records. |
+| [0015](0015-ask-source-questions-for-version-applicability.md) | Ask consequential source Questions for UNKNOWN Procedure Version applicability; preserve pinned rule meaning and published content. |
 
 ## Adding or superseding an ADR
 

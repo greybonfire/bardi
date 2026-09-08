@@ -105,6 +105,10 @@ The production validator must cover at least the invariants proven or required b
 
 - every authored rule validates against the pinned rules-contract version;
 - referenced Fact keys exist and have valid literal types;
+- Procedure Version applicability has structural same-Service Question coverage, expanding
+  derived Facts through pinned source dependencies, including future-effective versions;
+- every Question answer key exists and is non-derived, including all multi-Fact answers;
+  version-applicability coverage is mandatory even when selection coverage is disabled;
 - Eligibility Bases have explicit qualification and valid reachability rules;
 - every consequential source Fact required by a Basis stage has an authored Service Question;
 - blocking dependency cycles are rejected;

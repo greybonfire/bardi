@@ -67,7 +67,9 @@ def _question_result(
         for key in question.resolved_fact_keys
         if key in snapshot.fact_definitions
     )
-    if len(answers) != len(question.resolved_fact_keys):
+    if len(answers) != len(question.resolved_fact_keys) or any(
+        snapshot.fact_definitions[key].derived for key in question.resolved_fact_keys
+    ):
         return _configuration_invalid()
     return NextQuestionResult(
         service_id,
@@ -135,7 +137,18 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         submitted_keys=preparation.prepared_facts.submitted_keys,
     )
     if version_applicability.value is TruthValue.UNKNOWN:
-        return InconclusiveResult("procedure_version_applicability_unknown")
+        if not version_applicability.missing_facts:
+            return InconclusiveResult("procedure_version_applicability_unknown")
+        question = pick_consequential_question(
+            snapshot,
+            service,
+            preparation.prepared_facts,
+            version_applicability.missing_facts,
+            diagnostic_prefix="missing_procedure_version_question",
+        )
+        if question.diagnostic_codes or question.question is None:
+            return _configuration_invalid()
+        return _question_result(snapshot, service.semantic_id, question.question)
     if version_applicability.value is TruthValue.FALSE:
         return InconclusiveResult("procedure_version_not_applicable")
 

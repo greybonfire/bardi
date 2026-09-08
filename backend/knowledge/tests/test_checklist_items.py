@@ -55,6 +55,14 @@ class ChecklistPublicationTests(TestCase):
         self.service = Service.objects.create(
             semantic_id="checklist.service", text_ar="خدمة", text_en="Service"
         )
+        ServiceQuestion.objects.create(
+            semantic_id="checklist.service.question.applicability",
+            service=self.service,
+            fact=self.student_fact,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
+        )
         self.procedure = Procedure.objects.create(
             semantic_id="checklist.procedure",
             text_ar="إجراء",
@@ -290,6 +298,14 @@ class ChecklistPublicationConcurrencyTests(TransactionTestCase):
         actor = get_user_model().objects.create_user(username="checklist-race-publisher")
         service = Service.objects.create(
             semantic_id="checklist.race.service", text_ar="خدمة", text_en="Service"
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="checklist.race.service.question.applicability",
+            service=service,
+            fact=FactDefinition.objects.get(key="is_student"),
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
         )
         procedure = Procedure.objects.create(
             semantic_id="checklist.race.procedure",

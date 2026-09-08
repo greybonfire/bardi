@@ -20,6 +20,7 @@ from knowledge.models import (
     ProcedureVersion,
     Service,
     ServiceProcedureCandidate,
+    ServiceQuestion,
     Source,
     Warning,
 )
@@ -122,6 +123,14 @@ class FeePublicationTests(TestCase):
         self.actor = get_user_model().objects.create_user(username="fee-publication-publisher")
         service = Service.objects.create(
             semantic_id="fee.publication.service", text_ar="خدمة", text_en="Service"
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="fee.publication.service.question.applicability",
+            service=service,
+            fact=self.fact,
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
         )
         procedure = Procedure.objects.create(
             semantic_id="fee.publication.procedure",

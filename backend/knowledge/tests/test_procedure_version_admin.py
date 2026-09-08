@@ -36,6 +36,7 @@ from knowledge.models import (
     ProcedureVersionAuditEvent,
     Service,
     ServiceProcedureCandidate,
+    ServiceQuestion,
     Source,
     Step,
     Warning,
@@ -98,6 +99,14 @@ class ChecklistAdminTests(TestCase):
         self.request.user = self.user
         service = Service.objects.create(
             semantic_id="checklist.admin.service", text_ar="خدمة", text_en="Service"
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="checklist.admin.service.question.applicability",
+            service=service,
+            fact=FactDefinition.objects.get(key="is_student"),
+            text_ar="هل ينطبق عليك شرط الخدمة؟",
+            text_en="Does the service condition apply to you?",
+            priority=100,
         )
         procedure = Procedure.objects.create(
             semantic_id="checklist.admin.procedure",

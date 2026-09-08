@@ -18,6 +18,7 @@ from knowledge.models import (
     ProcedureVersionAuditEvent,
     Service,
     ServiceProcedureCandidate,
+    ServiceQuestion,
 )
 from knowledge.publication import (
     PublicationDiagnostic,
@@ -51,8 +52,20 @@ class DuplicateCoreNameGate:
 class ProcedureVersionTests(TestCase):
     def setUp(self) -> None:
         self.actor = get_user_model().objects.create_user(username="publisher")
+        self.student_fact, _ = FactDefinition.objects.get_or_create(
+            key="is_student",
+            defaults={"kind": "boolean", "enum_values": [], "is_published": True},
+        )
         self.service = Service.objects.create(
             semantic_id="versions.service", text_ar="خدمة", text_en="Service"
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="versions.question.is-student",
+            service=self.service,
+            fact=self.student_fact,
+            text_ar="هل أنت طالب؟",
+            text_en="Are you a student?",
+            priority=10,
         )
         self.procedure = Procedure.objects.create(
             semantic_id="versions.procedure",
@@ -152,6 +165,14 @@ class ProcedureVersionTests(TestCase):
         )
         fact.is_published = True
         fact.save()
+        ServiceQuestion.objects.create(
+            semantic_id="versions.question.published-dependency",
+            service=self.service,
+            fact=fact,
+            text_ar="هل ينطبق الشرط المنشور؟",
+            text_en="Does the published condition apply?",
+            priority=20,
+        )
         draft = self.draft(
             "versions.published-fact",
             applicability={"op": "eq", "fact": fact.key, "value": True},
@@ -288,13 +309,21 @@ class ConcurrentProcedureVersionPublicationTests(TransactionTestCase):
     reset_sequences = True
 
     def test_overlapping_publications_serialize_on_the_procedure(self) -> None:
-        FactDefinition.objects.get_or_create(
+        student_fact, _ = FactDefinition.objects.get_or_create(
             key="is_student",
             defaults={"kind": "boolean", "enum_values": [], "is_published": True},
         )
         actor = get_user_model().objects.create_user(username="concurrent-publisher")
         service = Service.objects.create(
             semantic_id="concurrent.service", text_ar="خدمة", text_en="Service"
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="concurrent.question.is-student",
+            service=service,
+            fact=student_fact,
+            text_ar="هل أنت طالب؟",
+            text_en="Are you a student?",
+            priority=10,
         )
         procedure = Procedure.objects.create(
             semantic_id="concurrent.procedure",

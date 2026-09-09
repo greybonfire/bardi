@@ -6,8 +6,8 @@ from collections.abc import Callable, Mapping
 from datetime import date
 from typing import cast
 
-from knowledge.domain import load_consistent_knowledge_snapshot
 from knowledge.evidence_workflow_temporal import load_consistent_knowledge_snapshot_as_of
+from knowledge.navigation import ServiceNavigationEntry, load_active_service_navigation
 from planning import (
     InconclusiveResult,
     InvalidResult,
@@ -22,6 +22,7 @@ from planning.public import Locale, PublicSource
 from planning.trust import Freshness
 
 SnapshotLoader = Callable[[], KnowledgeSnapshot]
+NavigationLoader = Callable[[], tuple[ServiceNavigationEntry, ...]]
 Planner = Callable[[KnowledgeSnapshot, PlanningInput], PlanningResult]
 
 _MESSAGES: Mapping[str, Mapping[str, str]] = {
@@ -235,16 +236,26 @@ def execute_planning(
 
 def list_active_services(
     *,
-    snapshot_loader: SnapshotLoader = load_consistent_knowledge_snapshot,
+    navigation_loader: NavigationLoader = load_active_service_navigation,
+    snapshot_loader: SnapshotLoader | None = None,
 ) -> dict[str, object]:
-    snapshot = snapshot_loader()
-    return {
-        "services": [
+    if snapshot_loader is not None:
+        snapshot = snapshot_loader()
+        services = (
             {
                 "id": service.semantic_id,
                 "title": {"ar": service.text.ar, "en": service.text.en},
             }
             for service in sorted(snapshot.services, key=lambda item: item.semantic_id)
             if service.is_active
-        ]
-    }
+        )
+    else:
+        entries = sorted(navigation_loader(), key=lambda item: item.semantic_id)
+        services = (
+            {
+                "id": entry.semantic_id,
+                "title": {"ar": entry.text_ar, "en": entry.text_en},
+            }
+            for entry in entries
+        )
+    return {"services": list(services)}

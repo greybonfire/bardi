@@ -20,6 +20,7 @@ class ChecklistSelection:
     missing_facts: frozenset[str] = frozenset()
     trust_inconclusive: bool = False
     basis_resolution_required: bool = False
+    applicability_inconclusive: bool = False
 
 
 def select_checklist_items(
@@ -35,6 +36,7 @@ def select_checklist_items(
     consequential_missing: set[str] = set()
     trust_inconclusive = False
     basis_resolution_required = False
+    applicability_inconclusive = False
     for item in sorted(
         version.checklist_items, key=lambda value: (value.display_order, value.semantic_id)
     ):
@@ -55,13 +57,14 @@ def select_checklist_items(
             continue
         if item.effective_to is not None and evaluation_date > item.effective_to:
             continue
+        pending_missing: frozenset[str] | None = None
         if item.applicability is not None:
             result = evaluate(item.applicability, facts.values, submitted_keys=facts.submitted_keys)
             if result.value is TruthValue.UNKNOWN:
-                if item.classification == "official_requirement":
-                    consequential_missing.update(result.missing_facts)
-                continue
-            if result.value is not TruthValue.TRUE:
+                if item.classification != "official_requirement":
+                    continue
+                pending_missing = result.missing_facts
+            elif result.value is not TruthValue.TRUE:
                 continue
         assessment = assess_trust(
             item.verification_state,
@@ -70,6 +73,8 @@ def select_checklist_items(
             reverify_on=item.reverify_on,
         )
         if assessment.disposition != "assert_current":
+            if pending_missing is not None:
+                applicability_inconclusive = True
             if (
                 item.classification == "official_requirement"
                 and assessment.disposition == "inconclusive"
@@ -82,8 +87,14 @@ def select_checklist_items(
             official_only=item.classification == "official_requirement",
         )
         if sources is None:
+            if pending_missing is not None:
+                applicability_inconclusive = True
             if item.classification == "official_requirement":
                 trust_inconclusive = True
+            continue
+        if pending_missing is not None:
+            consequential_missing.update(pending_missing)
+            applicability_inconclusive |= not pending_missing
             continue
         selected.append(
             PublicChecklistItem(
@@ -106,6 +117,7 @@ def select_checklist_items(
         frozenset(consequential_missing),
         trust_inconclusive,
         basis_resolution_required,
+        applicability_inconclusive,
     )
 
 

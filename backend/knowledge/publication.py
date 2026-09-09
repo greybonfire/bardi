@@ -162,11 +162,34 @@ class ApplicabilityGate:
                 PublicationDiagnostic(self.name, diagnostic.code)
                 for diagnostic in decoded.diagnostics
             )
-        required, defects = _source_fact_keys((decoded.predicate,), context)
-        failures = [
+        predicates = [decoded.predicate]
+        failures: list[PublicationDiagnostic] = []
+        # Structural coverage includes future and non-current authored material. Runtime
+        # trust/date/basis filtering cannot exempt a predicate from publication coverage.
+        official_items = context.version.checklist_items.filter(
+            classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT,
+            scope__in=("procedure", "eligibility_basis"),
+        ).exclude(applicability={})
+        steps = context.version.steps.filter(scope__in=("procedure", "eligibility_basis")).exclude(
+            applicability={}
+        )
+        for rows in (official_items, steps):
+            for owner, raw in rows.order_by("semantic_id").values_list(
+                "semantic_id", "applicability"
+            ):
+                item_rule = decode_stored_rule(raw, context.fact_definitions)
+                if item_rule.predicate is None:
+                    failures.extend(
+                        PublicationDiagnostic(self.name, diagnostic.code, owner)
+                        for diagnostic in item_rule.diagnostics
+                    )
+                else:
+                    predicates.append(item_rule.predicate)
+        required, defects = _source_fact_keys(predicates, context)
+        failures.extend(
             PublicationDiagnostic(self.name, "invalid_derived_fact_dependency", key)
             for key in sorted(defects)
-        ]
+        )
         covered: set[str] = set()
         questions = context.version.procedure.primary_service.questions.prefetch_related(
             "resolved_fact_links__fact", "fact"

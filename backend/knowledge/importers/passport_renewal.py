@@ -928,8 +928,8 @@ def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
             "passport.student.unknown",
             "unknown",
             {k: v for k, v in common.items() if k != "is_student"},
-            "inconclusive",
-            {"reason": "checklist_applicability_unknown"},
+            "next_question",
+            {"question_id": "q.is_student"},
         ),
         (
             "passport.fee.urgent",

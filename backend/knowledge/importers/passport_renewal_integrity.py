@@ -32,6 +32,7 @@ from knowledge.service_point_routing import (
 VERSION_ID = "ordinary_domestic_passport_renewal.research-2026-08-25"
 
 _LEGACY_SCENARIO_DIGEST = "1299e2c32df5567b20a4018ab7fce7a58f42da6c5567b1dcaac1ba9d77807f24"
+_PRE_QUESTION_SCENARIO_DIGEST = "e5f2c2f2fa59c63876324eec0610b548455fa5e1c14a506da119c00c479041f4"
 _ROUTING_SCENARIO_NAMES = (
     "passport.fee.urgent",
     "passport.fee.premium",
@@ -43,7 +44,7 @@ _EXPECTED = {
     "documents": "515fb6b1ef9e6f450d39ca0f24bb6f3f08bb139c7f33394d9629462baeb2be93",
     "evidence": "0b1768a1be95fa9a081a17bb4f511cd17b5de0c57ec47508572b2130fcee6ba9",
     "policy": "a606df3d811909414097f400cf393f94eac503607f718f5aecc066a25bba2605",
-    "scenarios": "e5f2c2f2fa59c63876324eec0610b548455fa5e1c14a506da119c00c479041f4",
+    "scenarios": "b8745464a02dcef9045a290668969c8438a5eb66450714e3d92960c9a8aaa4d8",
     "sources": "87efb46c6eb3b57883936c927517d6c011577e2504e846ea0d4ebaf41e33ff54",
     "trust": "f409b172c9565fa0bb6a6a7a1a1a463278cd2f8d63804cd12d9bb14e6944a009",
 }
@@ -111,7 +112,7 @@ def _verify_planning_signature(version: ProcedureVersion) -> None:
         raise ValidationError(f"{VERSION_ID}: semantic conflict in planning behavior.")
 
 
-def _verify_scenarios(version: ProcedureVersion, *, allow_legacy: bool = False) -> bool:
+def _verify_scenarios(version: ProcedureVersion, *, allow_legacy: bool = False) -> str | None:
     """Validate the complete scenario seal and report an exact legacy match."""
 
     rows = list(
@@ -128,10 +129,11 @@ def _verify_scenarios(version: ProcedureVersion, *, allow_legacy: bool = False) 
             "expected_diagnostics",
         )
     )
-    if allow_legacy and _digest(rows) == _LEGACY_SCENARIO_DIGEST:
-        return True
+    digest = _digest(rows)
+    if allow_legacy and digest in {_LEGACY_SCENARIO_DIGEST, _PRE_QUESTION_SCENARIO_DIGEST}:
+        return digest
     _require_digest("scenarios", rows)
-    return False
+    return None
 
 
 def _verify_shared_research_records() -> None:
@@ -269,7 +271,7 @@ def _verify_review_policy(version: ProcedureVersion) -> None:
 
 @transaction.atomic
 def verify_passport_renewal_import(version: ProcedureVersion) -> None:
-    """Verify sealed research and upgrade only exact legacy draft routing expectations."""
+    """Verify sealed research and upgrade exact legacy draft routing/Question expectations."""
 
     version = ProcedureVersion.objects.select_for_update().get(pk=version.pk)
     if version.semantic_id != VERSION_ID:
@@ -285,17 +287,30 @@ def verify_passport_renewal_import(version: ProcedureVersion) -> None:
 
     # Validate every seal before changing any draft rows. Finalized scenarios remain
     # immutable history, and only their exact old or new seal is accepted above.
-    if legacy_scenarios and version.state == ProcedureVersion.State.DRAFT:
+    if legacy_scenarios is not None and version.state == ProcedureVersion.State.DRAFT:
+        names = ["passport.student.unknown"]
+        if legacy_scenarios == _LEGACY_SCENARIO_DIGEST:
+            names.extend(_ROUTING_SCENARIO_NAMES)
         for scenario in PlanningScenario.objects.filter(
-            procedure_version=version, name__in=_ROUTING_SCENARIO_NAMES
+            procedure_version=version, name__in=names
         ).order_by("name"):
-            scenario.expected_identifiers = {
-                **scenario.expected_identifiers,
-                "routing_status": "unresolved",
-            }
+            if scenario.name == "passport.student.unknown":
+                scenario.expected_result_family = "next_question"
+                scenario.expected_identifiers = {"question_id": "q.is_student"}
+            else:
+                scenario.expected_identifiers = {
+                    **scenario.expected_identifiers,
+                    "routing_status": "unresolved",
+                }
             # Use the normal model path: ownership, validation, and signatures still apply.
             # Existing review approvals become stale because they include scenario content.
-            scenario.save(update_fields=("expected_identifiers", "behavior_signature"))
+            scenario.save(
+                update_fields=(
+                    "expected_result_family",
+                    "expected_identifiers",
+                    "behavior_signature",
+                )
+            )
         _verify_scenarios(version)
 
 

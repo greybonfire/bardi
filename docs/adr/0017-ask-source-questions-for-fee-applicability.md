@@ -1,6 +1,7 @@
 # ADR 0017: Ask source Questions for Fee applicability
 
-**Status:** Accepted  
+**Status:** Accepted
+
 **Date:** 2026-09-09
 
 ## Context

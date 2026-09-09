@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Any, cast
 from unittest.mock import patch
@@ -9,11 +10,16 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TransactionTestCase
+from planning import Predicate, PreparedFacts
+from planning.fees import select_fees
 from planning.trust import VerificationState
 
+from knowledge.domain import load_knowledge_snapshot
 from knowledge.evidence_workflow import (
     EvidenceDiscrepancy,
     EvidenceReverificationEvent,
+    _overlay_item,
+    _TrustOverlay,
     open_evidence_discrepancy,
     record_evidence_reverification,
     resolve_evidence_discrepancy,
@@ -451,6 +457,53 @@ class EvidenceWorkflowTests(TransactionTestCase):
             event.save()
         with self.assertRaises(ValidationError):
             event.delete()
+
+    def test_current_overlay_never_exposes_authored_unverified_researched_amount(self) -> None:
+        self.publish()
+        snapshot = load_knowledge_snapshot()
+        version = next(
+            item
+            for item in snapshot.procedure_versions
+            if item.semantic_id == self.version.semantic_id
+        )
+        authored_unverified = replace(
+            version.fees[0],
+            value_state="unverified",
+            amount=900,
+            verification_state="needs_reverification",
+            applicability=Predicate("eq", "overlay_fee_applies", True),
+        )
+        current = _overlay_item(
+            authored_unverified,
+            _TrustOverlay(state="current", owner_verified_on=TODAY),
+        )
+        overlaid_version = replace(version, fees=(current,))
+
+        unknown = select_fees(
+            overlaid_version,
+            PreparedFacts({}, frozenset(), {}),
+            TODAY,
+        )
+        self.assertEqual(unknown.missing_facts, frozenset({"overlay_fee_applies"}))
+        self.assertFalse(unknown.items)
+
+        selected = select_fees(
+            overlaid_version,
+            PreparedFacts(
+                {"overlay_fee_applies": True},
+                frozenset({"overlay_fee_applies"}),
+                {},
+            ),
+            TODAY,
+        )
+        fee = selected.items[0]
+        self.assertEqual(fee.value_state, "unverified")
+        self.assertIsNone(fee.amount)
+        self.assertIsNone(fee.minimum_amount)
+        self.assertIsNone(fee.maximum_amount)
+        self.assertTrue(fee.current_value_unknown)
+        self.assertEqual(fee.sources[0].id, self.source.semantic_id)
+        self.assertEqual(fee.freshness.state, "current")
 
     def test_fee_discrepancy_hides_amount_without_erasing_reliable_sections(self) -> None:
         self.publish()

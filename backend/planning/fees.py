@@ -113,10 +113,10 @@ def select_fees(
             else:
                 sources = claim_sources(item.evidence_links)
                 public_state = authored_state
-                amount = item.amount
-                minimum_amount = item.minimum_amount
-                maximum_amount = item.maximum_amount
-                current_value_unknown = authored_state == "unknown"
+                amount = None
+                minimum_amount = None
+                maximum_amount = None
+                current_value_unknown = True
         else:
             sources = claim_sources(item.evidence_links)
             public_state = "unknown" if authored_state == "unknown" else "unverified"

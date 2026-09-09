@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import importlib
 import json
 from datetime import date
 from typing import Any
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
+from django.db import connections
 from django.test import TransactionTestCase, override_settings, tag
 from knowledge.evidence_workflow_temporal import load_knowledge_snapshot_as_of
 from knowledge.importers.national_id_renewal import (
@@ -25,6 +28,7 @@ from knowledge.importers.temporary_family_exemption import (
 from knowledge.importers.temporary_family_exemption import (
     import_temporary_family_exemption,
 )
+from knowledge.models import FactDefinition
 from knowledge.publication import publish_procedure_version
 from planning import CasePreparationSuccess, prepare_case
 
@@ -76,7 +80,35 @@ MILITARY_ONLY_SON_FACTS: dict[str, object] = {
 class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):
     serialized_rollback = True
 
+    @classmethod
+    def _fixture_setup(cls) -> None:
+        # Ordinary TransactionTestCase teardown can leave post_migrate metadata behind.
+        # Remove all test state before restoring the complete migrated snapshot, including
+        # the migration-seeded facts required by the acceptance importers.
+        for db_name in cls._databases_names(include_mirrors=False):  # type: ignore[attr-defined]
+            connection = connections[db_name]
+            if cls.serialized_rollback and hasattr(connection, "_test_serialized_contents"):
+                call_command(
+                    "flush",
+                    verbosity=0,
+                    interactive=False,
+                    database=db_name,
+                    reset_sequences=False,
+                    inhibit_post_migrate=True,
+                )
+        super()._fixture_setup()  # type: ignore[misc]
+
     def setUp(self) -> None:
+        migration = importlib.import_module("knowledge.migrations.0001_initial")
+        for key, kind, enum_values, minimum, derived in migration.SEEDED_FACTS:
+            with self.subTest(fact=key):
+                fact = FactDefinition.objects.get(key=key)
+                self.assertEqual(fact.kind, kind)
+                self.assertEqual(fact.enum_values, enum_values)
+                self.assertEqual(fact.minimum, minimum)
+                self.assertEqual(fact.derived, derived)
+                self.assertTrue(fact.is_published)
+
         author = get_user_model().objects.create_user(
             username="cross-family-acceptance-author",
             is_staff=True,

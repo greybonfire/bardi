@@ -111,6 +111,41 @@ The planning validation domain has a database-free fast suite:
 
 Run the complete checks with PostgreSQL available:
 
+Database-backed Django commands require the exported `.env` values and a running local
+PostgreSQL service. The `manage.py test` commands below create and destroy disposable test
+databases; the `manage.py migrate` commands below target the configured `POSTGRES_DB`. Do not
+use `--keepdb` for lifecycle-isolation checks.
+
+The combined backend discovery suite is supported from the `backend/` directory:
+
+```bash
+(cd backend && uv run python manage.py test \
+  --settings=bardi.settings.test --noinput)
+```
+
+The two existing CI database-backed groups are also supported independently:
+
+```bash
+(cd backend && uv run python manage.py test \
+  api.tests.test_cross_family_production_parity \
+  --settings=bardi.settings.test --noinput)
+
+(cd backend && uv run python manage.py test \
+  planning.tests knowledge.tests api.tests core.tests \
+  --exclude-tag=production_acceptance \
+  --settings=bardi.settings.test --noinput)
+```
+
+The focused mixed-lifecycle regression is:
+
+```bash
+(cd backend && uv run python manage.py test \
+  api.tests.test_serialized_rollback_isolation \
+  --settings=bardi.settings.test --noinput)
+```
+
+The broader production scaffold checks are:
+
 ```bash
 uv run ruff check backend
 uv run ruff format --check backend
@@ -120,7 +155,7 @@ uv run python backend/manage.py check --settings=bardi.settings.development
 uv run python backend/manage.py makemigrations --check --dry-run --settings=bardi.settings.test
 uv run python backend/manage.py migrate --noinput --settings=bardi.settings.test
 uv run python backend/manage.py migrate --check --settings=bardi.settings.test
-(cd backend && uv run python manage.py test --settings=bardi.settings.test)
+(cd backend && uv run python manage.py test --settings=bardi.settings.test --noinput)
 python -m unittest discover -s prototype/tests -v
 ```
 

@@ -6,7 +6,7 @@ from typing import Any
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from knowledge.admin import ProcedureVersionAdmin
@@ -25,6 +25,7 @@ from knowledge.models import (
     Warning,
 )
 from knowledge.publication import PublicationRejected, publish_procedure_version
+from knowledge.services import set_question_resolved_facts
 
 
 class FeeModelValidationTests(TestCase):
@@ -272,6 +273,119 @@ class FeePublicationTests(TestCase):
         self.assertIn(
             "invalid_basis_owner",
             {item.code for item in diagnostics},
+        )
+
+    def test_fee_coverage_rejects_a_question_owned_by_the_wrong_service(self) -> None:
+        self.regeneration_warning()
+        extra = FactDefinition.objects.create(
+            key="fee_wrong_service_fact",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        other_service = Service.objects.create(
+            semantic_id="fee.publication.other-service",
+            text_ar="خدمة أخرى",
+            text_en="Other service",
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="fee.publication.wrong-service-question",
+            service=other_service,
+            fact=extra,
+            text_ar="سؤال",
+            text_en="Question",
+            priority=100,
+        )
+        self.fee(
+            "fee.publication.wrong-service",
+            value_state=Fee.ValueState.UNKNOWN,
+            amount=None,
+            applicability={"op": "eq", "fact": extra.key, "value": True},
+        )
+
+        diagnostics = self.rejection().diagnostics
+
+        self.assertIn(
+            ("missing_service_question", extra.key),
+            {(item.code, item.detail) for item in diagnostics},
+        )
+
+    def test_fee_coverage_expands_derived_facts_and_accepts_complete_multi_fact_question(
+        self,
+    ) -> None:
+        self.regeneration_warning()
+        birth_date, _ = FactDefinition.objects.get_or_create(
+            key="birth_date",
+            defaults={"kind": "date", "enum_values": [], "is_published": True},
+        )
+        derived_age, _ = FactDefinition.objects.get_or_create(
+            key="age_years_on_evaluation_date",
+            defaults={
+                "kind": "integer",
+                "enum_values": [],
+                "minimum": 0,
+                "derived": True,
+                "is_published": True,
+            },
+        )
+        companion = FactDefinition.objects.create(
+            key="fee_multi_companion",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        question = ServiceQuestion.objects.create(
+            semantic_id="fee.publication.multi-derived-question",
+            service=self.version.procedure.primary_service,
+            fact=birth_date,
+            text_ar="بيانات متعددة",
+            text_en="Multiple answers",
+            priority=50,
+        )
+        set_question_resolved_facts(question, (birth_date, companion))
+        self.fee(
+            "fee.publication.derived",
+            value_state=Fee.ValueState.UNKNOWN,
+            amount=None,
+            applicability={"op": "gte", "fact": derived_age.key, "value": 18},
+        )
+
+        published = publish_procedure_version(self.version.pk, actor=self.actor)
+
+        self.assertEqual(published.state, ProcedureVersion.State.PUBLISHED)
+
+    @override_settings(SELECTION_QUESTIONS_REQUIRED=False)
+    def test_fee_coverage_is_mandatory_for_future_noncurrent_basis_fee(self) -> None:
+        self.regeneration_warning()
+        uncovered = FactDefinition.objects.create(
+            key="fee_future_basis_fact",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        basis = EligibilityBasis.objects.create(
+            procedure_version=self.version,
+            semantic_id="fee.publication.future-basis",
+            text_ar="أساس مستقبلي",
+            text_en="Future basis",
+            qualification={"op": "eq", "fact": self.fact.key, "value": True},
+        )
+        self.fee(
+            "fee.publication.future-noncurrent-basis",
+            value_state=Fee.ValueState.UNKNOWN,
+            amount=None,
+            scope=Fee.Scope.ELIGIBILITY_BASIS,
+            eligibility_basis=basis,
+            effective_from=date(2027, 1, 1),
+            verification_state="needs_reverification",
+            applicability={"op": "eq", "fact": uncovered.key, "value": True},
+        )
+
+        diagnostics = self.rejection().diagnostics
+
+        self.assertIn(
+            ("missing_service_question", uncovered.key),
+            {(item.code, item.detail) for item in diagnostics},
         )
 
     def test_explicit_unknown_publishes_without_invented_amount_or_evidence(self) -> None:

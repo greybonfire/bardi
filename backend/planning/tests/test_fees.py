@@ -129,6 +129,26 @@ class FeeSelectionTests(unittest.TestCase):
         self.assertTrue(by_id["unverified"].current_value_unknown)
         self.assertEqual(by_id["unverified"].sources[0].id, "source")
 
+    def test_current_authored_unverified_fee_never_exposes_researched_amount(self) -> None:
+        fee = self.fee(
+            "authored-unverified",
+            1,
+            value_state="unverified",
+            amount=900,
+            verification_state="current",
+        )
+
+        selected = select_fees(self.version(fee), self.facts, date(2026, 2, 1))
+
+        item = selected.items[0]
+        self.assertEqual(item.value_state, "unverified")
+        self.assertIsNone(item.amount)
+        self.assertIsNone(item.minimum_amount)
+        self.assertIsNone(item.maximum_amount)
+        self.assertTrue(item.current_value_unknown)
+        self.assertEqual(item.sources[0].id, "source")
+        self.assertEqual(item.freshness.state, "current")
+
     def test_unreliable_fee_is_local_and_never_exposes_its_amount(self) -> None:
         reliable = self.fee("reliable", 1, amount=100)
         disputed = self.fee(
@@ -168,6 +188,31 @@ class FeeSelectionTests(unittest.TestCase):
         untrusted_selection = select_fees(self.version(untrusted), self.facts, date(2026, 2, 1))
         self.assertFalse(untrusted_selection.missing_facts)
         self.assertFalse(untrusted_selection.items)
+
+    def test_noncurrent_future_and_unmatched_basis_fees_do_not_request_facts(self) -> None:
+        rule = Predicate("eq", "missing", True)
+        noncurrent = self.fee(
+            "noncurrent",
+            1,
+            applicability=rule,
+            verification_state="needs_reverification",
+        )
+        future = replace(
+            self.fee("future", 2, applicability=rule),
+            effective_from=date(2026, 3, 1),
+        )
+        basis = self.fee("basis", 3, applicability=rule, scope="eligibility_basis")
+
+        selected = select_fees(
+            self.version(noncurrent, future, basis),
+            self.facts,
+            date(2026, 2, 1),
+            matched_basis_ids=set(),
+        )
+
+        self.assertFalse(selected.items)
+        self.assertFalse(selected.missing_facts)
+        self.assertFalse(selected.applicability_inconclusive)
 
     def test_current_basis_scoped_fee_fails_closed_until_basis_resolution(self) -> None:
         fee = self.fee("basis-fee", 1, scope="eligibility_basis")

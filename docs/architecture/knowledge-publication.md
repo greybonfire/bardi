@@ -107,8 +107,10 @@ The production validator must cover at least the invariants proven or required b
 - referenced Fact keys exist and have valid literal types;
 - Procedure Version applicability has structural same-Service Question coverage, expanding
   derived Facts through pinned source dependencies, including future-effective versions;
-- official checklist and supported step applicability predicates in procedure/basis scopes have
-  the same structural source-Question coverage, including future/non-current material (ADR 0016);
+- official checklist, supported step, and Fee applicability predicates in procedure/basis scopes
+  have the same structural source-Question coverage, including future/non-current material
+  (ADRs 0016 and 0017); Fee coverage is independent of monetary value state, evidence, freshness,
+  current date, and runtime Basis matching;
 - every Question answer key exists and is non-derived, including all multi-Fact answers;
   version-applicability coverage is mandatory even when selection coverage is disabled;
 - Eligibility Bases have explicit qualification and valid reachability rules;
@@ -213,14 +215,15 @@ Admin, and publish only with the canonical Procedure Version Admin action. Rerun
 returns an identical draft (or verifies an already finalized identity) and rejects semantic
 conflicts; it never manufactures users, approvals, publisher identity, or publication dates.
 
-The passport importer recognizes the exact scenario seal from before the empty-routing
-status correction. After all research integrity checks pass, rerunning it upgrades only
-the three affected expectations on an existing draft, atomically, through normal scenario
-validation. Changed scenario content invalidates prior review signatures; publication still
-requires fresh approvals. Exact legacy published or withdrawn imports remain verifiable
-without rewriting their scenarios. Any other scenario drift is rejected, including partial
-upgrades. Fresh imports use the corrected expectations. This compatibility path does not
-change claims, evidence, lifecycle state, or publication history.
+The passport importer recognizes only its exact legacy, pre-checklist-Question, and
+pre-Fee-Question scenario seals. After all other integrity checks pass, rerunning it upgrades an
+eligible draft atomically through normal scenario saves: legacy routing corrections are retained,
+the student Question correction is retained where needed, and the missing Fee applicability
+scenario is created for every prior seal. Changed scenario content invalidates prior review
+signatures; publication still requires fresh approvals. Exact legacy published or withdrawn
+imports remain verifiable without rewriting their scenarios. Any other scenario drift is rejected,
+including missing or partial upgrades. Fresh imports use the current expectations. This
+compatibility path does not change claims, evidence, lifecycle state, or publication history.
 
 ## Migrating the researched fixtures
 
@@ -238,11 +241,18 @@ invalid verification metadata, incomplete support, current contradictions, and m
 Report provenance. Routing Facts need not have Service Questions because routing uncertainty is
 local and non-consequential.
 
-### Passport checklist Question compatibility
+### Passport applicability Question compatibility
 
-The passport importer now authors `passport.student.unknown` as `next_question` for `q.is_student`.
-Its integrity verifier accepts only the current seal and the two exact previously supported
-pre-Question/pre-routing scenario sets. Once all other seals pass, a draft upgrades the student
-expectation and any required legacy routing expectations atomically via normal model saves.
-Published/withdrawn scenarios remain immutable; existing review signatures become stale after a
-draft scenario change. Direct and sequential upgrades retain prior compatibility and reject drift.
+The passport importer authors `passport.student.unknown` as `next_question` for `q.is_student` and
+`passport.fee.service_level_unknown` as `next_question` for the existing bilingual
+`q.service_level`. Its integrity verifier accepts only the current seal and the exact legacy,
+pre-checklist-Question, and pre-Fee-Question seals. Only after planning signature, research, trust,
+evidence, and review-policy checks pass, an eligible draft receives all missing historical routing
+and student updates plus the Fee scenario in one transaction through normal model saves. Thus
+direct upgrades from every prior seal and sequential historical transitions end at the current
+seal, while scenario changes invalidate prior review approvals.
+
+Exact published or withdrawn prior seals remain verifiable and are never rewritten. Missing,
+partial, or arbitrary scenario drift is rejected without a partial upgrade. This compatibility
+path changes no claims, Fee predicates or values, evidence, lifecycle state, publication history,
+or immutable rules-contract semantics.

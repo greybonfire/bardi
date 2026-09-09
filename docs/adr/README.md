@@ -24,6 +24,7 @@ Older ADRs predate the structured Status/Context/Decision/Consequences template;
 | [0014](0014-use-service-as-production-procedure-grouping.md) | Use Service / خدمة as the production name for the stable Procedure grouping; keep Goal only in the frozen prototype and historical records. |
 | [0015](0015-ask-source-questions-for-version-applicability.md) | Ask consequential source Questions for UNKNOWN Procedure Version applicability; preserve pinned rule meaning and published content. |
 | [0016](0016-ask-source-questions-for-checklists-and-steps.md) | Ask source Questions for usable official checklist and step applicability; preserve blocked research uncertainty. |
+| [0017](0017-ask-source-questions-for-fee-applicability.md) | Ask source Questions for trusted Fee applicability without weakening monetary evidence fallback. |
 
 ## Adding or superseding an ADR
 

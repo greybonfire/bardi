@@ -932,6 +932,13 @@ def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
             {"question_id": "q.is_student"},
         ),
         (
+            "passport.fee.service_level_unknown",
+            "unknown",
+            {k: v for k, v in common.items() if k != "service_level"},
+            "next_question",
+            {"question_id": "q.service_level"},
+        ),
+        (
             "passport.fee.urgent",
             "positive",
             {**common, "service_level": "urgent"},

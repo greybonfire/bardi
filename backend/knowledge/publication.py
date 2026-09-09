@@ -173,7 +173,14 @@ class ApplicabilityGate:
         steps = context.version.steps.filter(scope__in=("procedure", "eligibility_basis")).exclude(
             applicability={}
         )
-        for rows in (official_items, steps):
+        # Imported lazily because the feature model imports this publication interface.
+        from .fees import Fee
+
+        fees = Fee.objects.filter(
+            procedure_version=context.version,
+            scope__in=(Fee.Scope.PROCEDURE, Fee.Scope.ELIGIBILITY_BASIS),
+        ).exclude(applicability={})
+        for rows in (official_items, steps, fees):
             for owner, raw in rows.order_by("semantic_id").values_list(
                 "semantic_id", "applicability"
             ):

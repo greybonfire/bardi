@@ -12,6 +12,7 @@ from planning import (
     EligibilityBasisSnapshot,
     EvidenceLinkSnapshot,
     FactDefinition,
+    FeeSnapshot,
     InconclusiveResult,
     InvalidResult,
     KnowledgeSnapshot,
@@ -29,6 +30,7 @@ from planning import (
     StepSnapshot,
     plan_stateless,
 )
+from planning.fees import FeeSelection
 
 
 def snapshot(
@@ -76,6 +78,77 @@ def snapshot(
 
 def request(facts: dict[str, object] | None = None) -> PlanningInput:
     return PlanningInput("service", facts or {}, "en", date(2026, 9, 1))
+
+
+def fee_operation_snapshot(
+    *,
+    value_state: str = "known",
+    amount: int | None = 100,
+    minimum_amount: int | None = None,
+    maximum_amount: int | None = None,
+    evidence: tuple[EvidenceLinkSnapshot, ...] | None = None,
+    questions: tuple[QuestionSnapshot, ...] | None = None,
+    fee_fact: str = "fee_applies",
+    fee_predicate: Predicate | None = None,
+) -> KnowledgeSnapshot:
+    base = snapshot(version=True)
+    source = SourceSnapshot(
+        "fee-source",
+        AuthoritySnapshot("authority", LocalizedText("جهة", "Authority")),
+        "Fee source",
+        "https://example.test/fee",
+        "official",
+        date(2026, 8, 1),
+    )
+    support = EvidenceLinkSnapshot(
+        "Fee passage",
+        "Fee table",
+        "Fee support",
+        "supports",
+        "current",
+        (source,),
+        verified_on=date(2026, 8, 1),
+    )
+    fee = FeeSnapshot(
+        "fee",
+        LocalizedText("رسم", "Fee"),
+        value_state,
+        amount,
+        minimum_amount,
+        maximum_amount,
+        "EGP",
+        "service_fee",
+        1,
+        fee_predicate or Predicate("eq", fee_fact, True),
+        "procedure",
+        None,
+        None,
+        None,
+        "current",
+        date(2026, 8, 1),
+        None,
+        (support,) if evidence is None else evidence,
+    )
+    definitions = {
+        **base.fact_definitions,
+        "fee_applies": FactDefinition("fee_applies", "boolean"),
+    }
+    authored_questions = (
+        (
+            QuestionSnapshot(
+                "fee-question",
+                LocalizedText("هل ينطبق الرسم؟", "Does the fee apply?"),
+                5,
+                "fee_applies",
+                ("fee_applies",),
+            ),
+        )
+        if questions is None
+        else questions
+    )
+    service = replace(base.services[0], questions=base.services[0].questions + authored_questions)
+    version = replace(base.procedure_versions[0], fees=(fee,))
+    return KnowledgeSnapshot(definitions, (service,), (version,))
 
 
 def step(
@@ -193,6 +266,160 @@ class PublicPlanningOperationTests(unittest.TestCase):
         assert isinstance(result, PlanResult)
         self.assertEqual(result.steps, ())
         self.assertEqual(result.inconclusive_sections, ("steps",))
+
+    def test_fee_question_true_and_false_preserve_all_authored_value_states(self) -> None:
+        cases = (
+            ("known", 100, None, None),
+            ("range", None, 100, 150),
+            ("unknown", None, None, None),
+            ("unverified", 900, None, None),
+        )
+        for value_state, amount, minimum, maximum in cases:
+            with self.subTest(value_state=value_state):
+                knowledge = fee_operation_snapshot(
+                    value_state=value_state,
+                    amount=amount,
+                    minimum_amount=minimum,
+                    maximum_amount=maximum,
+                )
+                unanswered = plan_stateless(knowledge, request({"answer": True}))
+                self.assertIsInstance(unanswered, NextQuestionResult)
+                assert isinstance(unanswered, NextQuestionResult)
+                self.assertEqual(unanswered.question.id, "fee-question")
+
+                included = plan_stateless(knowledge, request({"answer": True, "fee_applies": True}))
+                self.assertIsInstance(included, PlanResult)
+                assert isinstance(included, PlanResult)
+                self.assertEqual([item.id for item in included.fees], ["fee"])
+                projected = included.fees[0]
+                if value_state == "known":
+                    self.assertEqual(projected.amount, 100)
+                    self.assertFalse(projected.current_value_unknown)
+                elif value_state == "range":
+                    self.assertEqual(
+                        (projected.minimum_amount, projected.maximum_amount), (100, 150)
+                    )
+                    self.assertFalse(projected.current_value_unknown)
+                else:
+                    self.assertIsNone(projected.amount)
+                    self.assertIsNone(projected.minimum_amount)
+                    self.assertIsNone(projected.maximum_amount)
+                    self.assertTrue(projected.current_value_unknown)
+
+                excluded = plan_stateless(
+                    knowledge, request({"answer": True, "fee_applies": False})
+                )
+                self.assertIsInstance(excluded, PlanResult)
+                assert isinstance(excluded, PlanResult)
+                self.assertFalse(excluded.fees)
+
+    def test_fee_question_does_not_promote_unavailable_stale_or_disputed_support(self) -> None:
+        base = fee_operation_snapshot()
+        original = base.procedure_versions[0].fees[0].evidence_links[0]
+        for label, evidence in (
+            ("unavailable", ()),
+            ("stale", (replace(original, verification_state="stale"),)),
+            ("disputed", (replace(original, verification_state="disputed"),)),
+        ):
+            with self.subTest(support=label):
+                knowledge = fee_operation_snapshot(evidence=evidence)
+                self.assertIsInstance(
+                    plan_stateless(knowledge, request({"answer": True})),
+                    NextQuestionResult,
+                )
+                result = plan_stateless(knowledge, request({"answer": True, "fee_applies": True}))
+                self.assertIsInstance(result, PlanResult)
+                assert isinstance(result, PlanResult)
+                projected = result.fees[0]
+                self.assertEqual(projected.value_state, "unverified")
+                self.assertIsNone(projected.amount)
+                self.assertTrue(projected.current_value_unknown)
+
+    def test_fee_question_expands_derived_facts_and_uses_deterministic_multi_fact_order(
+        self,
+    ) -> None:
+        questions = (
+            QuestionSnapshot(
+                "later-question",
+                LocalizedText("لاحق", "Later"),
+                20,
+                "birth_date",
+                ("birth_date",),
+            ),
+            QuestionSnapshot(
+                "multi-question",
+                LocalizedText("متعدد", "Multi"),
+                10,
+                "birth_date",
+                ("birth_date", "fee_applies"),
+            ),
+        )
+        knowledge = fee_operation_snapshot(
+            questions=questions,
+            fee_predicate=Predicate("gte", "age_years_on_evaluation_date", 18),
+        )
+        knowledge = KnowledgeSnapshot(
+            {
+                **knowledge.fact_definitions,
+                "birth_date": FactDefinition("birth_date", "date"),
+                "age_years_on_evaluation_date": FactDefinition(
+                    "age_years_on_evaluation_date", "integer", minimum=0, derived=True
+                ),
+            },
+            knowledge.services,
+            knowledge.procedure_versions,
+        )
+
+        first = plan_stateless(knowledge, request({"answer": True}))
+        self.assertIsInstance(first, NextQuestionResult)
+        assert isinstance(first, NextQuestionResult)
+        self.assertEqual(first.question.id, "multi-question")
+        self.assertEqual(
+            tuple(answer.key for answer in first.question.answers), ("birth_date", "fee_applies")
+        )
+
+        partial = plan_stateless(knowledge, request({"answer": True, "fee_applies": False}))
+        self.assertIsInstance(partial, NextQuestionResult)
+        assert isinstance(partial, NextQuestionResult)
+        self.assertEqual(partial.question.id, "multi-question")
+
+        adult = plan_stateless(
+            knowledge,
+            request({"answer": True, "fee_applies": False, "birth_date": date(2000, 1, 1)}),
+        )
+        self.assertIsInstance(adult, PlanResult)
+        assert isinstance(adult, PlanResult)
+        self.assertEqual([item.id for item in adult.fees], ["fee"])
+
+    def test_fee_question_configuration_defects_and_no_actionable_fallback_fail_closed(
+        self,
+    ) -> None:
+        missing_coverage = fee_operation_snapshot(questions=())
+        result = plan_stateless(missing_coverage, request({"answer": True}))
+        self.assertIsInstance(result, InvalidResult)
+        assert isinstance(result, InvalidResult)
+        self.assertEqual(result.diagnostics[0].code, "knowledge_configuration_invalid")
+
+        invalid_question = fee_operation_snapshot(
+            questions=(
+                QuestionSnapshot(
+                    "invalid-question",
+                    LocalizedText("غير صالح", "Invalid"),
+                    1,
+                    "fee_applies",
+                    ("fee_applies", "not_defined"),
+                ),
+            )
+        )
+        invalid = plan_stateless(invalid_question, request({"answer": True}))
+        self.assertIsInstance(invalid, InvalidResult)
+
+        with patch(
+            "planning.operation.select_fees",
+            return_value=FeeSelection((), applicability_inconclusive=True),
+        ):
+            fallback = plan_stateless(snapshot(version=True), request({"answer": True}))
+        self.assertEqual(fallback, InconclusiveResult("fee_applicability_unknown"))
 
     def test_unknown_basis_scope_is_configuration_invalid_after_basis_resolution(self) -> None:
         base = snapshot(version=True)

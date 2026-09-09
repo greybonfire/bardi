@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from django.test import SimpleTestCase
+from knowledge.navigation import ServiceNavigationEntry
 from planning import (
     FactDefinition,
     InconclusiveResult,
@@ -23,14 +24,67 @@ class ApplicationBoundaryTests(SimpleTestCase):
             (
                 ServiceSnapshot("z", LocalizedText("ز", "Z"), (), (), (), True),
                 ServiceSnapshot("a", LocalizedText("أ", "A"), (), (), (), False),
+                ServiceSnapshot("A", LocalizedText("ألف", "Alpha"), (), (), (), True),
+                ServiceSnapshot("a-10", LocalizedText("عشرة", "Ten"), (), (), (), True),
             ),
         )
 
-    def test_navigation_is_active_sorted_and_whitelisted(self) -> None:
+    def test_snapshot_navigation_is_active_sorted_and_whitelisted(self) -> None:
         self.assertEqual(
             list_active_services(snapshot_loader=lambda: self.snapshot),
-            {"services": [{"id": "z", "title": {"ar": "ز", "en": "Z"}}]},
+            {
+                "services": [
+                    {"id": "A", "title": {"ar": "ألف", "en": "Alpha"}},
+                    {"id": "a-10", "title": {"ar": "عشرة", "en": "Ten"}},
+                    {"id": "z", "title": {"ar": "ز", "en": "Z"}},
+                ]
+            },
         )
+
+    def test_navigation_injection_is_detached_sorted_and_whitelisted(self) -> None:
+        entries = (
+            ServiceNavigationEntry("item-10", "عشرة", "Ten"),
+            ServiceNavigationEntry("item-2", "اثنان", "Two"),
+            ServiceNavigationEntry("Item!", "عنصر", "Item"),
+            ServiceNavigationEntry("item.1", "واحد", "One"),
+            ServiceNavigationEntry("خدمة", "خدمة", "Service"),
+        )
+        calls: list[str] = []
+
+        def loader() -> tuple[ServiceNavigationEntry, ...]:
+            calls.append("loaded")
+            return entries
+
+        self.assertEqual(
+            list_active_services(navigation_loader=loader),
+            {
+                "services": [
+                    {"id": entry.semantic_id, "title": {"ar": entry.text_ar, "en": entry.text_en}}
+                    for entry in sorted(entries, key=lambda item: item.semantic_id)
+                ]
+            },
+        )
+        self.assertEqual(calls, ["loaded"])
+
+    def test_snapshot_loader_takes_precedence_over_navigation_loader(self) -> None:
+        calls: list[str] = []
+
+        def navigation_loader() -> tuple[ServiceNavigationEntry, ...]:
+            calls.append("navigation")
+            return (ServiceNavigationEntry("wrong", "خطأ", "Wrong"),)
+
+        self.assertEqual(
+            list_active_services(
+                navigation_loader=navigation_loader,
+                snapshot_loader=lambda: self.snapshot,
+            )["services"],
+            [
+                {"id": "A", "title": {"ar": "ألف", "en": "Alpha"}},
+                {"id": "a-10", "title": {"ar": "عشرة", "en": "Ten"}},
+                {"id": "z", "title": {"ar": "ز", "en": "Z"}},
+            ],
+        )
+        self.assertEqual(calls, [])
 
     def test_snapshot_is_fully_loaded_before_detached_input_reaches_planner(self) -> None:
         events: list[str] = []

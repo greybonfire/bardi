@@ -158,7 +158,34 @@ and invalid source dependencies return sanitized configuration-invalid responses
 answered for the checklist is already available to steps on the next stateless request.
 
 These progression corrections apply to existing `v1` and historical evaluations without changing
-published rows or evaluator semantics. Fee and routing behavior is unchanged by this extension.
+published rows or evaluator semantics. Routing behavior is unchanged by this extension.
+
+## Fee applicability Questions
+
+[ADR 0017](../adr/0017-ask-source-questions-for-fee-applicability.md) extends the shared policy to
+the Fee phase, after checklist and steps. Runtime date, procedure/Eligibility-Basis scope,
+matched-Basis, and `context_only` filters run first. Only an UNKNOWN Fee whose item trust is
+`assert_current` contributes consequential Facts. Fee value state and usable supporting evidence
+are deliberately not prerequisites: applicability can be resolved independently for known,
+range, authored unknown, and unverified values.
+
+The shared picker expands missing derived Facts to prepared source dependencies and preserves
+priority/semantic-ID ordering, multi-Fact recurrence, one-question responses, and stateless
+resubmission. Missing coverage, unknown Facts, unsupported dependencies, and invalid Question
+answer keys fail with sanitized `invalid` / `knowledge_configuration_invalid`. A trusted UNKNOWN
+predicate with no actionable missing Facts retains `fee_applicability_unknown`. Non-current and
+context-only Fees retain their prior behavior and do not ask.
+
+An answer can only include or exclude the Fee according to its predicate. It cannot improve item
+or evidence trust, recover an unavailable amount, or settle a discrepancy. Applicable
+known/range Fees without current supporting evidence retain the #110/#113 projection:
+`unverified`, null monetary fields, `current_value_unknown=True`, preserved claim-source history,
+and unknown freshness. Authored unknown/unverified values never produce guessed amounts.
+
+Publication structurally requires same-Service Question coverage for every non-empty Fee
+predicate in procedure or Eligibility-Basis scope. It includes future, currently inactive, and
+non-current-trust Fees independently of amount, evidence, freshness, current date, or Basis match;
+derived references expand to source Facts and all multi-Fact answer keys remain validated.
 
 ## Eligibility Basis evaluation
 
@@ -221,14 +248,18 @@ Public results do not expose raw rule ASTs, raw Facts, full Evaluation Traces, E
 
 A published Procedure Version pins a rules-contract version. A future software release may add a new contract version, but it must retain compatible implementations required to reproduce published historical semantics. Changing a Fact's meaning requires a new Fact key rather than reinterpretation of old data.
 
-[ADR 0015](../adr/0015-ask-source-questions-for-version-applicability.md) explicitly corrects
-application progression for UNKNOWN version applicability under existing `v1` contracts, including
-historical evaluation dates: an incomplete case may now return `next_question` rather than the
-former inconclusive response. This does not change pinned evaluator/derivation behavior, Fact
-meaning, TRUE/FALSE results, or trust. Published and withdrawn rows are not rewritten. Older
-published knowledge without actionable Question coverage fails closed when that gap becomes
-consequential; new publication must satisfy coverage. This application correction is not an
-exception permitting future evaluator changes to silently reinterpret pinned contracts.
+[ADRs 0015](../adr/0015-ask-source-questions-for-version-applicability.md),
+[0016](../adr/0016-ask-source-questions-for-checklists-and-steps.md), and
+[0017](../adr/0017-ask-source-questions-for-fee-applicability.md) explicitly correct application
+progression for UNKNOWN applicability under existing `v1` contracts, including historical
+evaluation dates. An incomplete case may now return `next_question` rather than the former
+inconclusive response. This does not change pinned evaluator/derivation behavior, Fact meaning,
+TRUE/FALSE results, Fee monetary fields or calculation, evidence fallback, or trust. Published
+and withdrawn rows remain immutable and are not rewritten. Older published knowledge without
+actionable Question coverage fails closed when that gap becomes consequential; new publication
+must satisfy coverage. These application corrections are not exceptions permitting future
+evaluator changes to silently reinterpret pinned contracts, and pinned implementations continue
+to reproduce historical rule semantics.
 
 ## Local routing semantics
 

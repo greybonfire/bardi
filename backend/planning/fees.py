@@ -20,6 +20,7 @@ class FeeSelection:
     items: tuple[PublicFee, ...]
     missing_facts: frozenset[str] = frozenset()
     basis_resolution_required: bool = False
+    applicability_inconclusive: bool = False
 
 
 def select_fees(
@@ -41,6 +42,7 @@ def select_fees(
     selected: list[PublicFee] = []
     missing: set[str] = set()
     basis_resolution_required = False
+    applicability_inconclusive = False
 
     for item in sorted(version.fees, key=lambda row: (row.display_order, row.semantic_id)):
         if item.scope not in {"procedure", "eligibility_basis"}:
@@ -85,6 +87,7 @@ def select_fees(
             if applicability.value is TruthValue.UNKNOWN:
                 if trust.disposition == "assert_current":
                     missing.update(applicability.missing_facts)
+                    applicability_inconclusive |= not applicability.missing_facts
                 continue
 
         authored_state = cast(FeeValueState, item.value_state)
@@ -138,4 +141,9 @@ def select_fees(
             )
         )
 
-    return FeeSelection(tuple(selected), frozenset(missing), basis_resolution_required)
+    return FeeSelection(
+        tuple(selected),
+        frozenset(missing),
+        basis_resolution_required,
+        applicability_inconclusive,
+    )

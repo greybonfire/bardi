@@ -33,6 +33,16 @@ VERSION_ID = "ordinary_domestic_passport_renewal.research-2026-08-25"
 
 _LEGACY_SCENARIO_DIGEST = "1299e2c32df5567b20a4018ab7fce7a58f42da6c5567b1dcaac1ba9d77807f24"
 _PRE_QUESTION_SCENARIO_DIGEST = "e5f2c2f2fa59c63876324eec0610b548455fa5e1c14a506da119c00c479041f4"
+_PRE_FEE_QUESTION_SCENARIO_DIGEST = (
+    "b8745464a02dcef9045a290668969c8438a5eb66450714e3d92960c9a8aaa4d8"
+)
+_SUPPORTED_PRIOR_SCENARIO_DIGESTS = frozenset(
+    {
+        _LEGACY_SCENARIO_DIGEST,
+        _PRE_QUESTION_SCENARIO_DIGEST,
+        _PRE_FEE_QUESTION_SCENARIO_DIGEST,
+    }
+)
 _ROUTING_SCENARIO_NAMES = (
     "passport.fee.urgent",
     "passport.fee.premium",
@@ -44,7 +54,7 @@ _EXPECTED = {
     "documents": "515fb6b1ef9e6f450d39ca0f24bb6f3f08bb139c7f33394d9629462baeb2be93",
     "evidence": "0b1768a1be95fa9a081a17bb4f511cd17b5de0c57ec47508572b2130fcee6ba9",
     "policy": "a606df3d811909414097f400cf393f94eac503607f718f5aecc066a25bba2605",
-    "scenarios": "b8745464a02dcef9045a290668969c8438a5eb66450714e3d92960c9a8aaa4d8",
+    "scenarios": "3bb59aa46f68521475248acf848c3f38dbefdc9163a89d4d549e54b9006870cd",
     "sources": "87efb46c6eb3b57883936c927517d6c011577e2504e846ea0d4ebaf41e33ff54",
     "trust": "f409b172c9565fa0bb6a6a7a1a1a463278cd2f8d63804cd12d9bb14e6944a009",
 }
@@ -130,7 +140,7 @@ def _verify_scenarios(version: ProcedureVersion, *, allow_legacy: bool = False) 
         )
     )
     digest = _digest(rows)
-    if allow_legacy and digest in {_LEGACY_SCENARIO_DIGEST, _PRE_QUESTION_SCENARIO_DIGEST}:
+    if allow_legacy and digest in _SUPPORTED_PRIOR_SCENARIO_DIGESTS:
         return digest
     _require_digest("scenarios", rows)
     return None
@@ -271,7 +281,7 @@ def _verify_review_policy(version: ProcedureVersion) -> None:
 
 @transaction.atomic
 def verify_passport_renewal_import(version: ProcedureVersion) -> None:
-    """Verify sealed research and upgrade exact legacy draft routing/Question expectations."""
+    """Verify sealed research and upgrade exact prior draft scenario expectations."""
 
     version = ProcedureVersion.objects.select_for_update().get(pk=version.pk)
     if version.semantic_id != VERSION_ID:
@@ -288,7 +298,12 @@ def verify_passport_renewal_import(version: ProcedureVersion) -> None:
     # Validate every seal before changing any draft rows. Finalized scenarios remain
     # immutable history, and only their exact old or new seal is accepted above.
     if legacy_scenarios is not None and version.state == ProcedureVersion.State.DRAFT:
-        names = ["passport.student.unknown"]
+        names: list[str] = []
+        if legacy_scenarios in {
+            _LEGACY_SCENARIO_DIGEST,
+            _PRE_QUESTION_SCENARIO_DIGEST,
+        }:
+            names.append("passport.student.unknown")
         if legacy_scenarios == _LEGACY_SCENARIO_DIGEST:
             names.extend(_ROUTING_SCENARIO_NAMES)
         for scenario in PlanningScenario.objects.filter(
@@ -311,6 +326,24 @@ def verify_passport_renewal_import(version: ProcedureVersion) -> None:
                     "behavior_signature",
                 )
             )
+        PlanningScenario(
+            procedure_version=version,
+            name="passport.fee.service_level_unknown",
+            kind="unknown",
+            evaluation_context={"evaluation_date": "2026-08-25", "locale": "en"},
+            source_facts={
+                "citizenship": "egyptian",
+                "application_location": "inside_egypt",
+                "existing_passport_state": "expired",
+                "passport_class": "ordinary",
+                "birth_date": "1995-06-10",
+                "sex": "female",
+                "is_student": False,
+                "residence_police_jurisdiction": "giza",
+            },
+            expected_result_family="next_question",
+            expected_identifiers={"question_id": "q.service_level"},
+        ).save()
         _verify_scenarios(version)
 
 

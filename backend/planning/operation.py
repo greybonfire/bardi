@@ -245,6 +245,17 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
     if fees.basis_resolution_required:
         return _configuration_invalid()
     if fees.missing_facts:
+        question = pick_consequential_question(
+            snapshot,
+            service,
+            preparation.prepared_facts,
+            fees.missing_facts,
+            diagnostic_prefix="missing_fee_question",
+        )
+        if question.diagnostic_codes or question.question is None:
+            return _configuration_invalid()
+        return _question_result(snapshot, service.semantic_id, question.question)
+    if fees.applicability_inconclusive:
         return InconclusiveResult("fee_applicability_unknown")
     warnings = select_warnings(
         resolution.version, preparation.prepared_facts, planning_input.evaluation_date

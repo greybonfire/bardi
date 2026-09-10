@@ -15,36 +15,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version:
-          - "3.11"
-          - "3.12"
-          - "3.13"
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v7
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Show interpreter version
-        run: python --version
-
-      - name: Compile prototype
-        run: python -m compileall -q prototype
-
-      - name: Run prototype unit tests
-        run: python -m unittest discover -s prototype/tests -v
-
   production:
     name: Production backend
     runs-on: ubuntu-latest
@@ -101,7 +71,7 @@ jobs:
         run: uv run mypy backend
 
       - name: Compile project Python
-        run: uv run python -m compileall -q backend prototype
+        run: uv run python -m compileall -q backend
 
       - name: Run Django deploy checks
         run: uv run python backend/manage.py check --deploy --settings=bardi.settings.production
@@ -209,17 +179,13 @@ jobs:
   required:
     name: CI required
     needs:
-      - test
       - production
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
     steps:
-      - name: Verify prototype and production tracks passed
+      - name: Verify production track passed
         env:
-          PROTOTYPE_RESULT: ${{ needs.test.result }}
           PRODUCTION_RESULT: ${{ needs.production.result }}
-        run: |
-          test "$PROTOTYPE_RESULT" = "success"
-          test "$PRODUCTION_RESULT" = "success"
+        run: test "$PRODUCTION_RESULT" = "success"

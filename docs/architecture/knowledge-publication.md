@@ -61,7 +61,8 @@ current public classifications. Inconclusive trust on an applicable Official Req
 only Checklist output inconclusive; unavailable Practical Preparation is omitted. Public
 responses use an explicit compact Source/freshness projection and never expose passages,
 evidence locations, applicability context, support flags, or other editorial Evidence Link
-structures. The frozen prototype remains reference-only and is not imported by production code.
+structures. The retired research prototype is preserved only in Git history and is not a
+production dependency.
 
 ## Implementation status: issue #55
 
@@ -245,7 +246,8 @@ compatibility path does not change claims, evidence, lifecycle state, or publica
 
 ## Migrating the researched fixtures
 
-The three evidence packs and frozen prototype fixtures are migration/reference inputs, not production runtime dependencies.
+The three evidence packs remain research/reference inputs. Historical prototype fixtures are
+preserved in Git history only and are not production runtime dependencies.
 
 Production seeding should create real production records through supported import/fixture services and then validate them using the production publication validator. The migration should preserve stable semantic IDs where useful for acceptance parity, but should not preserve prototype-only compatibility aliases or test-only synthetic structures.
 

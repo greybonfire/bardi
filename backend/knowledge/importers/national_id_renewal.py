@@ -204,7 +204,7 @@ def _verify_existing(version: ProcedureVersion) -> None:
 
 
 @transaction.atomic
-def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
+def _import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
     """Create or verify the researched draft, without approvals or publication metadata."""
 
     user_model = get_user_model()
@@ -867,6 +867,18 @@ def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
 
     _verify_existing(version)
     validate_core_catalog()
+    return version
+
+
+@transaction.atomic
+def import_national_id_renewal(*, author: models.Model) -> ProcedureVersion:
+    """Create or verify the researched draft, then verify its complete semantic state."""
+
+    version = _import_national_id_renewal(author=author)
+
+    from .national_id_renewal_integrity import verify_national_id_renewal_import
+
+    verify_national_id_renewal_import(version)
     return version
 
 

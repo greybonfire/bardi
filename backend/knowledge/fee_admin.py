@@ -116,4 +116,5 @@ class FeeOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
             return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
+
 __all__ = ("FeeAdmin", "FeeEvidenceInline", "FeeForm", "FeeOwnerInline")

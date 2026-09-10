@@ -87,10 +87,7 @@ class RecentApplicabilityPublicationRegressionTests(TestCase):
             self.actor,
             _load_published_fact_definitions(),
         )
-        return {
-            (item.code, item.detail)
-            for item in ApplicabilityGate().validate(context)
-        }
+        return {(item.code, item.detail) for item in ApplicabilityGate().validate(context)}
 
     def test_version_applicability_requires_same_service_question(self) -> None:
         key = "recent_version_applies"

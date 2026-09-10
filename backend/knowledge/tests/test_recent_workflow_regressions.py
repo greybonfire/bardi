@@ -9,6 +9,7 @@ from django.test import TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 
 from knowledge.evidence_workflow import (
+    EvidenceDiscrepancy,
     EvidenceReverificationEvent,
     _lock_workflow_evidence,
     open_evidence_discrepancy,
@@ -77,7 +78,7 @@ class RecentWorkflowRegressionTests(TransactionTestCase):
     def owner_key(self) -> tuple[str, str, str]:
         return ("checklist", self.version.semantic_id, self.item.semantic_id)
 
-    def _open(self, state: str, day: date):
+    def _open(self, state: str, day: date) -> EvidenceDiscrepancy:
         with patch("django.utils.timezone.now", return_value=_at(day)):
             discrepancy = open_evidence_discrepancy(
                 anchor_evidence_link=self.link,
@@ -92,7 +93,7 @@ class RecentWorkflowRegressionTests(TransactionTestCase):
         ).update(occurred_at=_at(day))
         return discrepancy
 
-    def _resolve(self, discrepancy, state: str, day: date) -> None:
+    def _resolve(self, discrepancy: EvidenceDiscrepancy, state: str, day: date) -> None:
         with patch("django.utils.timezone.now", return_value=_at(day)):
             resolve_evidence_discrepancy(
                 discrepancy.pk,

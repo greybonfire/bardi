@@ -422,7 +422,9 @@ class ChecklistPublicationConcurrencyTests(TransactionTestCase):
 
 class ChecklistApplicabilityQuestionCoverageTests(TestCase):
     def setUp(self) -> None:
-        self.actor = get_user_model().objects.create_user(username="checklist-applicability-coverage")
+        self.actor = get_user_model().objects.create_user(
+            username="checklist-applicability-coverage"
+        )
         self.service = Service.objects.create(
             semantic_id="checklist.coverage.service",
             text_ar="خدمة",

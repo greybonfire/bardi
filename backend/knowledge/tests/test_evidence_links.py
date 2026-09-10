@@ -220,6 +220,7 @@ class EvidenceLinkContractTests(TransactionTestCase):
             with self.subTest(field=field_name):
                 field = EvidenceLink._meta.get_field(field_name)
                 self.assertIsInstance(field, models.ForeignKey)
+                assert isinstance(field, models.ForeignKey)
                 self.assertTrue(field.null)
                 self.assertTrue(field.blank)
                 self.assertIs(field.remote_field.on_delete, models.CASCADE)
@@ -244,7 +245,9 @@ class EvidenceLinkContractTests(TransactionTestCase):
                 "unique_evidence_id_point_association_owner",
             ),
         )
-        self.assertEqual(EvidenceLink.owner.fget.__module__, "knowledge.models")
+        owner_getter = EvidenceLink.owner.fget
+        assert owner_getter is not None
+        self.assertEqual(owner_getter.__module__, "knowledge.models")
         self.assertEqual(EvidenceLink.owning_versions.__module__, "knowledge.models")
         self.assertEqual(EvidenceLink.owning_version.__module__, "knowledge.models")
         self.assertEqual(EvidenceLink.clean.__module__, "knowledge.models")
@@ -341,7 +344,10 @@ class EvidenceLinkContractTests(TransactionTestCase):
             kind=Warning.Kind.PRODUCT,
         )
         invalid_warning_link = self._link("warning", product_warning)
-        with self.assertRaisesMessage(ValidationError, "Product warnings cannot carry Evidence Links"):
+        with self.assertRaisesMessage(
+            ValidationError,
+            "Product warnings cannot carry Evidence Links",
+        ):
             invalid_warning_link.full_clean()
 
         persisted = self._link("checklist_item", self.checklist, "protected-owner")

@@ -133,7 +133,7 @@ def _evidence(
 
 
 @transaction.atomic
-def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
+def _import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
     """Create or verify the researched draft, without approvals or publication metadata."""
 
     user_model = get_user_model()
@@ -994,6 +994,18 @@ def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
         row.save()
 
     validate_core_catalog()
+    return version
+
+
+@transaction.atomic
+def import_passport_renewal(*, author: models.Model) -> ProcedureVersion:
+    """Create or verify the researched draft, then verify its complete semantic state."""
+
+    version = _import_passport_renewal(author=author)
+
+    from .passport_renewal_integrity import verify_passport_renewal_import
+
+    verify_passport_renewal_import(version)
     return version
 
 

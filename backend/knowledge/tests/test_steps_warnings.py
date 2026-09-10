@@ -243,6 +243,26 @@ class StepApplicabilityQuestionCoverageTests(TestCase):
             text_ar="خدمة",
             text_en="Service",
         )
+        self.version_fact = FactDefinition.objects.create(
+            key="step_version_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        self.fact = FactDefinition.objects.create(
+            key="step_coverage_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="step.coverage.question.version",
+            service=self.service,
+            fact=self.version_fact,
+            text_ar="هل ينطبق الإصدار؟",
+            text_en="Does this version apply?",
+            priority=1,
+        )
         procedure = Procedure.objects.create(
             semantic_id="step.coverage.procedure",
             text_ar="إجراء",
@@ -254,13 +274,7 @@ class StepApplicabilityQuestionCoverageTests(TestCase):
             procedure=procedure,
             text_ar="نسخة",
             text_en="Version",
-            applicability={},
-        )
-        self.fact = FactDefinition.objects.create(
-            key="step_coverage_applies",
-            kind=FactDefinition.Kind.BOOLEAN,
-            enum_values=[],
-            is_published=True,
+            applicability={"op": "eq", "fact": self.version_fact.key, "value": True},
         )
 
     def diagnostics(self) -> set[tuple[str, str]]:

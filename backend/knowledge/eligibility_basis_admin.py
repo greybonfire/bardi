@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from django import forms
 from django.contrib import admin
-from django.contrib.admin.sites import NotRegistered  # type: ignore[attr-defined]
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
 
@@ -77,12 +76,6 @@ class EligibilityBasisEvidenceInline(admin.TabularInline):  # type: ignore[type-
         return ("id",)
 
 
-try:
-    admin.site.unregister(EligibilityBasis)
-except NotRegistered:
-    pass
-
-
 @admin.register(EligibilityBasis)
 class EligibilityBasisAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = EligibilityBasisForm
@@ -134,18 +127,6 @@ class EligibilityBasisOwnerInline(admin.TabularInline):  # type: ignore[type-arg
             return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
-
-def install_procedure_version_basis_inline() -> None:
-    from .admin import ProcedureVersionAdmin
-
-    if EligibilityBasisOwnerInline not in ProcedureVersionAdmin.inlines:
-        ProcedureVersionAdmin.inlines = (  # type: ignore[assignment]
-            *ProcedureVersionAdmin.inlines,
-            EligibilityBasisOwnerInline,
-        )
-
-
-install_procedure_version_basis_inline()
 
 __all__ = (
     "EligibilityBasisAdmin",

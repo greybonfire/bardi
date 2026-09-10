@@ -117,17 +117,4 @@ class FeeOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
 
-def install_procedure_version_fee_inline() -> None:
-    """Add Fee navigation to the already registered ProcedureVersion Admin."""
-    from .admin import ProcedureVersionAdmin
-
-    if FeeOwnerInline not in ProcedureVersionAdmin.inlines:
-        ProcedureVersionAdmin.inlines = (  # type: ignore[assignment]
-            *ProcedureVersionAdmin.inlines,
-            FeeOwnerInline,
-        )
-
-
-install_procedure_version_fee_inline()
-
 __all__ = ("FeeAdmin", "FeeEvidenceInline", "FeeForm", "FeeOwnerInline")

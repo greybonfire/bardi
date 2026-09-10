@@ -5,7 +5,8 @@ from datetime import date
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission, User
-from django.test import RequestFactory, TransactionTestCase, override_settings
+from django.contrib.messages import get_messages
+from django.test import RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from planning.versions import (
     ProcedureVersionResolved,
@@ -13,10 +14,31 @@ from planning.versions import (
     resolve_procedure_version,
 )
 
-from knowledge.admin import EvidenceLinkAdmin, ProcedureVersionAdmin
+from knowledge import (
+    admin_lifecycle_admin,
+    eligibility_basis_admin,
+    fee_admin,
+    procedure_dependency_admin,
+    service_point_routing_admin,
+)
+from knowledge.admin import (
+    ChecklistItemOwnerInline,
+    EligibilityBasisAdmin,
+    EvidenceLinkAdmin,
+    EvidenceSourceInline,
+    ProcedureVersionAdmin,
+    StepOwnerInline,
+    WarningOwnerInline,
+)
 from knowledge.admin_lifecycle import clone_published_procedure_version
+from knowledge.admin_lifecycle_admin import (
+    EvidenceLinkLifecycleAdmin,
+    ProcedureVersionLifecycleAdmin,
+)
 from knowledge.domain import load_knowledge_snapshot
+from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
 from knowledge.evidence_workflow import EvidenceReverificationEvent
+from knowledge.fee_admin import FeeAdmin, FeeOwnerInline
 from knowledge.fees import Fee
 from knowledge.models import (
     Authority,
@@ -35,6 +57,10 @@ from knowledge.models import (
 )
 from knowledge.planning_scenarios import PlanningScenario
 from knowledge.procedure_dependencies import ProcedureDependency
+from knowledge.procedure_dependency_admin import (
+    ProcedureDependencyAdmin,
+    ProcedureDependencyOwnerInline,
+)
 from knowledge.publication import publish_procedure_version, withdraw_procedure_version
 from knowledge.review_workflow import (
     ProcedureVersionReviewApproval,
@@ -45,7 +71,135 @@ from knowledge.service_point_routing import (
     ServicePoint,
     ServicePointVersion,
 )
+from knowledge.service_point_routing_admin import (
+    ProcedureServicePointAssociationAdmin,
+    ProcedureServicePointAssociationInline,
+    ServicePointAdmin,
+    ServicePointVersionAdmin,
+)
 from knowledge.services import set_evidence_link_sources
+
+
+class AdminCompositionTests(SimpleTestCase):
+    def test_migrated_admin_registry_uses_one_explicit_class_per_model(self) -> None:
+        expected = {
+            ProcedureVersion: ProcedureVersionAdmin,
+            EvidenceLink: EvidenceLinkAdmin,
+            EligibilityBasis: EligibilityBasisAdmin,
+            Fee: FeeAdmin,
+            ProcedureDependency: ProcedureDependencyAdmin,
+            ServicePoint: ServicePointAdmin,
+            ServicePointVersion: ServicePointVersionAdmin,
+            ProcedureServicePointAssociation: ProcedureServicePointAssociationAdmin,
+        }
+
+        for model, admin_class in expected.items():
+            with self.subTest(model=model._meta.label):
+                self.assertIs(type(admin.site._registry[model]), admin_class)
+
+        self.assertEqual(
+            reverse("admin:knowledge_procedureversion_changelist"),
+            "/admin/knowledge/procedureversion/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_evidencelink_changelist"),
+            "/admin/knowledge/evidencelink/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_eligibilitybasis_changelist"),
+            "/admin/knowledge/eligibilitybasis/",
+        )
+        self.assertEqual(reverse("admin:knowledge_fee_changelist"), "/admin/knowledge/fee/")
+        self.assertEqual(
+            reverse("admin:knowledge_proceduredependency_changelist"),
+            "/admin/knowledge/proceduredependency/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_servicepoint_changelist"),
+            "/admin/knowledge/servicepoint/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_servicepointversion_changelist"),
+            "/admin/knowledge/servicepointversion/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_procedureservicepointassociation_changelist"),
+            "/admin/knowledge/procedureservicepointassociation/",
+        )
+
+    def test_procedure_version_and_evidence_admin_configuration_is_explicit(self) -> None:
+        self.assertEqual(
+            ProcedureVersionAdmin.actions,
+            (
+                "publish_selected",
+                "withdraw_selected",
+                "clone_selected_to_draft",
+                "approve_selected_versions",
+            ),
+        )
+        self.assertEqual(
+            ProcedureVersionAdmin.inlines,
+            (
+                ChecklistItemOwnerInline,
+                StepOwnerInline,
+                WarningOwnerInline,
+                EligibilityBasisOwnerInline,
+                FeeOwnerInline,
+                ProcedureDependencyOwnerInline,
+                ProcedureServicePointAssociationInline,
+            ),
+        )
+        self.assertEqual(
+            ProcedureVersionAdmin.list_display,
+            (
+                "semantic_id",
+                "procedure",
+                "state",
+                "effective_from",
+                "effective_to",
+                "published_at",
+            ),
+        )
+        self.assertEqual(
+            ProcedureVersionAdmin.list_filter,
+            ("state", "procedure", "effective_from", "effective_to"),
+        )
+        self.assertEqual(EvidenceLinkAdmin.actions, ("reverify_selected_evidence",))
+        self.assertEqual(EvidenceLinkAdmin.inlines, (EvidenceSourceInline,))
+        self.assertEqual(
+            EvidenceLinkAdmin.list_display,
+            ("semantic_id", "owner_display", "support_status", "verification_state"),
+        )
+
+    def test_migrated_admin_behavior_is_declared_without_installers(self) -> None:
+        self.assertIs(ProcedureVersionAdmin.__mro__[1], ProcedureVersionLifecycleAdmin)
+        self.assertIs(EvidenceLinkAdmin.__mro__[1], EvidenceLinkLifecycleAdmin)
+        for method in (
+            "clone_selected_to_draft",
+            "has_clone_procedureversion_permission",
+            "approve_selected_versions",
+            "has_review_version_permission",
+            "changelist_view",
+        ):
+            self.assertIn(method, ProcedureVersionLifecycleAdmin.__dict__)
+        for method in (
+            "reverify_selected_evidence",
+            "has_reverify_evidence_permission",
+            "changelist_view",
+        ):
+            self.assertIn(method, EvidenceLinkLifecycleAdmin.__dict__)
+
+        self.assertNotIn("_procedure_version_admin", vars(admin_lifecycle_admin))
+        self.assertNotIn("_evidence_link_admin", vars(admin_lifecycle_admin))
+        for module in (
+            eligibility_basis_admin,
+            fee_admin,
+            procedure_dependency_admin,
+            service_point_routing_admin,
+        ):
+            self.assertFalse(
+                any(name.startswith("install_procedure_version_") for name in vars(module))
+            )
 
 
 @override_settings(PROCEDURE_VERSION_PUBLICATION_GATES=())
@@ -389,10 +543,11 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             evidence_admin.get_actions(self._request_for(self.viewer)),
         )
 
-    def test_admin_review_reverification_and_unauthorized_clone_use_services(self) -> None:
+    def test_authorized_review_post_uses_service(self) -> None:
         draft = clone_published_procedure_version(self.version.pk, actor=self.researcher)
         self._grant(self.reviewer, "view_procedureversion", "review_procedureversion")
         self.client.force_login(self.reviewer)
+
         response = self.client.post(
             reverse("admin:knowledge_procedureversion_changelist"),
             {
@@ -402,6 +557,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
                 "approval": "dimension:rule_logic",
             },
         )
+
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
             ProcedureVersionReviewApproval.objects.filter(
@@ -411,6 +567,34 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             ).exists()
         )
 
+    def test_unauthorized_review_post_is_rejected(self) -> None:
+        draft = clone_published_procedure_version(self.version.pk, actor=self.researcher)
+        self._grant(self.viewer, "view_procedureversion")
+        self.client.force_login(self.viewer)
+
+        response = self.client.post(
+            reverse("admin:knowledge_procedureversion_changelist"),
+            {
+                "action": "approve_selected_versions",
+                "_selected_action": str(draft.pk),
+                "apply": "1",
+                "approval": "dimension:rule_logic",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            ProcedureVersionReviewApproval.objects.filter(
+                procedure_version=draft,
+                reviewer=self.viewer,
+            ).exists()
+        )
+        self.assertIn(
+            "You do not have permission to perform that lifecycle action.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_authorized_reverification_post_uses_service(self) -> None:
         self._grant(
             self.reverifier,
             "view_evidencelink",
@@ -418,6 +602,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
         )
         self.client.force_login(self.reverifier)
         link = self.evidence["checklist"]
+
         response = self.client.post(
             reverse("admin:knowledge_evidencelink_changelist"),
             {
@@ -430,6 +615,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
                 "rationale": "Admin lifecycle re-verification test.",
             },
         )
+
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
             EvidenceReverificationEvent.objects.filter(
@@ -438,9 +624,45 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             ).exists()
         )
 
-        self._grant(self.viewer, "view_procedureversion")
+    def test_unauthorized_reverification_post_is_rejected(self) -> None:
+        self._grant(self.viewer, "view_evidencelink")
         self.client.force_login(self.viewer)
+        link = self.evidence["checklist"]
+        before = EvidenceReverificationEvent.objects.filter(anchor_evidence_link=link).count()
+
+        response = self.client.post(
+            reverse("admin:knowledge_evidencelink_changelist"),
+            {
+                "action": "reverify_selected_evidence",
+                "_selected_action": str(link.pk),
+                "apply": "1",
+                "verification_state": "current",
+                "verified_on": "2026-09-06",
+                "reverify_on": "2026-12-06",
+                "rationale": "Unauthorized re-verification attempt.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            EvidenceReverificationEvent.objects.filter(anchor_evidence_link=link).count(),
+            before,
+        )
+        self.assertIn(
+            "You do not have permission to perform that lifecycle action.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_authorized_clone_post_uses_service(self) -> None:
+        self._grant(
+            self.researcher,
+            "view_procedureversion",
+            "add_procedureversion",
+            "change_procedureversion",
+        )
+        self.client.force_login(self.researcher)
         before = ProcedureVersion.objects.count()
+
         response = self.client.post(
             reverse("admin:knowledge_procedureversion_changelist"),
             {
@@ -448,5 +670,31 @@ class SafeAdminLifecycleTests(TransactionTestCase):
                 "_selected_action": str(self.version.pk),
             },
         )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(ProcedureVersion.objects.count(), before + 1)
+        successor = ProcedureVersion.objects.get(semantic_id="admin.lifecycle.v1.successor")
+        self.assertEqual(successor.state, ProcedureVersion.State.DRAFT)
+        self.assertEqual(successor.procedure_id, self.version.procedure_id)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.state, ProcedureVersion.State.PUBLISHED)
+
+    def test_unauthorized_clone_post_is_rejected(self) -> None:
+        self._grant(self.viewer, "view_procedureversion")
+        self.client.force_login(self.viewer)
+        before = ProcedureVersion.objects.count()
+
+        response = self.client.post(
+            reverse("admin:knowledge_procedureversion_changelist"),
+            {
+                "action": "clone_selected_to_draft",
+                "_selected_action": str(self.version.pk),
+            },
+        )
+
         self.assertEqual(response.status_code, 302)
         self.assertEqual(ProcedureVersion.objects.count(), before)
+        self.assertIn(
+            "You do not have permission to perform that lifecycle action.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )

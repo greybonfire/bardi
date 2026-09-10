@@ -8,6 +8,10 @@ from django.forms import ModelForm, Textarea
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
+from .admin_lifecycle_admin import EvidenceLinkLifecycleAdmin, ProcedureVersionLifecycleAdmin
+from .eligibility_basis_admin import EligibilityBasisAdmin as EligibilityBasisAdmin
+from .eligibility_basis_admin import EligibilityBasisOwnerInline
+from .fee_admin import FeeOwnerInline
 from .forms import (
     CandidateForm,
     ChecklistItemForm,
@@ -24,7 +28,6 @@ from .models import (
     Authority,
     ChecklistItem,
     DocumentType,
-    EligibilityBasis,
     EvidenceLink,
     EvidenceLinkSource,
     FactDefinition,
@@ -41,11 +44,13 @@ from .models import (
     Step,
     Warning,
 )
+from .procedure_dependency_admin import ProcedureDependencyOwnerInline
 from .publication import (
     PublicationRejected,
     publish_procedure_version,
     withdraw_procedure_version,
 )
+from .service_point_routing_admin import ProcedureServicePointAssociationInline
 from .services import (
     set_contradiction_facts,
     set_evidence_link_sources,
@@ -283,7 +288,7 @@ class ChecklistItemOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
 
 
 @admin.register(ProcedureVersion)
-class ProcedureVersionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+class ProcedureVersionAdmin(ProcedureVersionLifecycleAdmin):
     list_display = (
         "semantic_id",
         "procedure",
@@ -301,8 +306,21 @@ class ProcedureVersionAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     )
     autocomplete_fields = ("procedure",)
     ordering = ("procedure__semantic_id", "effective_from", "semantic_id")
-    actions = ("publish_selected", "withdraw_selected")
-    inlines = (ChecklistItemOwnerInline, StepOwnerInline, WarningOwnerInline)
+    actions = (
+        "publish_selected",
+        "withdraw_selected",
+        "clone_selected_to_draft",
+        "approve_selected_versions",
+    )
+    inlines = (
+        ChecklistItemOwnerInline,
+        StepOwnerInline,
+        WarningOwnerInline,
+        EligibilityBasisOwnerInline,
+        FeeOwnerInline,
+        ProcedureDependencyOwnerInline,
+        ProcedureServicePointAssociationInline,
+    )
     lifecycle_fields = (
         "state",
         "published_at",
@@ -511,29 +529,6 @@ class WarningEvidenceInline(EvidenceOwnerInline):
         )
 
 
-@admin.register(EligibilityBasis)
-class EligibilityBasisAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
-    list_display = ("semantic_id", "procedure_version")
-    search_fields = ("semantic_id", "procedure_version__semantic_id")
-    autocomplete_fields = ("procedure_version",)
-
-    def get_readonly_fields(
-        self, request: HttpRequest, obj: EligibilityBasis | None = None
-    ) -> tuple[str, ...]:
-        return (
-            tuple(field.name for field in self.model._meta.fields)
-            if obj and obj.procedure_version.state != "draft"
-            else ()
-        )
-
-    def has_delete_permission(
-        self, request: HttpRequest, obj: EligibilityBasis | None = None
-    ) -> bool:
-        if not super().has_delete_permission(request, obj):
-            return False
-        return bool(obj is None or obj.procedure_version.state == "draft")
-
-
 @admin.register(Step)
 class StepAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = StepForm
@@ -614,7 +609,7 @@ class EvidenceSourceInline(admin.TabularInline):  # type: ignore[type-arg]
 
 
 @admin.register(EvidenceLink)
-class EvidenceLinkAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+class EvidenceLinkAdmin(EvidenceLinkLifecycleAdmin):
     form = EvidenceLinkForm
     list_display = (
         "semantic_id",
@@ -631,6 +626,7 @@ class EvidenceLinkAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
         "location",
     )
     autocomplete_fields = ("checklist_item", "step", "warning")
+    actions = ("reverify_selected_evidence",)
 
     @admin.display(description="Owner")
     def owner_display(self, obj: EvidenceLink) -> object:

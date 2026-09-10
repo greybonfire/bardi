@@ -162,7 +162,7 @@ class EligibilityBasisKnowledgeTests(TestCase):
         )
         self.assertEqual(
             EligibilityBasis._meta.ordering,
-            ("procedure_version_id", "semantic_id"),
+            ("procedure_version_id", "display_order", "semantic_id"),
         )
         self.assertEqual(
             tuple(constraint.name for constraint in EligibilityBasis._meta.constraints),
@@ -177,6 +177,19 @@ class EligibilityBasisKnowledgeTests(TestCase):
         )
         self.assertEqual(EligibilityBasis.clean.__module__, "knowledge.models")
         self.assertFalse(hasattr(eligibility_bases, "_install_basis_fields"))
+
+    def test_default_basis_queryset_preserves_authored_display_order(self) -> None:
+        self.basis(semantic_id="basis.z-first", display_order=1)
+        self.basis(semantic_id="basis.a-second", display_order=20)
+
+        self.assertEqual(
+            list(
+                EligibilityBasis.objects.filter(procedure_version=self.version).values_list(
+                    "semantic_id", flat=True
+                )
+            ),
+            ["basis.z-first", "basis.a-second"],
+        )
 
     def test_draft_basis_edits_use_declared_validation(self) -> None:
         basis = self.basis(

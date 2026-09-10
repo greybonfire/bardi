@@ -245,7 +245,10 @@ class EvidenceLinkContractTests(TransactionTestCase):
                 "unique_evidence_id_point_association_owner",
             ),
         )
-        owner_getter = EvidenceLink.owner.fget
+        owner_property = EvidenceLink.__dict__["owner"]
+        self.assertIsInstance(owner_property, property)
+        assert isinstance(owner_property, property)
+        owner_getter = owner_property.fget
         assert owner_getter is not None
         self.assertEqual(owner_getter.__module__, "knowledge.models")
         self.assertEqual(EvidenceLink.owning_versions.__module__, "knowledge.models")

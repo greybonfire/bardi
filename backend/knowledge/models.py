@@ -963,15 +963,43 @@ class EligibilityBasis(VersionOwnedModel):
         ProcedureVersion, on_delete=models.CASCADE, related_name="eligibility_bases"
     )
     semantic_id = models.CharField(max_length=128)
+    text_ar = models.TextField(default="")
+    text_en = models.TextField(default="")
+    reachability = models.JSONField(default=dict, blank=True)
+    qualification = models.JSONField(default=dict, blank=True)
+    display_order = models.PositiveIntegerField(default=0)
+    effective_from = models.DateField(null=True, blank=True)
+    effective_to = models.DateField(null=True, blank=True)
+    verified_on = models.DateField(null=True, blank=True)
+    reverify_on = models.DateField(null=True, blank=True)
+    verification_state = models.CharField(
+        max_length=24, choices=VERIFICATION_CHOICES, default="unknown"
+    )
 
     class Meta:
-        ordering = ("procedure_version_id", "semantic_id")
+        ordering = ("procedure_version_id", "display_order", "semantic_id")
         constraints = [
             models.UniqueConstraint(
                 fields=("procedure_version", "semantic_id"), name="unique_basis_id_per_version"
             ),
             models.CheckConstraint(
                 condition=Q(semantic_id__regex=NONBLANK_PATTERN), name="basis_id_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="basis_ar_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(text_en__regex=NONBLANK_PATTERN), name="basis_en_nonblank"
+            ),
+            models.CheckConstraint(
+                condition=Q(effective_from__isnull=True)
+                | Q(effective_to__isnull=True)
+                | Q(effective_from__lte=F("effective_to")),
+                name="basis_dates_ordered",
+            ),
+            models.CheckConstraint(
+                condition=Q(verification_state__in=[choice[0] for choice in VERIFICATION_CHOICES]),
+                name="basis_verification_supported",
             ),
         ]
 
@@ -980,6 +1008,22 @@ class EligibilityBasis(VersionOwnedModel):
 
     def clean(self) -> None:
         _required(self.semantic_id, "semantic_id")
+        _required(self.text_ar, "text_ar")
+        _required(self.text_en, "text_en")
+        if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
+            raise ValidationError({"effective_to": "Effective interval is not ordered."})
+
+        from .domain import decode_stored_rule
+
+        if self.reachability != {}:
+            reachability = decode_stored_rule(self.reachability)
+            if reachability.diagnostics:
+                raise ValidationError({"reachability": "Reachability rule is invalid."})
+        if self.qualification == {}:
+            raise ValidationError({"qualification": "Eligibility Basis qualification is required."})
+        qualification = decode_stored_rule(self.qualification)
+        if qualification.diagnostics:
+            raise ValidationError({"qualification": "Qualification rule is invalid."})
 
     def __str__(self) -> str:
         return f"{self.procedure_version.semantic_id}:{self.semantic_id}"

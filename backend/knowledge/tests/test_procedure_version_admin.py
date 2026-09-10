@@ -23,6 +23,8 @@ from knowledge.admin import (
     WarningAdmin,
     WarningEvidenceInline,
 )
+from knowledge.eligibility_basis_admin import EligibilityBasisAdmin as AuthoredEligibilityBasisAdmin
+from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
 from knowledge.models import (
     Authority,
     ChecklistItem,
@@ -316,6 +318,66 @@ class GuidanceAdminTests(TestCase):
             locator="https://example.test/guidance",
             classification=Source.Classification.OFFICIAL,
             retrieved_on=date(2026, 8, 1),
+        )
+
+    def test_eligibility_basis_admin_preserves_authored_display_order(self) -> None:
+        first = EligibilityBasis.objects.create(
+            procedure_version=self.version,
+            semantic_id="basis.z-first",
+            text_ar="الأول",
+            text_en="First",
+            qualification=self.basis.qualification,
+            display_order=1,
+        )
+        second = EligibilityBasis.objects.create(
+            procedure_version=self.version,
+            semantic_id="basis.a-second",
+            text_ar="الثاني",
+            text_en="Second",
+            qualification=self.basis.qualification,
+            display_order=20,
+        )
+        basis_admin = AuthoredEligibilityBasisAdmin(EligibilityBasis, admin.site)
+
+        self.assertEqual(
+            basis_admin.get_ordering(self.request),
+            ("procedure_version_id", "display_order", "semantic_id"),
+        )
+        self.assertEqual(
+            list(
+                basis_admin.get_queryset(self.request)
+                .filter(pk__in=(first.pk, second.pk))
+                .values_list("semantic_id", flat=True)
+            ),
+            ["basis.z-first", "basis.a-second"],
+        )
+
+    def test_procedure_version_basis_inline_preserves_authored_display_order(self) -> None:
+        first = EligibilityBasis.objects.create(
+            procedure_version=self.version,
+            semantic_id="basis.z-first",
+            text_ar="الأول",
+            text_en="First",
+            qualification=self.basis.qualification,
+            display_order=1,
+        )
+        second = EligibilityBasis.objects.create(
+            procedure_version=self.version,
+            semantic_id="basis.a-second",
+            text_ar="الثاني",
+            text_en="Second",
+            qualification=self.basis.qualification,
+            display_order=20,
+        )
+        basis_inline = EligibilityBasisOwnerInline(ProcedureVersion, admin.site)
+
+        self.assertEqual(
+            list(
+                basis_inline.get_queryset(self.request)
+                .filter(procedure_version=self.version, pk__in=(first.pk, second.pk))
+                .values_list("semantic_id", flat=True)
+            ),
+            ["basis.z-first", "basis.a-second"],
         )
 
     def test_staff_can_author_draft_steps_and_product_warnings(self) -> None:

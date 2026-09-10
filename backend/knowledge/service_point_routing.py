@@ -79,7 +79,7 @@ class ServicePointVersion(models.Model):
     address_ar = models.TextField()
     address_en = models.TextField()
     availability = models.CharField(max_length=16, choices=Availability.choices)
-    effective_from = models.DateField(null=True, blank=True)
+    effective_from = models.DateField()
     effective_to = models.DateField(null=True, blank=True)
     verified_on = models.DateField(null=True, blank=True)
     reverify_on = models.DateField(null=True, blank=True)

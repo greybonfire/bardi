@@ -95,6 +95,7 @@ class EligibilityBasisAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     list_filter = ("verification_state", "procedure_version")
     search_fields = ("semantic_id", "text_ar", "text_en", "procedure_version__semantic_id")
     autocomplete_fields = ("procedure_version",)
+    ordering = ("procedure_version_id", "display_order", "semantic_id")
     inlines = (EligibilityBasisEvidenceInline,)
 
     def get_readonly_fields(

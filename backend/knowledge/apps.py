@@ -11,16 +11,13 @@ class KnowledgeConfig(AppConfig):
     def import_models(self) -> None:
         # Focused feature modules define first-class models with ``app_label = "knowledge"``.
         # Import them during Django's model-loading phase so migrations and the app registry
-        # observe the complete knowledge graph before models_ready is set. EvidenceLink itself
-        # declares its complete owner union in knowledge.models and is not mutated here.
+        # observe the complete knowledge graph before models_ready is set. Model contracts are
+        # declared by their owning classes rather than installed through import side effects.
         super().import_models()
         fees = import_module(".fees", package=__package__)
         eligibility_bases = import_module(".eligibility_bases", package=__package__)
         procedure_dependencies = import_module(".procedure_dependencies", package=__package__)
         service_point_routing = import_module(".service_point_routing", package=__package__)
-        service_point_routing_contract = import_module(
-            ".service_point_routing_contract", package=__package__
-        )
         evidence_workflow = import_module(".evidence_workflow", package=__package__)
         evidence_workflow_temporal = import_module(
             ".evidence_workflow_temporal", package=__package__
@@ -32,7 +29,6 @@ class KnowledgeConfig(AppConfig):
         assert eligibility_bases.EligibilityBasisPublicationGate is not None
         assert procedure_dependencies.ProcedureDependency is not None
         assert service_point_routing.ServicePointVersion is not None
-        assert service_point_routing_contract.install_service_point_temporal_contract is not None
         assert evidence_workflow.EvidenceDiscrepancy is not None
         assert evidence_workflow_temporal.EvidenceDiscrepancyTransition is not None
         assert planning_scenarios.PlanningScenario is not None

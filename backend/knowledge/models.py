@@ -1170,6 +1170,29 @@ class Warning(VersionOwnedModel):
         return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
 
 
+EVIDENCE_OWNER_FIELDS = (
+    "checklist_item",
+    "step",
+    "warning",
+    "fee",
+    "eligibility_basis",
+    "procedure_dependency",
+    "service_point_version",
+    "procedure_service_point_association",
+)
+
+
+def _evidence_exactly_one_owner_condition() -> Q:
+    terms = [
+        Q(**{f"{name}__isnull": name != selected for name in EVIDENCE_OWNER_FIELDS})
+        for selected in EVIDENCE_OWNER_FIELDS
+    ]
+    condition = terms[0]
+    for term in terms[1:]:
+        condition |= term
+    return condition
+
+
 class EvidenceLink(VersionOwnedModel):
     class SupportStatus(models.TextChoices):
         SUPPORTS = "supports", "Supports"
@@ -1206,6 +1229,43 @@ class EvidenceLink(VersionOwnedModel):
     support_status = models.CharField(
         max_length=16, choices=SupportStatus.choices, default=SupportStatus.SUPPORTS
     )
+    # These feature models remain in focused modules. Lazy references keep their public import
+    # paths while making the complete EvidenceLink owner contract explicit at class construction.
+    fee = models.ForeignKey(
+        "knowledge.Fee",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="evidence_links",
+    )
+    eligibility_basis = models.ForeignKey(
+        EligibilityBasis,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="evidence_links",
+    )
+    procedure_dependency = models.ForeignKey(
+        "knowledge.ProcedureDependency",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="evidence_links",
+    )
+    service_point_version = models.ForeignKey(
+        "knowledge.ServicePointVersion",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="evidence_links",
+    )
+    procedure_service_point_association = models.ForeignKey(
+        "knowledge.ProcedureServicePointAssociation",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="evidence_links",
+    )
     sources = models.ManyToManyField(
         Source, through="EvidenceLinkSource", related_name="evidence_links"
     )
@@ -1213,14 +1273,6 @@ class EvidenceLink(VersionOwnedModel):
     class Meta:
         ordering = ("id",)
         constraints = [
-            models.CheckConstraint(
-                condition=(
-                    Q(checklist_item__isnull=False, step__isnull=True, warning__isnull=True)
-                    | Q(checklist_item__isnull=True, step__isnull=False, warning__isnull=True)
-                    | Q(checklist_item__isnull=True, step__isnull=True, warning__isnull=False)
-                ),
-                name="evidence_exactly_one_owner",
-            ),
             models.UniqueConstraint(
                 fields=("checklist_item", "semantic_id"),
                 condition=Q(checklist_item__isnull=False) & ~Q(semantic_id=""),
@@ -1258,29 +1310,79 @@ class EvidenceLink(VersionOwnedModel):
                 | Q(effective_from__lte=F("effective_to")),
                 name="evidence_dates_ordered",
             ),
+            models.CheckConstraint(
+                condition=_evidence_exactly_one_owner_condition(),
+                name="evidence_exactly_one_owner",
+            ),
+            models.CheckConstraint(
+                condition=Q(semantic_id="") | Q(semantic_id__regex=NONBLANK_PATTERN),
+                name="evidence_semantic_id_blank_or_nonblank",
+            ),
+            models.UniqueConstraint(
+                fields=("fee", "semantic_id"),
+                condition=Q(fee__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_fee_owner",
+            ),
+            models.UniqueConstraint(
+                fields=("eligibility_basis", "semantic_id"),
+                condition=Q(eligibility_basis__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_basis_owner",
+            ),
+            models.UniqueConstraint(
+                fields=("procedure_dependency", "semantic_id"),
+                condition=Q(procedure_dependency__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_dependency_owner",
+            ),
+            models.UniqueConstraint(
+                fields=("service_point_version", "semantic_id"),
+                condition=Q(service_point_version__isnull=False) & ~Q(semantic_id=""),
+                name="unique_evidence_id_point_version_owner",
+            ),
+            models.UniqueConstraint(
+                fields=("procedure_service_point_association", "semantic_id"),
+                condition=Q(procedure_service_point_association__isnull=False)
+                & ~Q(semantic_id=""),
+                name="unique_evidence_id_point_association_owner",
+            ),
         ]
 
     @property
-    def owner(self) -> ChecklistItem | Step | Warning:
+    def owner(self) -> Any:
         owners = [
-            owner for owner in (self.checklist_item, self.step, self.warning) if owner is not None
+            getattr(self, name)
+            for name in EVIDENCE_OWNER_FIELDS
+            if getattr(self, f"{name}_id") is not None
         ]
         if len(owners) != 1:
             raise ValidationError("Evidence must have exactly one claim owner.")
         return owners[0]
 
+    def owning_versions(self) -> tuple[ProcedureVersion, ...]:
+        candidate = self.owner
+        multiple = getattr(candidate, "owning_versions", None)
+        if callable(multiple):
+            return tuple(multiple())
+        single = getattr(candidate, "owning_version", None)
+        if callable(single):
+            return (single(),)
+        return (candidate.procedure_version,)
+
     def owning_version(self) -> ProcedureVersion:
-        return self.owner.procedure_version
+        versions = self.owning_versions()
+        if not versions:
+            raise ValidationError("Evidence owner must belong to a Procedure Version.")
+        return next(
+            (version for version in versions if version.state != ProcedureVersion.State.DRAFT),
+            versions[0],
+        )
 
     def clean(self) -> None:
-        if self.semantic_id and not self.semantic_id.strip():
-            raise ValidationError({"semantic_id": "Evidence identity cannot be whitespace."})
-        owner_ids = (self.checklist_item_id, self.step_id, self.warning_id)
+        owner_ids = tuple(getattr(self, f"{name}_id") for name in EVIDENCE_OWNER_FIELDS)
         if self.pk is not None:
             stored = (
                 type(self)
                 .objects.filter(pk=self.pk)
-                .values_list("checklist_item_id", "step_id", "warning_id")
+                .values_list(*(f"{name}_id" for name in EVIDENCE_OWNER_FIELDS))
                 .first()
             )
             if stored is not None and stored != owner_ids:
@@ -1295,6 +1397,8 @@ class EvidenceLink(VersionOwnedModel):
             raise ValidationError({"warning": "Product warnings cannot carry Evidence Links."})
         if self.effective_from and self.effective_to and self.effective_from > self.effective_to:
             raise ValidationError({"effective_to": "Effective interval is not ordered."})
+        if self.semantic_id and not self.semantic_id.strip():
+            raise ValidationError({"semantic_id": "Evidence identity cannot be whitespace."})
 
     def __str__(self) -> str:
         identity = self.semantic_id or str(self.pk or "new")

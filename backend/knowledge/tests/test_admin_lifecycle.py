@@ -29,13 +29,13 @@ from knowledge.admin import (
     StepOwnerInline,
     WarningOwnerInline,
 )
+from knowledge.admin_lifecycle import clone_published_procedure_version
 from knowledge.admin_lifecycle_admin import (
     EvidenceLinkLifecycleAdmin,
     ProcedureVersionLifecycleAdmin,
 )
-from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
-from knowledge.admin_lifecycle import clone_published_procedure_version
 from knowledge.domain import load_knowledge_snapshot
+from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
 from knowledge.evidence_workflow import EvidenceReverificationEvent
 from knowledge.fee_admin import FeeAdmin, FeeOwnerInline
 from knowledge.fees import Fee

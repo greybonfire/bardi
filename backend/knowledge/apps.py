@@ -43,11 +43,6 @@ class KnowledgeConfig(AppConfig):
         from . import review_workflow_admin as _review_workflow_admin
         from . import service_point_routing_admin as _service_point_routing_admin
         from .aggregate_guard import connect_aggregate_relation_guards
-        from .runtime_integrity import (
-            install_national_id_renewal_integrity_verification,
-            install_passport_renewal_integrity_verification,
-            install_temporary_family_exemption_integrity_verification,
-        )
 
         assert _fee_admin.FeeAdmin is not None
         assert _eligibility_basis_admin.EligibilityBasisAdmin is not None
@@ -56,7 +51,4 @@ class KnowledgeConfig(AppConfig):
         assert _evidence_workflow_admin.EvidenceDiscrepancyAdmin is not None
         assert _planning_scenario_admin.PlanningScenarioAdmin is not None
         assert _review_workflow_admin.ProcedureVersionReviewPolicyAdmin is not None
-        install_passport_renewal_integrity_verification()
-        install_national_id_renewal_integrity_verification()
-        install_temporary_family_exemption_integrity_verification()
         connect_aggregate_relation_guards()

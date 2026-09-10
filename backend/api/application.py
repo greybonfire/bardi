@@ -6,7 +6,9 @@ from collections.abc import Callable, Mapping
 from datetime import date
 from typing import cast
 
-from knowledge.evidence_workflow_temporal import load_consistent_knowledge_snapshot_as_of
+from knowledge.evidence_workflow_temporal import (
+    load_consistent_service_knowledge_snapshot_as_of,
+)
 from knowledge.navigation import ServiceNavigationEntry, load_active_service_navigation
 from planning import (
     InconclusiveResult,
@@ -221,7 +223,9 @@ def execute_planning(
     planner: Planner = plan_stateless,
 ) -> dict[str, object]:
     snapshot = (
-        load_consistent_knowledge_snapshot_as_of(planning_input.evaluation_date)
+        load_consistent_service_knowledge_snapshot_as_of(
+            planning_input.service_id, planning_input.evaluation_date
+        )
         if snapshot_loader is None
         else snapshot_loader()
     )

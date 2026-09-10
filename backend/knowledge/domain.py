@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import date
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
 
@@ -115,7 +116,7 @@ class KnowledgeSnapshotLoadError(Exception):
         super().__init__(", ".join(self.owner_ids))
 
 
-def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
+def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeSnapshot:
     """Build the internal ORM-free core graph, not a fully featured snapshot.
 
     This stable callable excludes feature composition; use the public loaders for
@@ -145,15 +146,16 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
     # Every queryset is explicitly ordered and immediately materialized.  The remaining
     # work below uses only plain values and planning-domain objects.
     fact_rows = list(FactDefinition.objects.order_by("key"))
-    service_rows = list(
-        Service.objects.order_by("semantic_id").values(
-            "semantic_id", "text_ar", "text_en", "is_active"
-        )
+    service_queryset = Service.objects.order_by("semantic_id")
+    candidate_queryset = ServiceProcedureCandidate.objects.order_by(
+        "service__semantic_id", "procedure__semantic_id"
     )
+    if scope is not None:
+        service_queryset = service_queryset.filter(semantic_id=scope.service_id)
+        candidate_queryset = candidate_queryset.filter(service__semantic_id=scope.service_id)
+    service_rows = list(service_queryset.values("semantic_id", "text_ar", "text_en", "is_active"))
     candidate_rows = list(
-        ServiceProcedureCandidate.objects.order_by(
-            "service__semantic_id", "procedure__semantic_id"
-        ).values(
+        candidate_queryset.values(
             "service__semantic_id",
             "procedure__semantic_id",
             "procedure__text_ar",
@@ -161,12 +163,13 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "selection_predicate",
         )
     )
+    version_queryset = ProcedureVersion.objects.filter(
+        state__in=(ProcedureVersion.State.PUBLISHED, ProcedureVersion.State.WITHDRAWN)
+    )
+    if scope is not None:
+        version_queryset = version_queryset.filter(procedure_id__in=scope.procedure_ids)
     version_rows = list(
-        ProcedureVersion.objects.filter(
-            state__in=(ProcedureVersion.State.PUBLISHED, ProcedureVersion.State.WITHDRAWN)
-        )
-        .order_by("procedure__semantic_id", "semantic_id")
-        .values(
+        version_queryset.order_by("procedure__semantic_id", "semantic_id").values(
             "semantic_id",
             "procedure__semantic_id",
             "text_ar",
@@ -180,15 +183,18 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "published_by_id",
         )
     )
-    checklist_rows = list(
-        ChecklistItem.objects.filter(
-            procedure_version__state__in=(
-                ProcedureVersion.State.PUBLISHED,
-                ProcedureVersion.State.WITHDRAWN,
-            )
+    checklist_queryset = ChecklistItem.objects.filter(
+        procedure_version__state__in=(
+            ProcedureVersion.State.PUBLISHED,
+            ProcedureVersion.State.WITHDRAWN,
         )
-        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
-        .values(
+    )
+    if scope is not None:
+        checklist_queryset = checklist_queryset.filter(procedure_version_id__in=scope.version_ids)
+    checklist_rows = list(
+        checklist_queryset.order_by(
+            "procedure_version__semantic_id", "display_order", "semantic_id"
+        ).values(
             "id",
             "procedure_version__semantic_id",
             "semantic_id",
@@ -210,15 +216,23 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "reverify_on",
         )
     )
-    basis_rows = list(
-        EligibilityBasis.objects.filter(procedure_version__state__in=("published", "withdrawn"))
-        .order_by("procedure_version__semantic_id", "semantic_id")
-        .values("id", "procedure_version__semantic_id", "semantic_id")
+    basis_queryset = EligibilityBasis.objects.filter(
+        procedure_version__state__in=("published", "withdrawn")
     )
+    if scope is not None:
+        basis_queryset = basis_queryset.filter(procedure_version_id__in=scope.version_ids)
+    basis_rows = list(
+        basis_queryset.order_by("procedure_version__semantic_id", "semantic_id").values(
+            "id", "procedure_version__semantic_id", "semantic_id"
+        )
+    )
+    step_queryset = Step.objects.filter(procedure_version__state__in=("published", "withdrawn"))
+    if scope is not None:
+        step_queryset = step_queryset.filter(procedure_version_id__in=scope.version_ids)
     step_rows = list(
-        Step.objects.filter(procedure_version__state__in=("published", "withdrawn"))
-        .order_by("procedure_version__semantic_id", "phase_order", "slot", "semantic_id")
-        .values(
+        step_queryset.order_by(
+            "procedure_version__semantic_id", "phase_order", "slot", "semantic_id"
+        ).values(
             "id",
             "procedure_version__semantic_id",
             "semantic_id",
@@ -240,10 +254,13 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "reverify_on",
         )
     )
+    fee_queryset = Fee.objects.filter(procedure_version__state__in=("published", "withdrawn"))
+    if scope is not None:
+        fee_queryset = fee_queryset.filter(procedure_version_id__in=scope.version_ids)
     fee_rows = list(
-        Fee.objects.filter(procedure_version__state__in=("published", "withdrawn"))
-        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
-        .values(
+        fee_queryset.order_by(
+            "procedure_version__semantic_id", "display_order", "semantic_id"
+        ).values(
             "id",
             "procedure_version__semantic_id",
             "semantic_id",
@@ -269,10 +286,15 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "reverify_on",
         )
     )
+    warning_queryset = Warning.objects.filter(
+        procedure_version__state__in=("published", "withdrawn")
+    )
+    if scope is not None:
+        warning_queryset = warning_queryset.filter(procedure_version_id__in=scope.version_ids)
     warning_rows = list(
-        Warning.objects.filter(procedure_version__state__in=("published", "withdrawn"))
-        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
-        .values(
+        warning_queryset.order_by(
+            "procedure_version__semantic_id", "display_order", "semantic_id"
+        ).values(
             "id",
             "procedure_version__semantic_id",
             "semantic_id",
@@ -338,8 +360,11 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "source__authority__name_en",
         )
     )
+    question_queryset = ServiceQuestion.objects.order_by("service__semantic_id", "semantic_id")
+    if scope is not None:
+        question_queryset = question_queryset.filter(service__semantic_id=scope.service_id)
     question_rows = list(
-        ServiceQuestion.objects.order_by("service__semantic_id", "semantic_id").values(
+        question_queryset.values(
             "service__semantic_id",
             "semantic_id",
             "text_ar",
@@ -348,20 +373,33 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
             "fact__key",
         )
     )
-    question_link_rows = list(
-        ServiceQuestionResolvedFact.objects.order_by(
-            "question__semantic_id", "position", "fact__key"
-        ).values("question__semantic_id", "fact__key")
+    question_link_queryset = ServiceQuestionResolvedFact.objects.order_by(
+        "question__semantic_id", "position", "fact__key"
     )
-    contradiction_rows = list(
-        ServiceContradiction.objects.order_by("service__semantic_id", "semantic_id").values(
-            "service__semantic_id", "semantic_id", "condition"
+    if scope is not None:
+        question_link_queryset = question_link_queryset.filter(
+            question__service__semantic_id=scope.service_id
         )
+    question_link_rows = list(question_link_queryset.values("question__semantic_id", "fact__key"))
+    contradiction_queryset = ServiceContradiction.objects.order_by(
+        "service__semantic_id", "semantic_id"
     )
+    if scope is not None:
+        contradiction_queryset = contradiction_queryset.filter(
+            service__semantic_id=scope.service_id
+        )
+    contradiction_rows = list(
+        contradiction_queryset.values("service__semantic_id", "semantic_id", "condition")
+    )
+    contradiction_link_queryset = ServiceContradictionFact.objects.order_by(
+        "contradiction__semantic_id", "position", "fact__key"
+    )
+    if scope is not None:
+        contradiction_link_queryset = contradiction_link_queryset.filter(
+            contradiction__service__semantic_id=scope.service_id
+        )
     contradiction_link_rows = list(
-        ServiceContradictionFact.objects.order_by(
-            "contradiction__semantic_id", "position", "fact__key"
-        ).values("contradiction__semantic_id", "fact__key")
+        contradiction_link_queryset.values("contradiction__semantic_id", "fact__key")
     )
 
     # Authoring adapters decode against every definition, but request-time planning crosses
@@ -846,18 +884,26 @@ def _materialize_core_knowledge_snapshot() -> KnowledgeSnapshot:
     return KnowledgeSnapshot(published_definitions, services, tuple(versions))
 
 
-def _materialize_knowledge_snapshot() -> KnowledgeSnapshot:
-    """Compose the complete semantic snapshot, without temporal workflow overlays."""
+def _materialize_knowledge_snapshot(
+    scope: Any | None = None, *, evaluation_date: date | None = None
+) -> KnowledgeSnapshot:
+    """Compose a complete or explicitly service-scoped semantic snapshot."""
 
     # Import at call time to avoid cycles during Django's feature-model registration.
     from .eligibility_bases import _basis_snapshots
     from .procedure_dependencies import _dependency_snapshots
     from .service_point_routing import _routing_snapshots
 
-    snapshot = _materialize_core_knowledge_snapshot()
-    snapshot = _basis_snapshots(snapshot)
-    snapshot = _dependency_snapshots(snapshot)
-    return _routing_snapshots(snapshot)
+    if scope is not None:
+        # Scoped materialization retains the full request-time integrity ledger, but never
+        # constructs and discards unrelated semantic DTOs.
+        from .snapshot_validation import validate_global_catalog
+
+        validate_global_catalog(evaluation_date)
+    snapshot = _materialize_core_knowledge_snapshot(scope)
+    snapshot = _basis_snapshots(snapshot, scope=scope)
+    snapshot = _dependency_snapshots(snapshot, scope=scope)
+    return _routing_snapshots(snapshot, scope=scope)
 
 
 def load_knowledge_snapshot() -> KnowledgeSnapshot:

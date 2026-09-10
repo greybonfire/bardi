@@ -436,16 +436,19 @@ class EligibilityBasisPublicationGate:
         return failures
 
 
-def _basis_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
-    basis_rows = list(
-        EligibilityBasis.objects.filter(
-            procedure_version__state__in=(
-                ProcedureVersion.State.PUBLISHED,
-                ProcedureVersion.State.WITHDRAWN,
-            )
+def _basis_snapshots(snapshot: KnowledgeSnapshot, *, scope: Any | None = None) -> KnowledgeSnapshot:
+    basis_queryset = EligibilityBasis.objects.filter(
+        procedure_version__state__in=(
+            ProcedureVersion.State.PUBLISHED,
+            ProcedureVersion.State.WITHDRAWN,
         )
-        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
-        .values(
+    )
+    if scope is not None:
+        basis_queryset = basis_queryset.filter(procedure_version_id__in=scope.version_ids)
+    basis_rows = list(
+        basis_queryset.order_by(
+            "procedure_version__semantic_id", "display_order", "semantic_id"
+        ).values(
             "id",
             "procedure_version__semantic_id",
             "semantic_id",

@@ -2,14 +2,22 @@ from __future__ import annotations
 
 import importlib
 import json
-from datetime import date
-from typing import Any
+from datetime import UTC, date, datetime
+from typing import Any, cast
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import connections
 from django.test import TransactionTestCase, override_settings, tag
-from knowledge.evidence_workflow_temporal import load_knowledge_snapshot_as_of
+from knowledge.evidence_workflow import (
+    open_evidence_discrepancy,
+    resolve_evidence_discrepancy,
+)
+from knowledge.evidence_workflow_temporal import (
+    EvidenceDiscrepancyTransition,
+    load_consistent_service_knowledge_snapshot_as_of,
+    load_knowledge_snapshot_as_of,
+)
 from knowledge.importers.national_id_renewal import (
     import_national_id_renewal,
 )
@@ -28,9 +36,12 @@ from knowledge.importers.temporary_family_exemption import (
 from knowledge.importers.temporary_family_exemption import (
     import_temporary_family_exemption,
 )
-from knowledge.models import FactDefinition
+from knowledge.models import EvidenceLink, FactDefinition
+from knowledge.planning_scenarios import PlanningScenario
 from knowledge.publication import publish_procedure_version
-from planning import CasePreparationSuccess, prepare_case
+from planning import CasePreparationSuccess, KnowledgeSnapshot, PlanningInput, prepare_case
+
+from api.application import execute_planning
 
 PASSPORT_SERVICE_ID = "get_egyptian_passport"
 PASSPORT_PROCEDURE_ID = "ordinary_domestic_passport_renewal"
@@ -116,6 +127,7 @@ class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):
         publisher = get_user_model().objects.create_user(
             username="cross-family-acceptance-publisher"
         )
+        self.actor = publisher
         versions = [
             import_passport_renewal(author=author),
             import_national_id_renewal(author=author),
@@ -213,6 +225,163 @@ class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):
         )
         self.assertEqual(self.semantic_projection(arabic), self.semantic_projection(english))
         return arabic, english
+
+    def test_scoped_and_full_public_responses_match_imported_scenarios(self) -> None:
+        scenarios = (
+            (PASSPORT_SERVICE_ID, PASSPORT_PLAN_FACTS, date(2026, 8, 24)),
+            (PASSPORT_SERVICE_ID, PASSPORT_PLAN_FACTS, date(2026, 8, 25)),
+            (NATIONAL_ID_SERVICE_ID, NATIONAL_ID_PLAN_FACTS, date(2026, 8, 26)),
+            (MILITARY_SERVICE_ID, MILITARY_ONLY_SON_FACTS, date(2026, 8, 26)),
+        )
+        for service_id, facts, evaluation_date in scenarios:
+            with self.subTest(service_id=service_id):
+                full = load_knowledge_snapshot_as_of(evaluation_date)
+                scoped = load_consistent_service_knowledge_snapshot_as_of(
+                    service_id, evaluation_date
+                )
+                planning_input = PlanningInput(service_id, facts, "en", evaluation_date)
+
+                def full_loader(snapshot: KnowledgeSnapshot = full) -> KnowledgeSnapshot:
+                    return snapshot
+
+                def scoped_loader(snapshot: KnowledgeSnapshot = scoped) -> KnowledgeSnapshot:
+                    return snapshot
+
+                self.assertEqual(
+                    execute_planning(planning_input, snapshot_loader=full_loader),
+                    execute_planning(planning_input, snapshot_loader=scoped_loader),
+                )
+
+    def test_scoped_and_full_public_responses_match_every_imported_planning_scenario(self) -> None:
+        full_snapshots: dict[date, KnowledgeSnapshot] = {}
+        scoped_snapshots: dict[tuple[str, date], KnowledgeSnapshot] = {}
+        scenarios = tuple(
+            PlanningScenario.objects.select_related(
+                "procedure_version__procedure__primary_service"
+            ).order_by("pk")
+        )
+        self.assertGreater(len(scenarios), 10)
+        for scenario in scenarios:
+            expected_identifiers = cast(dict[str, Any], scenario.expected_identifiers)
+            expected_diagnostics = cast(list[str], scenario.expected_diagnostics)
+            evaluation_date = date.fromisoformat(scenario.evaluation_context["evaluation_date"])
+            service_id = scenario.procedure_version.procedure.primary_service.semantic_id
+            full = full_snapshots.setdefault(
+                evaluation_date, load_knowledge_snapshot_as_of(evaluation_date)
+            )
+            scoped = scoped_snapshots.setdefault(
+                (service_id, evaluation_date),
+                load_consistent_service_knowledge_snapshot_as_of(service_id, evaluation_date),
+            )
+            planning_input = PlanningInput(
+                service_id,
+                scenario.source_facts,
+                scenario.evaluation_context["locale"],
+                evaluation_date,
+            )
+
+            def full_loader(snapshot: KnowledgeSnapshot = full) -> KnowledgeSnapshot:
+                return snapshot
+
+            def scoped_loader(snapshot: KnowledgeSnapshot = scoped) -> KnowledgeSnapshot:
+                return snapshot
+
+            full_response = cast(
+                dict[str, Any], execute_planning(planning_input, snapshot_loader=full_loader)
+            )
+            scoped_response = cast(
+                dict[str, Any], execute_planning(planning_input, snapshot_loader=scoped_loader)
+            )
+            with self.subTest(scenario=scenario.name):
+                self.assertEqual(scoped_response, full_response)
+                self.assertEqual(full_response["type"], scenario.expected_result_family)
+                if scenario.expected_result_family == "next_question":
+                    self.assertEqual(
+                        full_response["question"]["id"],
+                        expected_identifiers["question_id"],
+                    )
+                elif scenario.expected_result_family == "inconclusive":
+                    self.assertEqual(full_response["reason"], expected_identifiers["reason"])
+                elif scenario.expected_result_family == "invalid":
+                    self.assertEqual(
+                        [item["code"] for item in full_response["diagnostics"]],
+                        expected_diagnostics,
+                    )
+                else:
+                    identifier_values = {
+                        "procedure_version_id": full_response["procedure_version_id"],
+                        "checklist_item_ids": [
+                            item["id"] for item in full_response["checklist_items"]
+                        ],
+                        "step_ids": [item["id"] for item in full_response["steps"]],
+                        "warning_ids": [item["id"] for item in full_response["warnings"]],
+                        "fee_ids": [item["id"] for item in full_response["fees"]],
+                        "routing_status": full_response["routing"]["status"],
+                        "routing_association_ids": [
+                            item["association_id"]
+                            for item in full_response["routing"]["destinations"]
+                        ],
+                    }
+                    for key, expected in expected_identifiers.items():
+                        if key in identifier_values:
+                            self.assertEqual(identifier_values[key], expected)
+
+    def test_temporal_full_scoped_comparison_separates_before_open_open_and_resolved(self) -> None:
+        link = EvidenceLink.objects.get(
+            checklist_item__semantic_id="passport.requirement.national_id"
+        )
+        discrepancy = open_evidence_discrepancy(
+            anchor_evidence_link=link,
+            evidence_links=(link,),
+            rationale="Imported-scenario temporal comparison.",
+            actor=self.actor,
+            outcome_state="disputed",
+        )
+        EvidenceDiscrepancyTransition.objects.filter(
+            discrepancy=discrepancy,
+            event_type=EvidenceDiscrepancyTransition.EventType.OPENED,
+        ).update(occurred_at=datetime(2026, 8, 26, tzinfo=UTC))
+        resolve_evidence_discrepancy(
+            discrepancy.pk,
+            outcome_state="current",
+            resolution="Imported-scenario temporal comparison resolved.",
+            actor=self.actor,
+        )
+        EvidenceDiscrepancyTransition.objects.filter(
+            discrepancy=discrepancy,
+            event_type=EvidenceDiscrepancyTransition.EventType.RESOLVED,
+        ).update(occurred_at=datetime(2026, 8, 28, tzinfo=UTC))
+
+        facts = PASSPORT_PLAN_FACTS
+        for evaluation_date, expected_state in (
+            (date(2026, 8, 25), "current"),
+            (date(2026, 8, 26), "disputed"),
+            (date(2026, 8, 28), "current"),
+        ):
+            with self.subTest(evaluation_date=evaluation_date):
+                full = load_knowledge_snapshot_as_of(evaluation_date)
+                scoped = load_consistent_service_knowledge_snapshot_as_of(
+                    PASSPORT_SERVICE_ID, evaluation_date
+                )
+                planning_input = PlanningInput(PASSPORT_SERVICE_ID, facts, "en", evaluation_date)
+
+                def full_loader(snapshot: KnowledgeSnapshot = full) -> KnowledgeSnapshot:
+                    return snapshot
+
+                def scoped_loader(snapshot: KnowledgeSnapshot = scoped) -> KnowledgeSnapshot:
+                    return snapshot
+
+                self.assertEqual(
+                    execute_planning(planning_input, snapshot_loader=full_loader),
+                    execute_planning(planning_input, snapshot_loader=scoped_loader),
+                )
+                scoped_item = next(
+                    item
+                    for version in scoped.procedure_versions
+                    for item in version.checklist_items
+                    if item.semantic_id == "passport.requirement.national_id"
+                )
+                self.assertEqual(scoped_item.verification_state, expected_state)
 
     def test_public_result_families_are_cross_family_bilingual(self) -> None:
         services_response = self.client.get("/v1/services")

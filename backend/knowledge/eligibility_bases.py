@@ -7,9 +7,6 @@ from collections.abc import Iterable
 from dataclasses import replace
 from typing import Any, cast
 
-from django.core.exceptions import ValidationError
-from django.db import models
-from django.db.models import F, Q
 from planning.case_preparation import DERIVED_FACT_DEPENDENCIES
 from planning.catalog import (
     AuthoritySnapshot,
@@ -21,7 +18,7 @@ from planning.catalog import (
 )
 from planning.diagnostics import ValidationDiagnostic
 from planning.rules import Predicate
-from planning.trust import VERIFICATION_CHOICES, VerificationState
+from planning.trust import VerificationState
 
 from .domain import (
     KnowledgeSnapshotLoadError,
@@ -30,97 +27,14 @@ from .domain import (
     referenced_fact_keys,
 )
 from .models import (
-    NONBLANK_PATTERN,
     Authority,
     EligibilityBasis,
     EvidenceLink,
     EvidenceLinkSource,
     ProcedureVersion,
     Source,
-    _required,
 )
 from .publication import PublicationContext, PublicationDiagnostic
-
-
-def _install_basis_fields() -> None:
-    existing = {field.name for field in EligibilityBasis._meta.fields}
-    fields: tuple[tuple[str, models.Field[Any, Any]], ...] = (
-        ("text_ar", models.TextField(default="")),
-        ("text_en", models.TextField(default="")),
-        ("reachability", models.JSONField(default=dict, blank=True)),
-        ("qualification", models.JSONField(default=dict, blank=True)),
-        ("display_order", models.PositiveIntegerField(default=0)),
-        ("effective_from", models.DateField(null=True, blank=True)),
-        ("effective_to", models.DateField(null=True, blank=True)),
-        ("verified_on", models.DateField(null=True, blank=True)),
-        ("reverify_on", models.DateField(null=True, blank=True)),
-        (
-            "verification_state",
-            models.CharField(max_length=24, choices=VERIFICATION_CHOICES, default="unknown"),
-        ),
-    )
-    for name, field in fields:
-        if name not in existing:
-            EligibilityBasis.add_to_class(name, field)
-
-    EligibilityBasis._meta.ordering = ("procedure_version_id", "display_order", "semantic_id")
-    constraint_names = {constraint.name for constraint in EligibilityBasis._meta.constraints}
-    additions: list[Any] = []
-    if "basis_ar_nonblank" not in constraint_names:
-        additions.append(
-            models.CheckConstraint(
-                condition=Q(text_ar__regex=NONBLANK_PATTERN), name="basis_ar_nonblank"
-            )
-        )
-    if "basis_en_nonblank" not in constraint_names:
-        additions.append(
-            models.CheckConstraint(
-                condition=Q(text_en__regex=NONBLANK_PATTERN), name="basis_en_nonblank"
-            )
-        )
-    if "basis_dates_ordered" not in constraint_names:
-        additions.append(
-            models.CheckConstraint(
-                condition=Q(effective_from__isnull=True)
-                | Q(effective_to__isnull=True)
-                | Q(effective_from__lte=F("effective_to")),
-                name="basis_dates_ordered",
-            )
-        )
-    if "basis_verification_supported" not in constraint_names:
-        additions.append(
-            models.CheckConstraint(
-                condition=Q(verification_state__in=[choice[0] for choice in VERIFICATION_CHOICES]),
-                name="basis_verification_supported",
-            )
-        )
-    EligibilityBasis._meta.constraints = [*EligibilityBasis._meta.constraints, *additions]
-
-    def clean(basis: EligibilityBasis) -> None:
-        authored = cast(Any, basis)
-        _required(authored.semantic_id, "semantic_id")
-        _required(authored.text_ar, "text_ar")
-        _required(authored.text_en, "text_en")
-        if (
-            authored.effective_from
-            and authored.effective_to
-            and authored.effective_from > authored.effective_to
-        ):
-            raise ValidationError({"effective_to": "Effective interval is not ordered."})
-        if authored.reachability != {}:
-            reachability = decode_stored_rule(authored.reachability)
-            if reachability.diagnostics:
-                raise ValidationError({"reachability": "Reachability rule is invalid."})
-        if authored.qualification == {}:
-            raise ValidationError({"qualification": "Eligibility Basis qualification is required."})
-        qualification = decode_stored_rule(authored.qualification)
-        if qualification.diagnostics:
-            raise ValidationError({"qualification": "Qualification rule is invalid."})
-
-    EligibilityBasis.clean = clean  # type: ignore[assignment]
-
-
-_install_basis_fields()
 
 
 def _source_fact_keys(

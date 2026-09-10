@@ -798,9 +798,7 @@ class ConsequentialQuestionTests(unittest.TestCase):
 
     def test_optional_practical_preparation_unknown_does_not_block_or_ask(self) -> None:
         knowledge = _question_planning_snapshot(
-            checklist_items=(
-                _question_checklist(classification="practical_preparation"),
-            ),
+            checklist_items=(_question_checklist(classification="practical_preparation"),),
             questions=(_question("checklist-question", "checklist_applies"),),
         )
 

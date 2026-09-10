@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.db import DatabaseError, transaction
 from django.test import TestCase
 
+from knowledge import eligibility_bases
 from knowledge.domain import load_knowledge_snapshot
 from knowledge.models import (
     Authority,
@@ -139,6 +140,76 @@ class EligibilityBasisKnowledgeTests(TestCase):
         with self.assertRaises(PublicationRejected) as caught:
             publish_procedure_version(self.version.pk, actor=self.actor)
         return caught.exception
+
+    def test_basis_contract_is_declared_on_the_model(self) -> None:
+        self.assertEqual(
+            tuple(field.name for field in EligibilityBasis._meta.fields),
+            (
+                "id",
+                "procedure_version",
+                "semantic_id",
+                "text_ar",
+                "text_en",
+                "reachability",
+                "qualification",
+                "display_order",
+                "effective_from",
+                "effective_to",
+                "verified_on",
+                "reverify_on",
+                "verification_state",
+            ),
+        )
+        self.assertEqual(
+            EligibilityBasis._meta.ordering,
+            ("procedure_version_id", "display_order", "semantic_id"),
+        )
+        self.assertEqual(
+            tuple(constraint.name for constraint in EligibilityBasis._meta.constraints),
+            (
+                "unique_basis_id_per_version",
+                "basis_id_nonblank",
+                "basis_ar_nonblank",
+                "basis_en_nonblank",
+                "basis_dates_ordered",
+                "basis_verification_supported",
+            ),
+        )
+        self.assertEqual(EligibilityBasis.clean.__module__, "knowledge.models")
+        self.assertFalse(hasattr(eligibility_bases, "_install_basis_fields"))
+
+    def test_draft_basis_edits_use_declared_validation(self) -> None:
+        basis = self.basis(
+            effective_from=date(2026, 1, 1),
+            effective_to=date(2026, 12, 31),
+        )
+        basis.text_en = "Updated eligibility route"
+        basis.effective_to = date(2027, 1, 1)
+        basis.save()
+        basis.refresh_from_db()
+        self.assertEqual(basis.text_en, "Updated eligibility route")
+        self.assertEqual(basis.effective_to, date(2027, 1, 1))
+
+        basis.effective_from = date(2027, 1, 2)
+        basis.effective_to = date(2027, 1, 1)
+        with self.assertRaisesMessage(ValidationError, "Effective interval is not ordered"):
+            basis.save()
+
+    def test_published_basis_rejects_model_save_and_delete(self) -> None:
+        self.regeneration_warning()
+        self.add_question(self.gate, priority=1)
+        self.add_question(self.qualification, priority=2)
+        basis = self.basis()
+        self.evidence(basis)
+        publish_procedure_version(self.version.pk, actor=self.actor)
+        basis.refresh_from_db()
+
+        basis.text_en = "Changed"
+        message = "Published and withdrawn Procedure Version children are immutable."
+        with self.assertRaisesMessage(ValidationError, message):
+            basis.save()
+        with self.assertRaisesMessage(ValidationError, message):
+            basis.delete()
 
     def test_basis_requires_bilingual_identity_and_explicit_qualification(self) -> None:
         invalid = (

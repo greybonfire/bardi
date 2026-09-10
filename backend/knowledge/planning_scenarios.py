@@ -1,7 +1,7 @@
 """Named executable planning scenarios used as an atomic publication gate.
 
 Scenarios are editorial acceptance records owned by one Procedure Version. They execute the
-actual production snapshot adapters and pure planner; the frozen prototype is intentionally not
+actual production snapshot adapters and pure planner; the retired research prototype is not
 an import or runtime dependency.
 """
 

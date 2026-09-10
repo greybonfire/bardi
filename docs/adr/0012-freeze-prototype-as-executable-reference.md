@@ -1,6 +1,6 @@
 # ADR 0012: Freeze the prototype as an executable reference
 
-**Status:** Accepted  
+**Status:** Superseded by ADR 0018  
 **Date:** 2026-09-01
 
 ## Context

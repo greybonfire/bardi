@@ -1,7 +1,7 @@
 [project]
 name = "bardi"
 version = "0.1.0"
-description = "Bardi production backend and frozen research prototype"
+description = "Bardi production backend for sourced Egyptian administrative guidance"
 requires-python = ">=3.14"
 dependencies = [
     "Django>=5.2,<5.3",

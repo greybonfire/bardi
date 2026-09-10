@@ -1,8 +1,21 @@
 # Prototype capability report
 
-This report closes the research-prototype loop for the three evidence-backed Procedures. It records what the fixtures actually require after issues #5–#12 and the final Eligibility-Basis reachability refinement in #27; it is **not** a proposed Django model, database schema, API contract, or publication workflow.
+**Status:** Historical research record
 
-The structural portions can be reproduced from `prototype.bardi_prototype.capabilities.build_capability_report()`. The caveats below remain deliberately human-authored because they describe evidence limits and product boundaries rather than Python structure.
+This report closed the research-prototype loop for the three evidence-backed Procedures. It
+records what the fixtures required after issues #5–#12 and the final Eligibility-Basis
+reachability refinement in #27; it is **not** a current Django model, database schema, API
+contract, or publication workflow.
+
+The executable prototype was retired from `main` under ADR 0018 after equivalent production
+acceptance coverage became authoritative. Its final state is preserved in Git history at commit
+`95128e22767edf8ffb9f3db838178b327b079aa0`. Prototype paths named below therefore refer to
+that historical snapshot.
+
+The structural portions were generated from
+`prototype.bardi_prototype.capabilities.build_capability_report()`. The caveats below remain
+deliberately human-authored because they describe evidence limits and product boundaries rather
+than Python structure.
 
 ## Cross-fixture conclusions
 
@@ -248,7 +261,8 @@ None for the source Facts currently referenced by military Procedure/Basis/routi
 
 ## Acceptance-suite coverage
 
-`prototype/tests/test_reproducibility_and_capabilities.py` remains the high-level foundation suite. It covers:
+In the retired snapshot, `prototype/tests/test_reproducibility_and_capabilities.py` was the
+high-level foundation suite. It covered:
 
 - repeated structurally identical runs using an explicit Procedure Version for all three researched Procedures;
 - no mutation or persistence requirement for supplied raw Facts;
@@ -258,6 +272,10 @@ None for the source Facts currently referenced by military Procedure/Basis/routi
 - the military March 24/25 immutable-version edge;
 - deterministic capability introspection and documentation of the one known missing Question (`citizenship`).
 
-`prototype/tests/test_eligibility_basis_reachability.py` is the final structural regression suite. It verifies the father bug that motivated #27, reachability-first questioning, qualification skipping for unreachable father/missing-relative/sibling branches, ungated mother/sister qualification behavior, exhaustive alternatives, editor trace separation, per-Basis capability reporting, and publication-time Question coverage for both stages.
+In the retired snapshot, `prototype/tests/test_eligibility_basis_reachability.py` was the final
+structural regression suite. It verified the father bug that motivated #27, reachability-first questioning, qualification skipping for unreachable father/missing-relative/sibling branches, ungated mother/sister qualification behavior, exhaustive alternatives, editor trace separation, per-Basis capability reporting, and publication-time Question coverage for both stages.
 
-The earlier focused suites remain authoritative for detailed typed-rule semantics, traces, trust propagation, dependency cycles, Service Point temporal behavior, bilingual projection, evidence gating, and synthetic supported-edge behavior. No synthetic fixture data is promoted into researched guidance.
+Those earlier focused suites are historical research evidence only. Current production contracts
+and production acceptance tests are authoritative for typed-rule semantics, trust propagation,
+dependency behavior, Service Point temporal behavior, bilingual projection, evidence gating, and
+supported production behavior. No synthetic fixture data is promoted into researched guidance.

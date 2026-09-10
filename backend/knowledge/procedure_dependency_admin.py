@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from django import forms
 from django.contrib import admin
-from django.contrib.admin.sites import NotRegistered  # type: ignore[attr-defined]
 from django.core.exceptions import ValidationError
 from django.http import HttpRequest
 
@@ -88,12 +87,6 @@ class ProcedureDependencyEvidenceInline(admin.TabularInline):  # type: ignore[ty
         return ("id",)
 
 
-try:
-    admin.site.unregister(ProcedureDependency)
-except NotRegistered:
-    pass
-
-
 @admin.register(ProcedureDependency)
 class ProcedureDependencyAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
     form = ProcedureDependencyForm
@@ -167,19 +160,6 @@ class ProcedureDependencyOwnerInline(admin.TabularInline):  # type: ignore[type-
         if not super().has_delete_permission(request, obj):
             return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
-
-
-def install_procedure_version_dependency_inline() -> None:
-    from .admin import ProcedureVersionAdmin
-
-    if ProcedureDependencyOwnerInline not in ProcedureVersionAdmin.inlines:
-        ProcedureVersionAdmin.inlines = (  # type: ignore[assignment]
-            *ProcedureVersionAdmin.inlines,
-            ProcedureDependencyOwnerInline,
-        )
-
-
-install_procedure_version_dependency_inline()
 
 __all__ = (
     "ProcedureDependencyAdmin",

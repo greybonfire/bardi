@@ -34,6 +34,10 @@ credentials in `.env.example` must never be used for a deployed database.
 The development settings include only local-safe defaults. Production settings fail
 closed and require every secret, host, origin, and PostgreSQL value to be provided.
 
+For the complete editor-facing workflow—including manual Admin authoring, evidence, review,
+publication, successor drafts, re-verification, and deterministic programmatic imports—see
+[`editorial-process.md`](editorial-process.md).
+
 ## Passport-renewal knowledge import and review
 
 Import or verify the production draft with an existing staff author (the command never creates

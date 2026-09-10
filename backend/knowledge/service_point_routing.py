@@ -624,15 +624,20 @@ def _snapshot_evidence_is_adequate(links: tuple[EvidenceLinkSnapshot, ...]) -> b
     return adequate
 
 
-def _routing_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
+def _routing_snapshots(
+    snapshot: KnowledgeSnapshot, *, scope: Any | None = None
+) -> KnowledgeSnapshot:
+    association_queryset = ProcedureServicePointAssociation.objects.filter(
+        procedure_version__state__in=("published", "withdrawn")
+    )
+    if scope is not None:
+        association_queryset = association_queryset.filter(
+            procedure_version_id__in=scope.version_ids
+        )
     associations = cast(
         list[dict[str, Any]],
         list(
-            ProcedureServicePointAssociation.objects.filter(
-                procedure_version__state__in=("published", "withdrawn")
-            )
-            .order_by("procedure_version__semantic_id", "semantic_id")
-            .values(
+            association_queryset.order_by("procedure_version__semantic_id", "semantic_id").values(
                 "id",
                 "procedure_version__semantic_id",
                 "semantic_id",

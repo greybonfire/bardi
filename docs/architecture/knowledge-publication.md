@@ -22,11 +22,29 @@ Service Questions and their resolved-Fact links so gate results and review signa
 race editorial changes. Procedure selection remains independent of date and version
 applicability; orchestration resolves the selected Procedure separately.
 
-Issue #37's request snapshot materializes all Fact definitions, Services (including inactive
+Issue #37's full request snapshot materializes all Fact definitions, Services (including inactive
 ones), candidates, Questions, contradictions, and published/withdrawn Procedure Versions in
 one coherent read-only transaction. Draft versions remain excluded. Public DTO projection is
 a separate whitelist boundary: availability in the internal snapshot does not make rule ASTs,
 raw Facts, traces, Evidence Links, discrepancy rationale, or publication actors public.
+
+The public planning operation uses a separate service-scoped repeatable-read loader. It retains
+the complete Fact-definition registry and runs the existing global request-time integrity
+ledger as scalar validation-only reads, but materializes only the requested Service, its
+Questions/candidates/contradictions, published or withdrawn versions, transitive blocking
+Procedure dependencies, version-owned guidance, evidence, and routing graph. Dependency
+closure is discovered in batched Procedure frontiers and cycles terminate without changing
+planner recursion policy. Temporal discrepancy transitions and semantic-preserving
+re-verification events are filtered to evidence owners in that graph while preserving all
+historical events needed for as-of reconstruction, including the same owner-resolution
+failure checks for visible workflow history as the full loader. The scoped loader is wired only
+to `execute_planning`; full loaders remain the API for callers that require the complete
+catalog. The validation/materialization boundary is intentional: the complete Fact registry,
+published rule decoding, evidence/source presence, basis/dependency/routing integrity,
+contradiction and question Fact reachability, and visible workflow owner resolution remain
+global validation-only reads; Service DTOs, graph features, and as-of workflow overlays are
+scoped. Both consistent loaders reject an already-open transaction and establish an outermost
+PostgreSQL `REPEATABLE READ, READ ONLY` transaction before any discovery or materialization.
 
 ## Implementation status: issue #40
 

@@ -157,22 +157,27 @@ def _owner_related_paths(anchor_path: str) -> tuple[str, ...]:
 
 def _workflow_overlays_as_of(
     evaluation_date: date,
+    *,
+    evidence_link_ids: frozenset[int] | None = None,
 ) -> dict[tuple[str, str, str], workflow._TrustOverlay]:
     timeline: list[tuple[datetime, int, int, str, object]] = []
-    for transition in (
-        EvidenceDiscrepancyTransition.objects.filter(occurred_at__date__lte=evaluation_date)
-        .select_related(*_owner_related_paths("discrepancy__anchor_evidence_link"))
-        .order_by("occurred_at", "pk")
-    ):
+    transitions = EvidenceDiscrepancyTransition.objects.filter(
+        occurred_at__date__lte=evaluation_date
+    )
+    reverifications = workflow.EvidenceReverificationEvent.objects.filter(
+        meaning_changed=False,
+        occurred_at__date__lte=evaluation_date,
+    )
+    if evidence_link_ids is not None:
+        transitions = transitions.filter(discrepancy__anchor_evidence_link_id__in=evidence_link_ids)
+        reverifications = reverifications.filter(anchor_evidence_link_id__in=evidence_link_ids)
+    for transition in transitions.select_related(
+        *_owner_related_paths("discrepancy__anchor_evidence_link")
+    ).order_by("occurred_at", "pk"):
         timeline.append((transition.occurred_at, 0, transition.pk, "discrepancy", transition))
-    for review in (
-        workflow.EvidenceReverificationEvent.objects.filter(
-            meaning_changed=False,
-            occurred_at__date__lte=evaluation_date,
-        )
-        .select_related(*_owner_related_paths("anchor_evidence_link"))
-        .order_by("occurred_at", "pk")
-    ):
+    for review in reverifications.select_related(
+        *_owner_related_paths("anchor_evidence_link")
+    ).order_by("occurred_at", "pk"):
         timeline.append((review.occurred_at, 1, review.pk, "reverification", review))
 
     overlays: dict[tuple[str, str, str], workflow._TrustOverlay] = {}
@@ -221,10 +226,12 @@ def _workflow_overlays_as_of(
 def apply_evidence_workflow_as_of(
     snapshot: KnowledgeSnapshot,
     evaluation_date: date,
+    *,
+    evidence_link_ids: frozenset[int] | None = None,
 ) -> KnowledgeSnapshot:
     """Apply only workflow history established on or before ``evaluation_date``."""
 
-    overlays = _workflow_overlays_as_of(evaluation_date)
+    overlays = _workflow_overlays_as_of(evaluation_date, evidence_link_ids=evidence_link_ids)
     if not overlays:
         return snapshot
 
@@ -287,9 +294,33 @@ def load_consistent_knowledge_snapshot_as_of(evaluation_date: date) -> Knowledge
         )
 
 
+def load_consistent_service_knowledge_snapshot_as_of(
+    service_id: str, evaluation_date: date
+) -> KnowledgeSnapshot:
+    """Load one requested Service graph and its coherent historical workflow state."""
+
+    if connection.in_atomic_block:
+        raise RuntimeError("a consistent knowledge snapshot requires an outermost transaction")
+    with transaction.atomic():
+        with connection.cursor() as cursor:
+            cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY")
+        from .planning_scope import discover_planning_scope
+
+        scope = discover_planning_scope(service_id)
+        snapshot = knowledge_domain._materialize_knowledge_snapshot(
+            scope, evaluation_date=evaluation_date
+        )
+        return apply_evidence_workflow_as_of(
+            snapshot,
+            evaluation_date,
+            evidence_link_ids=scope.evidence_link_ids,
+        )
+
+
 __all__ = (
     "EvidenceDiscrepancyTransition",
     "apply_evidence_workflow_as_of",
     "load_consistent_knowledge_snapshot_as_of",
+    "load_consistent_service_knowledge_snapshot_as_of",
     "load_knowledge_snapshot_as_of",
 )

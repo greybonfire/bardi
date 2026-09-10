@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from unittest.mock import patch
 
 from django.test import SimpleTestCase
 from knowledge.navigation import ServiceNavigationEntry
@@ -85,6 +86,21 @@ class ApplicationBoundaryTests(SimpleTestCase):
             ],
         )
         self.assertEqual(calls, [])
+
+    def test_default_planning_loader_is_service_scoped_and_date_aware(self) -> None:
+        with patch(
+            "api.application.load_consistent_service_knowledge_snapshot_as_of",
+            return_value=self.snapshot,
+        ) as loader:
+            output = execute_planning(
+                PlanningInput("z", {}, "en", date(2026, 9, 1)),
+                planner=lambda _snapshot, _input: InconclusiveResult(
+                    "no_matching_researched_procedure"
+                ),
+            )
+
+        loader.assert_called_once_with("z", date(2026, 9, 1))
+        self.assertEqual(output["type"], "inconclusive")
 
     def test_snapshot_is_fully_loaded_before_detached_input_reaches_planner(self) -> None:
         events: list[str] = []

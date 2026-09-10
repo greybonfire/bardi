@@ -1,0 +1,141 @@
+{
+  "issue": 119,
+  "measured_at": "2026-09-10",
+  "database": "disposable PostgreSQL 17 database bardi_issue119_repair_probe",
+  "command": "PYTHONPATH=backend POSTGRES_DB=bardi_issue119_repair_probe uv run python tools/measure_service_scoped_snapshot.py --scales 0,100,500 --settings bardi.settings.test --facts '{\"application_location\":\"inside_egypt\"}' --evaluation-date 2026-12-31",
+  "dataset": "The probe creates one requested published graph, one unrelated published graph, one unrelated authoring-draft graph, and then scale unrelated published and draft graphs. Each generated published graph has one evidence anchor with two discrepancy-transition rows (open and resolved) and two repeated semantic-preserving re-verification events. Draft graphs have the same catalog/evidence shape but are excluded by published/withdrawn validation filters. All generated rows are removed after each scale in the disposable database.",
+  "rows": [
+    {
+      "unrelated_published_graphs": 1,
+      "unrelated_draft_graphs": 1,
+      "unrelated_workflow_events": 0,
+      "catalog_validation_rows": 56,
+      "global_validation_rows": {
+        "total": 56,
+        "by_queryset": {
+          "checklist_items": 2,
+          "eligibility_bases": 0,
+          "fact_definitions": 39,
+          "fees": 0,
+          "procedure_dependencies": 0,
+          "procedure_service_point_associations": 0,
+          "procedure_versions": 2,
+          "service_contradiction_facts": 0,
+          "service_contradictions": 0,
+          "service_point_versions": 0,
+          "service_procedure_candidates": 3,
+          "service_question_resolved_facts": 0,
+          "service_questions": 3,
+          "services": 3,
+          "steps": 0,
+          "validation_evidence_links": 2,
+          "validation_evidence_sources": 2,
+          "workflow_discrepancy_transitions": 0,
+          "workflow_owner_rows": 0,
+          "workflow_reverification_events": 0
+        }
+      },
+      "detached_object_distinctions": {
+        "shared_fact_definitions": 39,
+        "requested_graph_rows": 7,
+        "full_catalog_rows": 56,
+        "unrelated_materialized_rows": 10
+      },
+      "workflow_rows": {"full": 0, "scoped": 0},
+      "responses_match": true,
+      "full": {"detached_rows": 56, "elapsed_ms": 123.241, "sql_queries": 23},
+      "scoped": {"detached_rows": 46, "elapsed_ms": 214.902, "sql_queries": 48}
+    },
+    {
+      "unrelated_published_graphs": 101,
+      "unrelated_draft_graphs": 101,
+      "unrelated_workflow_events": 400,
+      "catalog_validation_rows": 1556,
+      "global_validation_rows": {
+        "total": 1556,
+        "by_queryset": {
+          "checklist_items": 102,
+          "eligibility_bases": 0,
+          "fact_definitions": 39,
+          "fees": 0,
+          "procedure_dependencies": 0,
+          "procedure_service_point_associations": 0,
+          "procedure_versions": 102,
+          "service_contradiction_facts": 0,
+          "service_contradictions": 0,
+          "service_point_versions": 0,
+          "service_procedure_candidates": 203,
+          "service_question_resolved_facts": 0,
+          "service_questions": 203,
+          "services": 203,
+          "steps": 0,
+          "validation_evidence_links": 102,
+          "validation_evidence_sources": 102,
+          "workflow_discrepancy_transitions": 200,
+          "workflow_owner_rows": 100,
+          "workflow_reverification_events": 200
+        }
+      },
+      "detached_object_distinctions": {
+        "shared_fact_definitions": 39,
+        "requested_graph_rows": 7,
+        "full_catalog_rows": 1056,
+        "unrelated_materialized_rows": 1010
+      },
+      "workflow_rows": {"full": 400, "scoped": 0},
+      "responses_match": true,
+      "full": {"detached_rows": 1056, "elapsed_ms": 261.89, "sql_queries": 23},
+      "scoped": {"detached_rows": 46, "elapsed_ms": 229.722, "sql_queries": 49}
+    },
+    {
+      "unrelated_published_graphs": 501,
+      "unrelated_draft_graphs": 501,
+      "unrelated_workflow_events": 2000,
+      "catalog_validation_rows": 7556,
+      "global_validation_rows": {
+        "total": 7556,
+        "by_queryset": {
+          "checklist_items": 502,
+          "eligibility_bases": 0,
+          "fact_definitions": 39,
+          "fees": 0,
+          "procedure_dependencies": 0,
+          "procedure_service_point_associations": 0,
+          "procedure_versions": 502,
+          "service_contradiction_facts": 0,
+          "service_contradictions": 0,
+          "service_point_versions": 0,
+          "service_procedure_candidates": 1003,
+          "service_question_resolved_facts": 0,
+          "service_questions": 1003,
+          "services": 1003,
+          "steps": 0,
+          "validation_evidence_links": 502,
+          "validation_evidence_sources": 502,
+          "workflow_discrepancy_transitions": 1000,
+          "workflow_owner_rows": 500,
+          "workflow_reverification_events": 1000
+        }
+      },
+      "detached_object_distinctions": {
+        "shared_fact_definitions": 39,
+        "requested_graph_rows": 7,
+        "full_catalog_rows": 5056,
+        "unrelated_materialized_rows": 5010
+      },
+      "workflow_rows": {"full": 2000, "scoped": 0},
+      "responses_match": true,
+      "full": {"detached_rows": 5056, "elapsed_ms": 554.38, "sql_queries": 23},
+      "scoped": {"detached_rows": 46, "elapsed_ms": 333.168, "sql_queries": 49}
+    }
+  ],
+  "limitations": [
+    "Elapsed values are single-run observations on a local disposable PostgreSQL 17 instance, not a capacity benchmark or query-count-only performance claim.",
+    "The deterministic workload uses two discrepancy transitions and two repeated reviews per generated unrelated published anchor; validation reports every event row and one unique workflow owner row per anchor.",
+    "The scoped loader retains the complete Fact registry and global validation-only ledger; its row-linear global validation work is reported rather than hidden.",
+    "Detached rows count eagerly materialized domain records and nested provenance references. Global-validation rows and workflow rows are database row accounting, not detached object counts.",
+    "The generated graph is deterministic and includes published and draft catalog/evidence growth plus repeated unrelated workflow history, but it is synthetic and not an imported production-family workload.",
+    "The script uses production publication for generated published graphs, disables only aggregate immutability guards while deleting its own namespaced rows, and vacuums/analyzes after each scale; run it only in the documented disposable database and drop that database afterward.",
+    "Full/scoped response equality uses the supplied facts, locale, and evaluation date and records only the boolean result, not response contents."
+  ]
+}

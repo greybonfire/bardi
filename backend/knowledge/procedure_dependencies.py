@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import replace
-from typing import cast
+from typing import Any, cast
 
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -536,8 +536,10 @@ def _evidence_snapshot(link: EvidenceLink) -> EvidenceLinkSnapshot:
     )
 
 
-def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
-    rows = list(
+def _dependency_snapshots(
+    snapshot: KnowledgeSnapshot, *, scope: Any | None = None
+) -> KnowledgeSnapshot:
+    dependency_queryset = (
         ProcedureDependency.objects.select_related(
             "procedure_version__procedure",
             "target_procedure",
@@ -549,7 +551,13 @@ def _dependency_snapshots(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
                 ProcedureVersion.State.WITHDRAWN,
             )
         )
-        .order_by("procedure_version__semantic_id", "display_order", "semantic_id")
+    )
+    if scope is not None:
+        dependency_queryset = dependency_queryset.filter(procedure_version_id__in=scope.version_ids)
+    rows = list(
+        dependency_queryset.order_by(
+            "procedure_version__semantic_id", "display_order", "semantic_id"
+        )
     )
     if not rows:
         return snapshot

@@ -62,8 +62,6 @@ class PureDomainImportBoundaryTests(unittest.TestCase):
             "django",
             "core",
             "bardi",
-            "prototype",
-            "bardi_prototype",
             "requests",
             "httpx",
             "urllib",

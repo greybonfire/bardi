@@ -9,10 +9,8 @@ from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
 from .admin_lifecycle_admin import EvidenceLinkLifecycleAdmin, ProcedureVersionLifecycleAdmin
-from .eligibility_basis_admin import (
-    EligibilityBasisAdmin as EligibilityBasisAdmin,
-    EligibilityBasisOwnerInline,
-)
+from .eligibility_basis_admin import EligibilityBasisAdmin as EligibilityBasisAdmin
+from .eligibility_basis_admin import EligibilityBasisOwnerInline
 from .fee_admin import FeeOwnerInline
 from .forms import (
     CandidateForm,
@@ -26,8 +24,6 @@ from .forms import (
     StepForm,
     WarningForm,
 )
-from .procedure_dependency_admin import ProcedureDependencyOwnerInline
-from .service_point_routing_admin import ProcedureServicePointAssociationInline
 from .models import (
     Authority,
     ChecklistItem,
@@ -48,11 +44,13 @@ from .models import (
     Step,
     Warning,
 )
+from .procedure_dependency_admin import ProcedureDependencyOwnerInline
 from .publication import (
     PublicationRejected,
     publish_procedure_version,
     withdraw_procedure_version,
 )
+from .service_point_routing_admin import ProcedureServicePointAssociationInline
 from .services import (
     set_contradiction_facts,
     set_evidence_link_sources,

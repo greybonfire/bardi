@@ -20,6 +20,7 @@ from planning import (
     ProcedureCandidateSnapshot,
     ProcedureServicePointAssociationSnapshot,
     ProcedureVersionSnapshot,
+    PublicRouting,
     QuestionSnapshot,
     ServicePointSnapshot,
     ServicePointVersionSnapshot,
@@ -325,7 +326,9 @@ class RoutingStatusRegressionTests(unittest.TestCase):
         )
         return snapshot, version
 
-    def select(self, associations: tuple[ProcedureServicePointAssociationSnapshot, ...]):
+    def select(
+        self, associations: tuple[ProcedureServicePointAssociationSnapshot, ...]
+    ) -> PublicRouting:
         snapshot, version = self.snapshot(associations)
         return select_service_points(
             snapshot,

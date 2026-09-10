@@ -5,6 +5,7 @@ from datetime import date
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission, User
+from django.contrib.messages import get_messages
 from django.test import RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from planning.versions import (
@@ -542,10 +543,11 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             evidence_admin.get_actions(self._request_for(self.viewer)),
         )
 
-    def test_admin_review_reverification_and_unauthorized_clone_use_services(self) -> None:
+    def test_authorized_review_post_uses_service(self) -> None:
         draft = clone_published_procedure_version(self.version.pk, actor=self.researcher)
         self._grant(self.reviewer, "view_procedureversion", "review_procedureversion")
         self.client.force_login(self.reviewer)
+
         response = self.client.post(
             reverse("admin:knowledge_procedureversion_changelist"),
             {
@@ -555,6 +557,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
                 "approval": "dimension:rule_logic",
             },
         )
+
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
             ProcedureVersionReviewApproval.objects.filter(
@@ -564,6 +567,34 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             ).exists()
         )
 
+    def test_unauthorized_review_post_is_rejected(self) -> None:
+        draft = clone_published_procedure_version(self.version.pk, actor=self.researcher)
+        self._grant(self.viewer, "view_procedureversion")
+        self.client.force_login(self.viewer)
+
+        response = self.client.post(
+            reverse("admin:knowledge_procedureversion_changelist"),
+            {
+                "action": "approve_selected_versions",
+                "_selected_action": str(draft.pk),
+                "apply": "1",
+                "approval": "dimension:rule_logic",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(
+            ProcedureVersionReviewApproval.objects.filter(
+                procedure_version=draft,
+                reviewer=self.viewer,
+            ).exists()
+        )
+        self.assertIn(
+            "You do not have permission to perform that lifecycle action.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_authorized_reverification_post_uses_service(self) -> None:
         self._grant(
             self.reverifier,
             "view_evidencelink",
@@ -571,6 +602,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
         )
         self.client.force_login(self.reverifier)
         link = self.evidence["checklist"]
+
         response = self.client.post(
             reverse("admin:knowledge_evidencelink_changelist"),
             {
@@ -583,6 +615,7 @@ class SafeAdminLifecycleTests(TransactionTestCase):
                 "rationale": "Admin lifecycle re-verification test.",
             },
         )
+
         self.assertEqual(response.status_code, 302)
         self.assertTrue(
             EvidenceReverificationEvent.objects.filter(
@@ -591,9 +624,45 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             ).exists()
         )
 
-        self._grant(self.viewer, "view_procedureversion")
+    def test_unauthorized_reverification_post_is_rejected(self) -> None:
+        self._grant(self.viewer, "view_evidencelink")
         self.client.force_login(self.viewer)
+        link = self.evidence["checklist"]
+        before = EvidenceReverificationEvent.objects.filter(anchor_evidence_link=link).count()
+
+        response = self.client.post(
+            reverse("admin:knowledge_evidencelink_changelist"),
+            {
+                "action": "reverify_selected_evidence",
+                "_selected_action": str(link.pk),
+                "apply": "1",
+                "verification_state": "current",
+                "verified_on": "2026-09-06",
+                "reverify_on": "2026-12-06",
+                "rationale": "Unauthorized re-verification attempt.",
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(
+            EvidenceReverificationEvent.objects.filter(anchor_evidence_link=link).count(),
+            before,
+        )
+        self.assertIn(
+            "You do not have permission to perform that lifecycle action.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+
+    def test_authorized_clone_post_uses_service(self) -> None:
+        self._grant(
+            self.researcher,
+            "view_procedureversion",
+            "add_procedureversion",
+            "change_procedureversion",
+        )
+        self.client.force_login(self.researcher)
         before = ProcedureVersion.objects.count()
+
         response = self.client.post(
             reverse("admin:knowledge_procedureversion_changelist"),
             {
@@ -601,5 +670,32 @@ class SafeAdminLifecycleTests(TransactionTestCase):
                 "_selected_action": str(self.version.pk),
             },
         )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(ProcedureVersion.objects.count(), before + 1)
+        successor = ProcedureVersion.objects.get(semantic_id="admin.lifecycle.v1.successor")
+        self.assertEqual(successor.state, ProcedureVersion.State.DRAFT)
+        self.assertEqual(successor.procedure_id, self.version.procedure_id)
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.state, ProcedureVersion.State.PUBLISHED)
+
+    def test_unauthorized_clone_post_is_rejected(self) -> None:
+        self._grant(self.viewer, "view_procedureversion")
+        self.client.force_login(self.viewer)
+        before = ProcedureVersion.objects.count()
+
+        response = self.client.post(
+            reverse("admin:knowledge_procedureversion_changelist"),
+            {
+                "action": "clone_selected_to_draft",
+                "_selected_action": str(self.version.pk),
+            },
+        )
+
         self.assertEqual(response.status_code, 302)
         self.assertEqual(ProcedureVersion.objects.count(), before)
+        self.assertIn(
+            "You do not have permission to perform that lifecycle action.",
+            [str(message) for message in get_messages(response.wsgi_request)],
+        )
+

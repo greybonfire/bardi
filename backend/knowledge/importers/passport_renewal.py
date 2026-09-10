@@ -1,7 +1,7 @@
 """Deterministic production import for researched ordinary domestic passport renewal.
 
 This module transcribes the evidence pack into production models. It deliberately has no
-runtime or import dependency on the frozen prototype and never publishes or records approvals.
+runtime or import dependency on the retired research prototype and never publishes or records approvals.
 """
 
 from __future__ import annotations

@@ -4,7 +4,8 @@
 **Initial contract version:** `v1`  
 **Effective:** 2026-09-01
 
-The production evaluator must preserve the externally observable semantics proven by the prototype without depending on prototype code.
+The production evaluator preserves the externally observable semantics carried forward from the
+retired research prototype through authoritative production contracts and acceptance tests.
 
 ## Facts
 

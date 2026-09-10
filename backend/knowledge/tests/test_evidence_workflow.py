@@ -578,6 +578,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertFalse(event_admin.has_delete_permission(request, event))
 
     def test_open_discrepancy_survives_later_current_review(self) -> None:
+        self.publish()
         self.open_discrepancy(
             anchor_evidence_link=self.checklist_evidence,
             evidence_links=(self.checklist_evidence,),
@@ -603,6 +604,7 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertEqual(overlay.evidence_verified_on, reviewed_on)
 
     def test_resolving_one_discrepancy_preserves_another_and_historical_open_state(self) -> None:
+        self.publish()
         first = self.open_discrepancy(
             anchor_evidence_link=self.checklist_evidence,
             evidence_links=(self.checklist_evidence,),

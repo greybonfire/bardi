@@ -157,7 +157,6 @@ class ImporterIntegrityEntrypointTests(TestCase):
             import_temporary_family_exemption,
         )
 
-
     def test_passport_existing_row_verifier_failure_rolls_back_mutation(self) -> None:
         author = self._author("passport-existing-rollback-author")
         version = import_passport_renewal(author=author)

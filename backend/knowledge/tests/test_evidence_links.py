@@ -11,7 +11,6 @@ from knowledge import (
     eligibility_bases,
     fees,
     procedure_dependencies,
-    runtime_integrity,
     service_point_routing,
 )
 from knowledge.fees import Fee
@@ -259,7 +258,6 @@ class EvidenceLinkContractTests(TransactionTestCase):
             (eligibility_bases, "_install_basis_evidence_owner"),
             (procedure_dependencies, "_install_dependency_evidence_owner"),
             (service_point_routing, "_install_routing_evidence_owners"),
-            (runtime_integrity, "install_evidence_identity_validation"),
         ):
             with self.subTest(installer=installer):
                 self.assertFalse(hasattr(module, installer))

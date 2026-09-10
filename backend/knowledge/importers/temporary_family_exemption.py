@@ -1057,7 +1057,7 @@ def _create_version(
 
 
 @transaction.atomic
-def import_temporary_family_exemption(
+def _import_temporary_family_exemption(
     *, author: models.Model
 ) -> tuple[ProcedureVersion, ProcedureVersion]:
     """Create or verify both researched temporal drafts without approving or publishing them."""
@@ -1525,6 +1525,22 @@ def import_temporary_family_exemption(
     _verify_version(current, amended=True)
     validate_core_catalog()
     return historical, current
+
+
+@transaction.atomic
+def import_temporary_family_exemption(
+    *, author: models.Model
+) -> tuple[ProcedureVersion, ProcedureVersion]:
+    """Create or verify both researched temporal drafts, then verify their semantic state."""
+
+    versions = _import_temporary_family_exemption(author=author)
+
+    from .temporary_family_exemption_integrity import (
+        verify_temporary_family_exemption_import,
+    )
+
+    verify_temporary_family_exemption_import(versions)
+    return versions
 
 
 __all__ = (

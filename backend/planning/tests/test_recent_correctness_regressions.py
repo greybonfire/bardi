@@ -14,8 +14,8 @@ from planning import (
     KnowledgeSnapshot,
     LocalizedText,
     NextQuestionResult,
-    PlanResult,
     PlanningInput,
+    PlanResult,
     Predicate,
     ProcedureCandidateSnapshot,
     ProcedureServicePointAssociationSnapshot,
@@ -167,7 +167,7 @@ def _step(
 class ConsequentialQuestionRegressionTests(unittest.TestCase):
     """Durable coverage for the question phases added by issues #115 and #116."""
 
-    def test_version_applicability_question_progresses_true_false_and_missing_coverage(self) -> None:
+    def test_version_applicability_question_progresses_and_fails_closed(self) -> None:
         knowledge = _planning_snapshot(
             version_applicability=Predicate("eq", "version_applies", True),
             questions=(_question("version-question", "version_applies"),),
@@ -336,7 +336,7 @@ class RoutingStatusRegressionTests(unittest.TestCase):
             TODAY,
         )
 
-    def test_expired_future_and_false_only_routes_are_unresolved_when_nothing_is_selected(self) -> None:
+    def test_empty_routing_after_expired_future_or_false_is_unresolved(self) -> None:
         cases = (
             self.association("expired", effective_to=TODAY - timedelta(days=1)),
             self.association("future", effective_from=TODAY + timedelta(days=1)),

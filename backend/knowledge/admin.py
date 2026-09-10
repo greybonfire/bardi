@@ -8,6 +8,12 @@ from django.forms import ModelForm, Textarea
 from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
+from .admin_lifecycle_admin import EvidenceLinkLifecycleAdmin, ProcedureVersionLifecycleAdmin
+from .eligibility_basis_admin import (
+    EligibilityBasisAdmin as EligibilityBasisAdmin,
+    EligibilityBasisOwnerInline,
+)
+from .fee_admin import FeeOwnerInline
 from .forms import (
     CandidateForm,
     ChecklistItemForm,
@@ -20,12 +26,6 @@ from .forms import (
     StepForm,
     WarningForm,
 )
-from .admin_lifecycle_admin import EvidenceLinkLifecycleAdmin, ProcedureVersionLifecycleAdmin
-from .eligibility_basis_admin import (
-    EligibilityBasisAdmin as EligibilityBasisAdmin,
-    EligibilityBasisOwnerInline,
-)
-from .fee_admin import FeeOwnerInline
 from .procedure_dependency_admin import ProcedureDependencyOwnerInline
 from .service_point_routing_admin import ProcedureServicePointAssociationInline
 from .models import (

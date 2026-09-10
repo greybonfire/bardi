@@ -430,18 +430,11 @@ class ChecklistApplicabilityQuestionCoverageTests(TestCase):
             text_ar="خدمة",
             text_en="Service",
         )
-        procedure = Procedure.objects.create(
-            semantic_id="checklist.coverage.procedure",
-            text_ar="إجراء",
-            text_en="Procedure",
-            primary_service=self.service,
-        )
-        self.version = ProcedureVersion.objects.create(
-            semantic_id="checklist.coverage.procedure.v1",
-            procedure=procedure,
-            text_ar="نسخة",
-            text_en="Version",
-            applicability={},
+        self.version_fact = FactDefinition.objects.create(
+            key="checklist_version_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
         )
         self.official_fact = FactDefinition.objects.create(
             key="checklist_coverage_applies",
@@ -454,6 +447,27 @@ class ChecklistApplicabilityQuestionCoverageTests(TestCase):
             kind=FactDefinition.Kind.BOOLEAN,
             enum_values=[],
             is_published=True,
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="checklist.coverage.question.version",
+            service=self.service,
+            fact=self.version_fact,
+            text_ar="هل ينطبق الإصدار؟",
+            text_en="Does this version apply?",
+            priority=1,
+        )
+        procedure = Procedure.objects.create(
+            semantic_id="checklist.coverage.procedure",
+            text_ar="إجراء",
+            text_en="Procedure",
+            primary_service=self.service,
+        )
+        self.version = ProcedureVersion.objects.create(
+            semantic_id="checklist.coverage.procedure.v1",
+            procedure=procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability=self.rule(self.version_fact),
         )
 
     @staticmethod

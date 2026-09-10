@@ -23,10 +23,8 @@ from knowledge.admin import (
     WarningAdmin,
     WarningEvidenceInline,
 )
-from knowledge.eligibility_basis_admin import (
-    EligibilityBasisAdmin as AuthoredEligibilityBasisAdmin,
-    EligibilityBasisOwnerInline,
-)
+from knowledge.eligibility_basis_admin import EligibilityBasisAdmin as AuthoredEligibilityBasisAdmin
+from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
 from knowledge.models import (
     Authority,
     ChecklistItem,

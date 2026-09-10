@@ -19,16 +19,14 @@ Run commands from the repository root unless noted otherwise.
   (cd backend && uv run python manage.py test api.tests.test_application --settings=bardi.settings.test)
   ```
 
+## Coding conventions
+
+Prioritize clarity and maintainability. Apply SOLID where it clarifies responsibilities and interfaces; KISS/YAGNI to meet current requirements without speculative machinery; DRY for shared domain knowledge, not merely similar code. Follow existing project patterns and prefer a little duplication over premature abstraction.
+
 ## Read when relevant
 
 - Changing production behavior or contracts: read [`docs/architecture/README.md`](docs/architecture/README.md) and the relevant accepted ADRs in [`docs/adr/README.md`](docs/adr/README.md).
 - Naming or modeling domain concepts: consult [`CONTEXT.md`](CONTEXT.md).
-
-## Existing workflows
-
-- Read-only investigation and planning: [`.pi/prompts/scout-and-plan.md`](.pi/prompts/scout-and-plan.md).
-- Scout, plan, then implement: [`.pi/prompts/implement.md`](.pi/prompts/implement.md).
-- Implement, review, then apply feedback: [`.pi/prompts/implement-and-review.md`](.pi/prompts/implement-and-review.md).
 
 ## Git and operations
 

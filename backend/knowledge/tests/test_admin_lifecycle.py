@@ -5,7 +5,7 @@ from datetime import date
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission, User
-from django.test import RequestFactory, TransactionTestCase, override_settings
+from django.test import RequestFactory, SimpleTestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from planning.versions import (
     ProcedureVersionResolved,
@@ -13,10 +13,31 @@ from planning.versions import (
     resolve_procedure_version,
 )
 
-from knowledge.admin import EvidenceLinkAdmin, ProcedureVersionAdmin
+from knowledge import (
+    admin_lifecycle_admin,
+    eligibility_basis_admin,
+    fee_admin,
+    procedure_dependency_admin,
+    service_point_routing_admin,
+)
+from knowledge.admin import (
+    ChecklistItemOwnerInline,
+    EligibilityBasisAdmin,
+    EvidenceLinkAdmin,
+    EvidenceSourceInline,
+    ProcedureVersionAdmin,
+    StepOwnerInline,
+    WarningOwnerInline,
+)
+from knowledge.admin_lifecycle_admin import (
+    EvidenceLinkLifecycleAdmin,
+    ProcedureVersionLifecycleAdmin,
+)
+from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
 from knowledge.admin_lifecycle import clone_published_procedure_version
 from knowledge.domain import load_knowledge_snapshot
 from knowledge.evidence_workflow import EvidenceReverificationEvent
+from knowledge.fee_admin import FeeAdmin, FeeOwnerInline
 from knowledge.fees import Fee
 from knowledge.models import (
     Authority,
@@ -35,6 +56,10 @@ from knowledge.models import (
 )
 from knowledge.planning_scenarios import PlanningScenario
 from knowledge.procedure_dependencies import ProcedureDependency
+from knowledge.procedure_dependency_admin import (
+    ProcedureDependencyAdmin,
+    ProcedureDependencyOwnerInline,
+)
 from knowledge.publication import publish_procedure_version, withdraw_procedure_version
 from knowledge.review_workflow import (
     ProcedureVersionReviewApproval,
@@ -45,7 +70,135 @@ from knowledge.service_point_routing import (
     ServicePoint,
     ServicePointVersion,
 )
+from knowledge.service_point_routing_admin import (
+    ProcedureServicePointAssociationAdmin,
+    ProcedureServicePointAssociationInline,
+    ServicePointAdmin,
+    ServicePointVersionAdmin,
+)
 from knowledge.services import set_evidence_link_sources
+
+
+class AdminCompositionTests(SimpleTestCase):
+    def test_migrated_admin_registry_uses_one_explicit_class_per_model(self) -> None:
+        expected = {
+            ProcedureVersion: ProcedureVersionAdmin,
+            EvidenceLink: EvidenceLinkAdmin,
+            EligibilityBasis: EligibilityBasisAdmin,
+            Fee: FeeAdmin,
+            ProcedureDependency: ProcedureDependencyAdmin,
+            ServicePoint: ServicePointAdmin,
+            ServicePointVersion: ServicePointVersionAdmin,
+            ProcedureServicePointAssociation: ProcedureServicePointAssociationAdmin,
+        }
+
+        for model, admin_class in expected.items():
+            with self.subTest(model=model._meta.label):
+                self.assertIs(type(admin.site._registry[model]), admin_class)
+
+        self.assertEqual(
+            reverse("admin:knowledge_procedureversion_changelist"),
+            "/admin/knowledge/procedureversion/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_evidencelink_changelist"),
+            "/admin/knowledge/evidencelink/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_eligibilitybasis_changelist"),
+            "/admin/knowledge/eligibilitybasis/",
+        )
+        self.assertEqual(reverse("admin:knowledge_fee_changelist"), "/admin/knowledge/fee/")
+        self.assertEqual(
+            reverse("admin:knowledge_proceduredependency_changelist"),
+            "/admin/knowledge/proceduredependency/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_servicepoint_changelist"),
+            "/admin/knowledge/servicepoint/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_servicepointversion_changelist"),
+            "/admin/knowledge/servicepointversion/",
+        )
+        self.assertEqual(
+            reverse("admin:knowledge_procedureservicepointassociation_changelist"),
+            "/admin/knowledge/procedureservicepointassociation/",
+        )
+
+    def test_procedure_version_and_evidence_admin_configuration_is_explicit(self) -> None:
+        self.assertEqual(
+            ProcedureVersionAdmin.actions,
+            (
+                "publish_selected",
+                "withdraw_selected",
+                "clone_selected_to_draft",
+                "approve_selected_versions",
+            ),
+        )
+        self.assertEqual(
+            ProcedureVersionAdmin.inlines,
+            (
+                ChecklistItemOwnerInline,
+                StepOwnerInline,
+                WarningOwnerInline,
+                EligibilityBasisOwnerInline,
+                FeeOwnerInline,
+                ProcedureDependencyOwnerInline,
+                ProcedureServicePointAssociationInline,
+            ),
+        )
+        self.assertEqual(
+            ProcedureVersionAdmin.list_display,
+            (
+                "semantic_id",
+                "procedure",
+                "state",
+                "effective_from",
+                "effective_to",
+                "published_at",
+            ),
+        )
+        self.assertEqual(
+            ProcedureVersionAdmin.list_filter,
+            ("state", "procedure", "effective_from", "effective_to"),
+        )
+        self.assertEqual(EvidenceLinkAdmin.actions, ("reverify_selected_evidence",))
+        self.assertEqual(EvidenceLinkAdmin.inlines, (EvidenceSourceInline,))
+        self.assertEqual(
+            EvidenceLinkAdmin.list_display,
+            ("semantic_id", "owner_display", "support_status", "verification_state"),
+        )
+
+    def test_migrated_admin_behavior_is_declared_without_installers(self) -> None:
+        self.assertIs(ProcedureVersionAdmin.__mro__[1], ProcedureVersionLifecycleAdmin)
+        self.assertIs(EvidenceLinkAdmin.__mro__[1], EvidenceLinkLifecycleAdmin)
+        for method in (
+            "clone_selected_to_draft",
+            "has_clone_procedureversion_permission",
+            "approve_selected_versions",
+            "has_review_version_permission",
+            "changelist_view",
+        ):
+            self.assertIn(method, ProcedureVersionLifecycleAdmin.__dict__)
+        for method in (
+            "reverify_selected_evidence",
+            "has_reverify_evidence_permission",
+            "changelist_view",
+        ):
+            self.assertIn(method, EvidenceLinkLifecycleAdmin.__dict__)
+
+        self.assertNotIn("_procedure_version_admin", vars(admin_lifecycle_admin))
+        self.assertNotIn("_evidence_link_admin", vars(admin_lifecycle_admin))
+        for module in (
+            eligibility_basis_admin,
+            fee_admin,
+            procedure_dependency_admin,
+            service_point_routing_admin,
+        ):
+            self.assertFalse(
+                any(name.startswith("install_procedure_version_") for name in vars(module))
+            )
 
 
 @override_settings(PROCEDURE_VERSION_PUBLICATION_GATES=())

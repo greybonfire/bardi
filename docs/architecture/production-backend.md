@@ -5,7 +5,7 @@
 
 ## Purpose
 
-Build a maintainable production backend for sourced, bilingual Egyptian administrative guidance without losing the determinism, evidence discipline, local uncertainty, and privacy boundaries proven by the prototype.
+Build a maintainable production backend for sourced, bilingual Egyptian administrative guidance without losing the determinism, evidence discipline, local uncertainty, and privacy boundaries established during the research-prototype phase.
 
 The first production system is a **Django/PostgreSQL modular monolith**. Django Admin is the initial research/editorial interface. Django Ninja exposes a small application interface to a separate Next.js web client.
 
@@ -72,7 +72,7 @@ PostgreSQL is the source of truth for production knowledge.
 - Evidence Discrepancies are lightweight internal/editorial records and are not public plan objects.
 - Service Point identity, versioned material details, and Procedure-specific routing associations remain separate records.
 
-The production schema must be designed from the domain model rather than copied from prototype dataclasses.
+The production schema must be designed from the domain model rather than copied from historical prototype dataclasses.
 
 ## Public application interface
 

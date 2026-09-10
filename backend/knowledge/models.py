@@ -977,7 +977,7 @@ class EligibilityBasis(VersionOwnedModel):
     )
 
     class Meta:
-        ordering = ("procedure_version_id", "display_order", "semantic_id")
+        ordering = ("procedure_version_id", "semantic_id")
         constraints = [
             models.UniqueConstraint(
                 fields=("procedure_version", "semantic_id"), name="unique_basis_id_per_version"

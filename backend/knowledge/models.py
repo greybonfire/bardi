@@ -882,8 +882,10 @@ class ChecklistItem(VersionOwnedModel):
         max_length=24, choices=VERIFICATION_CHOICES, default="unknown"
     )
 
+    objects = EligibilityBasisManager()
+
     class Meta:
-        ordering = ("procedure_version_id", "display_order", "semantic_id")
+        ordering = ("procedure_version_id", "semantic_id")
         constraints = [
             models.UniqueConstraint(
                 fields=("procedure_version", "semantic_id"), name="unique_checklist_id_per_version"
@@ -956,6 +958,15 @@ class ChecklistItem(VersionOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
+
+
+class EligibilityBasisManager(models.Manager["EligibilityBasis"]):
+    def get_queryset(self) -> models.QuerySet["EligibilityBasis"]:
+        return super().get_queryset().order_by(
+            "procedure_version_id",
+            "display_order",
+            "semantic_id",
+        )
 
 
 class EligibilityBasis(VersionOwnedModel):

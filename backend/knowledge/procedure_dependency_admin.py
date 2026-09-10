@@ -161,6 +161,7 @@ class ProcedureDependencyOwnerInline(admin.TabularInline):  # type: ignore[type-
             return False
         return bool(obj is not None and obj.state == ProcedureVersion.State.DRAFT)
 
+
 __all__ = (
     "ProcedureDependencyAdmin",
     "ProcedureDependencyEvidenceInline",

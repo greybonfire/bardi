@@ -9,10 +9,10 @@ class KnowledgeConfig(AppConfig):
     verbose_name = "Knowledge catalog"
 
     def import_models(self) -> None:
-        # Focused feature modules extend the knowledge model graph during Django's model
-        # loading phase so migrations, the app registry, and static analysis observe one
-        # final EvidenceLink owner union before models_ready is set. Owner-extending modules
-        # are imported in dependency order so each sees the complete graph installed before it.
+        # Focused feature modules define first-class models with ``app_label = "knowledge"``.
+        # Import them during Django's model-loading phase so migrations and the app registry
+        # observe the complete knowledge graph before models_ready is set. EvidenceLink itself
+        # declares its complete owner union in knowledge.models and is not mutated here.
         super().import_models()
         fees = import_module(".fees", package=__package__)
         eligibility_bases = import_module(".eligibility_bases", package=__package__)
@@ -38,43 +38,6 @@ class KnowledgeConfig(AppConfig):
         assert planning_scenarios.PlanningScenario is not None
         assert review_workflow.ProcedureVersionReviewApproval is not None
 
-        # Evidence identifiers are intentionally owner-scoped. Feature modules install
-        # additional owner fields dynamically, so their constraints can only be attached
-        # after the complete owner union has loaded.
-        from django.db import models
-        from django.db.models import Q
-
-        from .models import NONBLANK_PATTERN, EvidenceLink
-
-        existing = {constraint.name for constraint in EvidenceLink._meta.constraints}
-        if "evidence_semantic_id_blank_or_nonblank" not in existing:
-            EvidenceLink._meta.constraints = [
-                *EvidenceLink._meta.constraints,
-                models.CheckConstraint(
-                    condition=Q(semantic_id="") | Q(semantic_id__regex=NONBLANK_PATTERN),
-                    name="evidence_semantic_id_blank_or_nonblank",
-                ),
-            ]
-        for field_name, constraint_name in (
-            ("fee", "unique_evidence_id_fee_owner"),
-            ("eligibility_basis", "unique_evidence_id_basis_owner"),
-            ("procedure_dependency", "unique_evidence_id_dependency_owner"),
-            ("service_point_version", "unique_evidence_id_point_version_owner"),
-            (
-                "procedure_service_point_association",
-                "unique_evidence_id_point_association_owner",
-            ),
-        ):
-            if constraint_name not in existing:
-                EvidenceLink._meta.constraints = [
-                    *EvidenceLink._meta.constraints,
-                    models.UniqueConstraint(
-                        fields=(field_name, "semantic_id"),
-                        condition=Q(**{f"{field_name}__isnull": False}) & ~Q(semantic_id=""),
-                        name=constraint_name,
-                    ),
-                ]
-
     def ready(self) -> None:
         from . import admin_lifecycle_admin as _admin_lifecycle_admin
         from . import eligibility_basis_admin as _eligibility_basis_admin
@@ -86,7 +49,6 @@ class KnowledgeConfig(AppConfig):
         from . import service_point_routing_admin as _service_point_routing_admin
         from .aggregate_guard import connect_aggregate_relation_guards
         from .runtime_integrity import (
-            install_evidence_identity_validation,
             install_national_id_renewal_integrity_verification,
             install_passport_renewal_integrity_verification,
             install_temporary_family_exemption_integrity_verification,
@@ -100,7 +62,6 @@ class KnowledgeConfig(AppConfig):
         assert _planning_scenario_admin.PlanningScenarioAdmin is not None
         assert _review_workflow_admin.ProcedureVersionReviewPolicyAdmin is not None
         assert _admin_lifecycle_admin.clone_selected_to_draft is not None
-        install_evidence_identity_validation()
         install_passport_renewal_integrity_verification()
         install_national_id_renewal_integrity_verification()
         install_temporary_family_exemption_integrity_verification()

@@ -325,9 +325,7 @@ class RoutingStatusRegressionTests(unittest.TestCase):
         )
         return snapshot, version
 
-    def select(
-        self, associations: tuple[ProcedureServicePointAssociationSnapshot, ...]
-    ):
+    def select(self, associations: tuple[ProcedureServicePointAssociationSnapshot, ...]):
         snapshot, version = self.snapshot(associations)
         return select_service_points(
             snapshot,

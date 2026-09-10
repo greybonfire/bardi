@@ -34,7 +34,6 @@ from .models import (
     ProcedureVersion,
     Source,
     VersionOwnedModel,
-    Warning,
     _required,
 )
 from .publication import PublicationContext, PublicationDiagnostic
@@ -238,103 +237,6 @@ class ProcedureServicePointAssociation(VersionOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
-
-
-def _install_routing_evidence_owners() -> None:
-    for name, model, related_name in (
-        ("service_point_version", ServicePointVersion, "evidence_links"),
-        ("procedure_service_point_association", ProcedureServicePointAssociation, "evidence_links"),
-    ):
-        if not any(field.name == name for field in EvidenceLink._meta.fields):
-            EvidenceLink.add_to_class(
-                name,
-                models.ForeignKey(
-                    model,
-                    null=True,
-                    blank=True,
-                    on_delete=models.CASCADE,
-                    related_name=related_name,
-                ),
-            )
-
-    names = (
-        "checklist_item",
-        "step",
-        "warning",
-        "fee",
-        "eligibility_basis",
-        "procedure_dependency",
-        "service_point_version",
-        "procedure_service_point_association",
-    )
-    terms = []
-    for selected in names:
-        terms.append(Q(**{f"{name}__isnull": name != selected for name in names}))
-    union = terms[0]
-    for term in terms[1:]:
-        union |= term
-    EvidenceLink._meta.constraints = [
-        c for c in EvidenceLink._meta.constraints if c.name != "evidence_exactly_one_owner"
-    ] + [models.CheckConstraint(condition=union, name="evidence_exactly_one_owner")]
-
-    def owner(link: EvidenceLink) -> object:
-        owners = [
-            getattr(link, name, None)
-            for name in names
-            if getattr(link, f"{name}_id", None) is not None
-        ]
-        if len(owners) != 1:
-            raise ValidationError("Evidence must have exactly one claim owner.")
-        return owners[0]
-
-    def owning_versions(link: EvidenceLink) -> tuple[ProcedureVersion, ...]:
-        candidate = owner(link)
-        method = getattr(candidate, "owning_versions", None)
-        if callable(method):
-            return cast(tuple[ProcedureVersion, ...], method())
-        single = getattr(candidate, "owning_version", None)
-        if callable(single):
-            return (cast(ProcedureVersion, single()),)
-        return (cast(ProcedureVersion, cast(Any, candidate).procedure_version),)
-
-    def owning_version(link: EvidenceLink) -> ProcedureVersion:
-        versions = owning_versions(link)
-        if not versions:
-            raise ValidationError("Evidence owner must belong to a Procedure Version.")
-        return next(
-            (version for version in versions if version.state != ProcedureVersion.State.DRAFT),
-            versions[0],
-        )
-
-    def clean(link: EvidenceLink) -> None:
-        owner_ids = tuple(getattr(link, f"{name}_id", None) for name in names)
-        if link.pk is not None:
-            stored = (
-                type(link)
-                .objects.filter(pk=link.pk)
-                .values_list(*(f"{name}_id" for name in names))
-                .first()
-            )
-            if stored is not None and stored != owner_ids:
-                raise ValidationError("Evidence claim ownership cannot be reassigned.")
-        if sum(value is not None for value in owner_ids) != 1:
-            raise ValidationError("Evidence must have exactly one claim owner.")
-        if (
-            link.warning_id is not None
-            and link.warning is not None
-            and link.warning.kind == Warning.Kind.PRODUCT
-        ):
-            raise ValidationError({"warning": "Product warnings cannot carry Evidence Links."})
-        if link.effective_from and link.effective_to and link.effective_from > link.effective_to:
-            raise ValidationError({"effective_to": "Effective interval is not ordered."})
-
-    EvidenceLink.owner = property(owner)  # type: ignore[assignment]
-    EvidenceLink.owning_versions = owning_versions  # type: ignore[attr-defined]
-    EvidenceLink.owning_version = owning_version  # type: ignore[assignment]
-    EvidenceLink.clean = clean  # type: ignore[assignment]
-
-
-_install_routing_evidence_owners()
 
 
 def _complete_support(

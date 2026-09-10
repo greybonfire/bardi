@@ -1,4 +1,4 @@
-"""Eligibility Basis authoring, evidence ownership, publication, and snapshot adaptation."""
+"""Eligibility Basis authoring, publication, and snapshot adaptation."""
 
 from __future__ import annotations
 
@@ -37,7 +37,6 @@ from .models import (
     EvidenceLinkSource,
     ProcedureVersion,
     Source,
-    Warning,
     _required,
 )
 from .publication import PublicationContext, PublicationDiagnostic
@@ -122,128 +121,6 @@ def _install_basis_fields() -> None:
 
 
 _install_basis_fields()
-
-
-def _install_basis_evidence_owner() -> None:
-    if not any(field.name == "eligibility_basis" for field in EvidenceLink._meta.fields):
-        EvidenceLink.add_to_class(
-            "eligibility_basis",
-            models.ForeignKey(
-                EligibilityBasis,
-                null=True,
-                blank=True,
-                on_delete=models.CASCADE,
-                related_name="evidence_links",
-            ),
-        )
-
-    EvidenceLink._meta.constraints = [
-        constraint
-        for constraint in EvidenceLink._meta.constraints
-        if constraint.name != "evidence_exactly_one_owner"
-    ] + [
-        models.CheckConstraint(
-            condition=(
-                Q(
-                    checklist_item__isnull=False,
-                    step__isnull=True,
-                    warning__isnull=True,
-                    fee__isnull=True,
-                    eligibility_basis__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=False,
-                    warning__isnull=True,
-                    fee__isnull=True,
-                    eligibility_basis__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=True,
-                    warning__isnull=False,
-                    fee__isnull=True,
-                    eligibility_basis__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=True,
-                    warning__isnull=True,
-                    fee__isnull=False,
-                    eligibility_basis__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=True,
-                    warning__isnull=True,
-                    fee__isnull=True,
-                    eligibility_basis__isnull=False,
-                )
-            ),
-            name="evidence_exactly_one_owner",
-        )
-    ]
-
-    def owner(link: EvidenceLink) -> object:
-        owners = [
-            candidate
-            for candidate in (
-                link.checklist_item,
-                link.step,
-                link.warning,
-                getattr(link, "fee", None),
-                getattr(link, "eligibility_basis", None),
-            )
-            if candidate is not None
-        ]
-        if len(owners) != 1:
-            raise ValidationError("Evidence must have exactly one claim owner.")
-        return owners[0]
-
-    def owning_version(link: EvidenceLink) -> ProcedureVersion:
-        candidate = owner(link)
-        return candidate.procedure_version  # type: ignore[attr-defined,no-any-return]
-
-    def clean(link: EvidenceLink) -> None:
-        owner_ids = (
-            link.checklist_item_id,
-            link.step_id,
-            link.warning_id,
-            getattr(link, "fee_id", None),
-            getattr(link, "eligibility_basis_id", None),
-        )
-        if link.pk is not None:
-            stored = (
-                type(link)
-                .objects.filter(pk=link.pk)
-                .values_list(
-                    "checklist_item_id",
-                    "step_id",
-                    "warning_id",
-                    "fee_id",
-                    "eligibility_basis_id",
-                )
-                .first()
-            )
-            if stored is not None and stored != owner_ids:
-                raise ValidationError("Evidence claim ownership cannot be reassigned.")
-        if sum(value is not None for value in owner_ids) != 1:
-            raise ValidationError("Evidence must have exactly one claim owner.")
-        if (
-            link.warning_id is not None
-            and link.warning is not None
-            and link.warning.kind == Warning.Kind.PRODUCT
-        ):
-            raise ValidationError({"warning": "Product warnings cannot carry Evidence Links."})
-        if link.effective_from and link.effective_to and link.effective_from > link.effective_to:
-            raise ValidationError({"effective_to": "Effective interval is not ordered."})
-
-    EvidenceLink.owner = property(owner)  # type: ignore[assignment]
-    EvidenceLink.owning_version = owning_version  # type: ignore[assignment]
-    EvidenceLink.clean = clean  # type: ignore[assignment]
-
-
-_install_basis_evidence_owner()
 
 
 def _source_fact_keys(

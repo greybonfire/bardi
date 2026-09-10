@@ -1,8 +1,7 @@
 """Structured Fee persistence and publication policy for issue #42.
 
-Fee is kept in a focused module while remaining a first-class model in the ``knowledge``
-app. ``install_fee_evidence_owner`` extends the shared EvidenceLink owner union so Fees use
-the same provenance aggregate as Checklist Items, Steps, and administrative Warnings.
+Fee remains a first-class model in the ``knowledge`` app while the shared ``EvidenceLink``
+model declares Fee provenance ownership centrally.
 """
 
 from __future__ import annotations
@@ -218,111 +217,6 @@ class Fee(VersionOwnedModel):
 
     def __str__(self) -> str:
         return f"{self.procedure_version.semantic_id}:{self.semantic_id}"
-
-
-def _install_fee_evidence_owner() -> None:
-    """Extend the shared EvidenceLink owner union with Fee exactly once."""
-    if any(field.name == "fee" for field in EvidenceLink._meta.fields):
-        return
-
-    EvidenceLink.add_to_class(
-        "fee",
-        models.ForeignKey(
-            Fee,
-            null=True,
-            blank=True,
-            on_delete=models.CASCADE,
-            related_name="evidence_links",
-        ),
-    )
-    EvidenceLink._meta.constraints = [
-        constraint
-        for constraint in EvidenceLink._meta.constraints
-        if constraint.name != "evidence_exactly_one_owner"
-    ] + [
-        models.CheckConstraint(
-            condition=(
-                Q(
-                    checklist_item__isnull=False,
-                    step__isnull=True,
-                    warning__isnull=True,
-                    fee__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=False,
-                    warning__isnull=True,
-                    fee__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=True,
-                    warning__isnull=False,
-                    fee__isnull=True,
-                )
-                | Q(
-                    checklist_item__isnull=True,
-                    step__isnull=True,
-                    warning__isnull=True,
-                    fee__isnull=False,
-                )
-            ),
-            name="evidence_exactly_one_owner",
-        )
-    ]
-
-    def owner(link: EvidenceLink) -> object:
-        owners = [
-            candidate
-            for candidate in (
-                link.checklist_item,
-                link.step,
-                link.warning,
-                getattr(link, "fee", None),
-            )
-            if candidate is not None
-        ]
-        if len(owners) != 1:
-            raise ValidationError("Evidence must have exactly one claim owner.")
-        return owners[0]
-
-    def owning_version(link: EvidenceLink) -> ProcedureVersion:
-        candidate = owner(link)
-        return candidate.procedure_version  # type: ignore[attr-defined,no-any-return]
-
-    def clean(link: EvidenceLink) -> None:
-        owner_ids = (
-            link.checklist_item_id,
-            link.step_id,
-            link.warning_id,
-            getattr(link, "fee_id", None),
-        )
-        if link.pk is not None:
-            stored = (
-                type(link)
-                .objects.filter(pk=link.pk)
-                .values_list("checklist_item_id", "step_id", "warning_id", "fee_id")
-                .first()
-            )
-            if stored is not None and stored != owner_ids:
-                raise ValidationError("Evidence claim ownership cannot be reassigned.")
-        if sum(value is not None for value in owner_ids) != 1:
-            raise ValidationError("Evidence must have exactly one claim owner.")
-        if (
-            link.warning_id is not None
-            and link.warning is not None
-            and link.warning.kind == Warning.Kind.PRODUCT
-        ):
-            raise ValidationError({"warning": "Product warnings cannot carry Evidence Links."})
-        if link.effective_from and link.effective_to and link.effective_from > link.effective_to:
-            raise ValidationError({"effective_to": "Effective interval is not ordered."})
-
-    EvidenceLink.owner = property(owner)  # type: ignore[assignment]
-    EvidenceLink.owning_version = owning_version  # type: ignore[assignment]
-    EvidenceLink.clean = clean  # type: ignore[assignment]
-
-
-_install_fee_evidence_owner()
 
 
 def _valid_value_shape(fee: Fee) -> bool:

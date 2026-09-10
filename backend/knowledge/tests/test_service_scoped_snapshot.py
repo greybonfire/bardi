@@ -678,6 +678,135 @@ class ServiceScopedSnapshotTests(TransactionTestCase):
 
         self._assert_full_and_scoped_failures_match()
 
+    def _assert_materializer_owner_parity(self, first: str, second: str) -> None:
+        """Persist one cross-owner link and compare real loader results/diagnostics."""
+        from knowledge.fees import Fee
+
+        _, version = self._draft_procedure(
+            self.unrelated, "scoped.owner-precedence", "Owner precedence"
+        )
+        common = {
+            "procedure_version": version,
+            "semantic_id": "owner-probe",
+            "text_ar": "فحص",
+            "text_en": "Probe",
+            "verification_state": "current",
+            "verified_on": date(2026, 8, 1),
+        }
+        point = ServicePoint.objects.create(
+            semantic_id="scoped.owner-point", name_ar="نقطة", name_en="Point"
+        )
+        material = ServicePointVersion.objects.create(
+            semantic_id="scoped.owner-material",
+            service_point=point,
+            address_ar="عنوان",
+            address_en="Address",
+            availability=ServicePointVersion.Availability.AVAILABLE,
+            effective_from=date(2026, 1, 1),
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        owners = {
+            "checklist_item": ChecklistItem(
+                **common, classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT
+            ),
+            "fee": Fee(**common, value_state="known", amount=100, currency="EGP"),
+            "warning": Warning(
+                **common,
+                kind=Warning.Kind.ADMINISTRATIVE,
+                severity=Warning.Severity.IMPORTANT,
+            ),
+            "eligibility_basis": EligibilityBasis(
+                **common,
+                reachability={},
+                qualification={"op": "eq", "fact": self.fact.key, "value": True},
+            ),
+            "procedure_dependency": ProcedureDependency(
+                **common,
+                target_procedure=self.requested_procedure,
+                relation=ProcedureDependency.Relation.BLOCKING_PREREQUISITE,
+                satisfied_when={"op": "eq", "fact": self.fact.key, "value": True},
+            ),
+            "service_point_version": material,
+            "procedure_service_point_association": ProcedureServicePointAssociation(
+                procedure_version=version,
+                semantic_id="owner-probe",
+                service_point_version=material,
+                applicability={"op": "eq", "fact": self.fact.key, "value": True},
+                effective_from=date(2026, 1, 1),
+                verification_state="current",
+                verified_on=date(2026, 8, 1),
+            ),
+        }
+        for field in (first, second):
+            owner = owners[field]
+            if owner.pk is None:
+                type(owner)._default_manager.bulk_create([owner])
+        link = EvidenceLink.objects.create(
+            **{first: owners[first]},
+            semantic_id="owner-probe-evidence",
+            passage="Probe passage",
+            location="Probe section",
+            applicability_context="Probe context",
+            support_status="supports",
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        source = self.evidence_by_service[self.unrelated.semantic_id].source_links.first()
+        assert source is not None
+        set_evidence_link_sources(link, (source.source,))
+        self._promote_corrupt_probe_version(version)
+        with self._persist_malformed_workflow_owner(
+            link, owner_field=second, owner_id=owners[second].pk
+        ):
+            try:
+                full = load_knowledge_snapshot_as_of(date(2026, 9, 1))
+            except KnowledgeSnapshotLoadError as error:
+                # Core and routing adapters choose one owner within their own family.
+                self.assertIn(first, {"fee", "service_point_version"})
+                for service in (self.requested, self.unrelated):
+                    with self.assertRaises(KnowledgeSnapshotLoadError) as scoped_error:
+                        load_consistent_service_knowledge_snapshot_as_of(
+                            service.semantic_id, date(2026, 9, 1)
+                        )
+                    self.assertEqual(
+                        error.rule_diagnostics, scoped_error.exception.rule_diagnostics
+                    )
+            else:
+                # Separate feature adapters can each consume the same malformed link.
+                self.assertNotIn(first, {"fee", "service_point_version"})
+                for service in (self.requested, self.unrelated):
+                    scoped = load_consistent_service_knowledge_snapshot_as_of(
+                        service.semantic_id, date(2026, 9, 1)
+                    )
+                    scoped_ids = {item.semantic_id for item in scoped.procedure_versions}
+                    expected = tuple(
+                        item for item in full.procedure_versions if item.semantic_id in scoped_ids
+                    )
+                    if service is self.unrelated:
+                        self.assertIn(version.semantic_id, scoped_ids)
+                    self.assertEqual(expected, scoped.procedure_versions)
+                    planning_input = PlanningInput(
+                        service.semantic_id, {self.fact.key: True}, "en", date(2026, 9, 1)
+                    )
+                    self.assertEqual(
+                        plan_stateless(full, planning_input), plan_stateless(scoped, planning_input)
+                    )
+
+    def test_multi_owner_fee_precedes_warning_in_both_loaders(self) -> None:
+        self._assert_materializer_owner_parity("fee", "warning")
+
+    def test_multi_owner_checklist_and_basis_both_receive_evidence(self) -> None:
+        self._assert_materializer_owner_parity("checklist_item", "eligibility_basis")
+
+    def test_multi_owner_basis_and_dependency_both_receive_evidence(self) -> None:
+        self._assert_materializer_owner_parity("eligibility_basis", "procedure_dependency")
+
+    def test_multi_owner_routing_association_precedes_material(self) -> None:
+        self._assert_materializer_owner_parity(
+            "service_point_version", "procedure_service_point_association"
+        )
+
     def test_validation_row_counts_preserves_repeated_history_rows(self) -> None:
         link = self.evidence_by_service[self.requested.semantic_id]
         discrepancy = open_evidence_discrepancy(

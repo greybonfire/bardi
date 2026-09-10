@@ -36,6 +36,15 @@ _OWNER_FIELDS = (
     "service_point_version",
     "procedure_service_point_association",
 )
+# These are materializer families, not the workflow's single-owner resolution order.
+# Core and routing each choose their first non-null owner; basis and dependency adapters
+# independently read their reverse relation, even when a malformed link spans families.
+_MATERIALIZER_OWNER_GROUPS = (
+    ("checklist_item", "step", "fee", "warning"),
+    ("eligibility_basis",),
+    ("procedure_dependency",),
+    ("procedure_service_point_association", "service_point_version"),
+)
 _PUBLIC_VERSION_STATES = ("published", "withdrawn")
 
 
@@ -148,28 +157,21 @@ def _load_validation_data() -> _ValidationData:
 
     evidence: dict[tuple[str, int], list[_EvidenceInfo]] = {}
     for row in link_rows:
-        owner = next(
-            (
-                (field, row[f"{field}_id"])
-                for field in _OWNER_FIELDS
-                if row[f"{field}_id"] is not None
-            ),
-            None,
+        info = _EvidenceInfo(
+            row["passage"],
+            row["location"],
+            row["applicability_context"],
+            row["support_status"],
+            row["verification_state"],
+            tuple(sources_by_link.get(row["id"], ())),
         )
-        if owner is None:
-            # The workflow adapter retains the historical owner-resolution failure.  The
-            # semantic loader itself ignored malformed orphan links unless they were used.
-            continue
-        evidence.setdefault(owner, []).append(
-            _EvidenceInfo(
-                row["passage"],
-                row["location"],
-                row["applicability_context"],
-                row["support_status"],
-                row["verification_state"],
-                tuple(sources_by_link.get(row["id"], ())),
+        for fields in _MATERIALIZER_OWNER_GROUPS:
+            owner = next(
+                ((field, row[f"{field}_id"]) for field in fields if row[f"{field}_id"] is not None),
+                None,
             )
-        )
+            if owner is not None:
+                evidence.setdefault(owner, []).append(info)
     return _ValidationData(
         fact_rows,
         definitions,

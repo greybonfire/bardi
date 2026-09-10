@@ -23,8 +23,9 @@ maintenance surface after production has become authoritative.
 
 Retire the executable `prototype/` tree from `main`.
 
-Production contracts, production tests, reviewed production data, and current evidence packs are
-the living authority. The prototype is historical research evidence only.
+Production contracts, production tests, and reviewed production data are the living authority.
+Evidence packs remain supporting research/provenance inputs. The prototype is historical research
+evidence only.
 
 The final `main` commit containing the complete executable prototype is
 `95128e22767edf8ffb9f3db838178b327b079aa0`. Git history is the canonical archive. The

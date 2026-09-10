@@ -8,7 +8,8 @@ administrative services.
 The Django/PostgreSQL backend provides environment-specific settings, Django Admin/authentication,
 deterministic planning, publication/review workflows, Django Ninja APIs, reproducible uv tooling,
 and PostgreSQL-backed checks. See [`docs/development.md`](docs/development.md) for local setup
-and validation.
+and validation. Editors should use [`docs/editorial-process.md`](docs/editorial-process.md) for the
+end-to-end authoring, review, publication, and programmatic-import workflow.
 
 ## Production design
 

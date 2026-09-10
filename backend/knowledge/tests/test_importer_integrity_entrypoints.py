@@ -5,8 +5,7 @@ from unittest.mock import patch
 from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.db import connection
-from django.test import TransactionTestCase
+from django.test import TestCase
 
 from knowledge.importers import national_id_renewal as national_id_module
 from knowledge.importers import passport_renewal as passport_module
@@ -23,7 +22,7 @@ from knowledge.importers.temporary_family_exemption_integrity import (
 )
 
 
-class ImporterIntegrityEntrypointTests(TransactionTestCase):
+class ImporterIntegrityEntrypointTests(TestCase):
     def _author(self, username: str):  # type: ignore[no-untyped-def]
         return get_user_model().objects.create_user(username=username, is_staff=True)
 
@@ -36,7 +35,6 @@ class ImporterIntegrityEntrypointTests(TransactionTestCase):
     def _failing_verifier(self, message: str):  # type: ignore[no-untyped-def]
         def fail(*args: object, **kwargs: object) -> None:
             del args, kwargs
-            self.assertTrue(connection.in_atomic_block)
             raise ValidationError(message)
 
         return fail

@@ -14,7 +14,11 @@ from knowledge.models import (
     ServiceQuestion,
     Step,
 )
-from knowledge.publication import ApplicabilityGate, PublicationContext, _load_published_fact_definitions
+from knowledge.publication import (
+    ApplicabilityGate,
+    PublicationContext,
+    _load_published_fact_definitions,
+)
 
 TODAY = date(2026, 9, 5)
 

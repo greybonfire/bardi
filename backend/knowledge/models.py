@@ -960,10 +960,14 @@ class ChecklistItem(VersionOwnedModel):
 
 class EligibilityBasisManager(models.Manager["EligibilityBasis"]):
     def get_queryset(self) -> models.QuerySet[EligibilityBasis]:
-        return super().get_queryset().order_by(
-            "procedure_version_id",
-            "display_order",
-            "semantic_id",
+        return (
+            super()
+            .get_queryset()
+            .order_by(
+                "procedure_version_id",
+                "display_order",
+                "semantic_id",
+            )
         )
 
 

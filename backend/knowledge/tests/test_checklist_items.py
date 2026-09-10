@@ -25,8 +25,11 @@ from knowledge.models import (
     Source,
 )
 from knowledge.publication import (
+    ApplicabilityGate,
+    PublicationContext,
     PublicationDiagnostic,
     PublicationRejected,
+    _load_published_fact_definitions,
     publish_procedure_version,
 )
 from knowledge.services import set_evidence_link_sources
@@ -415,3 +418,96 @@ class ChecklistPublicationConcurrencyTests(TransactionTestCase):
         self.assertEqual(evidence.passage, "Passage")
         self.assertEqual(authority.name_en, "Authority")
         self.assertEqual(document_type.name_en, "Document")
+
+
+class ChecklistApplicabilityQuestionCoverageTests(TestCase):
+    def setUp(self) -> None:
+        self.actor = get_user_model().objects.create_user(username="checklist-applicability-coverage")
+        self.service = Service.objects.create(
+            semantic_id="checklist.coverage.service",
+            text_ar="خدمة",
+            text_en="Service",
+        )
+        procedure = Procedure.objects.create(
+            semantic_id="checklist.coverage.procedure",
+            text_ar="إجراء",
+            text_en="Procedure",
+            primary_service=self.service,
+        )
+        self.version = ProcedureVersion.objects.create(
+            semantic_id="checklist.coverage.procedure.v1",
+            procedure=procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability={},
+        )
+        self.official_fact = FactDefinition.objects.create(
+            key="checklist_coverage_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        self.practical_fact = FactDefinition.objects.create(
+            key="practical_coverage_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+
+    @staticmethod
+    def rule(fact: FactDefinition) -> dict[str, object]:
+        return {"op": "eq", "fact": fact.key, "value": True}
+
+    def diagnostics(self) -> set[tuple[str, str]]:
+        context = PublicationContext(
+            self.version,
+            self.actor,
+            _load_published_fact_definitions(),
+        )
+        return {(item.code, item.detail) for item in ApplicabilityGate().validate(context)}
+
+    def test_official_checklist_requires_coverage_even_when_future_or_stale(self) -> None:
+        ChecklistItem.objects.create(
+            procedure_version=self.version,
+            semantic_id="checklist.coverage.future",
+            text_ar="متطلب",
+            text_en="Requirement",
+            classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT,
+            applicability=self.rule(self.official_fact),
+            effective_from=date(2026, 10, 5),
+            verification_state="stale",
+        )
+
+        self.assertIn(
+            ("missing_service_question", self.official_fact.key),
+            self.diagnostics(),
+        )
+
+        ServiceQuestion.objects.create(
+            semantic_id="checklist.coverage.question",
+            service=self.service,
+            fact=self.official_fact,
+            text_ar="هل؟",
+            text_en="Does it apply?",
+            priority=10,
+        )
+        self.assertNotIn(
+            ("missing_service_question", self.official_fact.key),
+            self.diagnostics(),
+        )
+
+    def test_optional_practical_preparation_does_not_require_question_coverage(self) -> None:
+        ChecklistItem.objects.create(
+            procedure_version=self.version,
+            semantic_id="checklist.coverage.practical",
+            text_ar="تحضير",
+            text_en="Preparation",
+            classification=ChecklistItem.Classification.PRACTICAL_PREPARATION,
+            applicability=self.rule(self.practical_fact),
+            verification_state="current",
+        )
+
+        self.assertNotIn(
+            ("missing_service_question", self.practical_fact.key),
+            self.diagnostics(),
+        )

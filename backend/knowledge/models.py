@@ -1340,8 +1340,7 @@ class EvidenceLink(VersionOwnedModel):
             ),
             models.UniqueConstraint(
                 fields=("procedure_service_point_association", "semantic_id"),
-                condition=Q(procedure_service_point_association__isnull=False)
-                & ~Q(semantic_id=""),
+                condition=Q(procedure_service_point_association__isnull=False) & ~Q(semantic_id=""),
                 name="unique_evidence_id_point_association_owner",
             ),
         ]

@@ -23,7 +23,13 @@ from knowledge.models import (
     Step,
     Warning,
 )
-from knowledge.publication import PublicationRejected, publish_procedure_version
+from knowledge.publication import (
+    ApplicabilityGate,
+    PublicationContext,
+    PublicationRejected,
+    _load_published_fact_definitions,
+    publish_procedure_version,
+)
 from knowledge.services import set_evidence_link_sources
 
 
@@ -227,3 +233,78 @@ class GuidancePublicationTests(TestCase):
             with self.subTest(model=model.__name__), self.assertRaises(DatabaseError):
                 with transaction.atomic():
                     model.objects.filter(pk=primary_key).update(**values)
+
+
+class StepApplicabilityQuestionCoverageTests(TestCase):
+    def setUp(self) -> None:
+        self.actor = get_user_model().objects.create_user(username="step-applicability-coverage")
+        self.service = Service.objects.create(
+            semantic_id="step.coverage.service",
+            text_ar="خدمة",
+            text_en="Service",
+        )
+        self.version_fact = FactDefinition.objects.create(
+            key="step_version_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        self.fact = FactDefinition.objects.create(
+            key="step_coverage_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        ServiceQuestion.objects.create(
+            semantic_id="step.coverage.question.version",
+            service=self.service,
+            fact=self.version_fact,
+            text_ar="هل ينطبق الإصدار؟",
+            text_en="Does this version apply?",
+            priority=1,
+        )
+        procedure = Procedure.objects.create(
+            semantic_id="step.coverage.procedure",
+            text_ar="إجراء",
+            text_en="Procedure",
+            primary_service=self.service,
+        )
+        self.version = ProcedureVersion.objects.create(
+            semantic_id="step.coverage.procedure.v1",
+            procedure=procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability={"op": "eq", "fact": self.version_fact.key, "value": True},
+        )
+
+    def diagnostics(self) -> set[tuple[str, str]]:
+        context = PublicationContext(
+            self.version,
+            self.actor,
+            _load_published_fact_definitions(),
+        )
+        return {(item.code, item.detail) for item in ApplicabilityGate().validate(context)}
+
+    def test_step_requires_coverage_even_when_future_or_stale(self) -> None:
+        Step.objects.create(
+            procedure_version=self.version,
+            semantic_id="step.coverage.future",
+            text_ar="خطوة",
+            text_en="Step",
+            phase="submit",
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+            effective_from=date(2026, 10, 5),
+            verification_state="stale",
+        )
+
+        self.assertIn(("missing_service_question", self.fact.key), self.diagnostics())
+
+        ServiceQuestion.objects.create(
+            semantic_id="step.coverage.question",
+            service=self.service,
+            fact=self.fact,
+            text_ar="هل؟",
+            text_en="Does it apply?",
+            priority=10,
+        )
+        self.assertNotIn(("missing_service_question", self.fact.key), self.diagnostics())

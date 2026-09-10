@@ -602,5 +602,252 @@ class PublicPlanningOperationTests(unittest.TestCase):
         )
 
 
+def _question_evidence(source_id: str = "question-source") -> tuple[EvidenceLinkSnapshot, ...]:
+    source = SourceSnapshot(
+        source_id,
+        AuthoritySnapshot("question-authority", LocalizedText("جهة", "Authority")),
+        "Official source",
+        "https://example.test/question-source",
+        "official",
+        date(2026, 8, 1),
+    )
+    return (
+        EvidenceLinkSnapshot(
+            "Passage",
+            "Section 1",
+            "Applies to the procedure",
+            "supports",
+            "current",
+            (source,),
+            verified_on=date(2026, 8, 1),
+        ),
+    )
+
+
+def _question(question_id: str, fact_key: str, priority: int = 10) -> QuestionSnapshot:
+    return QuestionSnapshot(
+        question_id,
+        LocalizedText("سؤال", "Question"),
+        priority,
+        fact_key,
+        (fact_key,),
+    )
+
+
+def _question_planning_snapshot(
+    *,
+    version_applicability: Predicate | None = None,
+    checklist_items: tuple[ChecklistItemSnapshot, ...] = (),
+    steps: tuple[StepSnapshot, ...] = (),
+    questions: tuple[QuestionSnapshot, ...] = (),
+) -> KnowledgeSnapshot:
+    definitions = {
+        "selected": FactDefinition("selected", "boolean"),
+        "version_applies": FactDefinition("version_applies", "boolean"),
+        "checklist_applies": FactDefinition("checklist_applies", "boolean"),
+        "step_applies": FactDefinition("step_applies", "boolean"),
+        "shared_applies": FactDefinition("shared_applies", "boolean"),
+    }
+    candidate = ProcedureCandidateSnapshot(
+        "procedure",
+        LocalizedText("إجراء", "Procedure"),
+        Predicate("eq", "selected", True),
+    )
+    service = ServiceSnapshot(
+        "service",
+        LocalizedText("خدمة", "Service"),
+        (candidate,),
+        questions,
+        (),
+        True,
+    )
+    version = ProcedureVersionSnapshot(
+        "procedure.v1",
+        "procedure",
+        LocalizedText("نسخة", "Version"),
+        version_applicability or Predicate("eq", "selected", True),
+        "v1",
+        "published",
+        None,
+        None,
+        checklist_items=checklist_items,
+        steps=steps,
+    )
+    return KnowledgeSnapshot(definitions, (service,), (version,))
+
+
+def _question_request(**facts: object) -> PlanningInput:
+    return PlanningInput("service", facts, "en", date(2026, 9, 1))
+
+
+def _question_checklist(
+    *,
+    fact_key: str = "checklist_applies",
+    classification: str = "official_requirement",
+    evidence: tuple[EvidenceLinkSnapshot, ...] | None = None,
+) -> ChecklistItemSnapshot:
+    return ChecklistItemSnapshot(
+        "requirement",
+        LocalizedText("متطلب", "Requirement"),
+        classification,
+        None,
+        1,
+        0,
+        0,
+        1,
+        Predicate("eq", fact_key, True),
+        "procedure",
+        "",
+        None,
+        None,
+        "current",
+        date(2026, 8, 1),
+        None,
+        _question_evidence("checklist-source") if evidence is None else evidence,
+    )
+
+
+def _question_step(
+    *,
+    fact_key: str = "step_applies",
+    evidence: tuple[EvidenceLinkSnapshot, ...] | None = None,
+) -> StepSnapshot:
+    return StepSnapshot(
+        "step",
+        LocalizedText("خطوة", "Step"),
+        "submit",
+        1,
+        1,
+        Predicate("eq", fact_key, True),
+        "procedure",
+        None,
+        None,
+        None,
+        "current",
+        date(2026, 8, 1),
+        None,
+        _question_evidence("step-source") if evidence is None else evidence,
+    )
+
+
+class ConsequentialQuestionTests(unittest.TestCase):
+    def test_version_applicability_question_progresses_and_fails_closed(self) -> None:
+        knowledge = _question_planning_snapshot(
+            version_applicability=Predicate("eq", "version_applies", True),
+            questions=(_question("version-question", "version_applies"),),
+        )
+
+        unanswered = plan_stateless(knowledge, _question_request(selected=True))
+        self.assertIsInstance(unanswered, NextQuestionResult)
+        assert isinstance(unanswered, NextQuestionResult)
+        self.assertEqual(unanswered.question.id, "version-question")
+
+        included = plan_stateless(
+            knowledge,
+            _question_request(selected=True, version_applies=True),
+        )
+        self.assertIsInstance(included, PlanResult)
+
+        excluded = plan_stateless(
+            knowledge,
+            _question_request(selected=True, version_applies=False),
+        )
+        self.assertEqual(excluded, InconclusiveResult("procedure_version_not_applicable"))
+
+        uncovered = replace(knowledge, services=(replace(knowledge.services[0], questions=()),))
+        invalid = plan_stateless(uncovered, _question_request(selected=True))
+        self.assertIsInstance(invalid, InvalidResult)
+        assert isinstance(invalid, InvalidResult)
+        self.assertEqual(invalid.diagnostics[0].code, "knowledge_configuration_invalid")
+
+    def test_checklist_question_is_asked_only_for_usable_official_material(self) -> None:
+        knowledge = _question_planning_snapshot(
+            checklist_items=(_question_checklist(),),
+            questions=(_question("checklist-question", "checklist_applies"),),
+        )
+
+        unanswered = plan_stateless(knowledge, _question_request(selected=True))
+        self.assertIsInstance(unanswered, NextQuestionResult)
+        assert isinstance(unanswered, NextQuestionResult)
+        self.assertEqual(unanswered.question.id, "checklist-question")
+
+        included = plan_stateless(
+            knowledge,
+            _question_request(selected=True, checklist_applies=True),
+        )
+        self.assertIsInstance(included, PlanResult)
+        assert isinstance(included, PlanResult)
+        self.assertEqual([item.id for item in included.checklist_items], ["requirement"])
+
+        excluded = plan_stateless(
+            knowledge,
+            _question_request(selected=True, checklist_applies=False),
+        )
+        self.assertIsInstance(excluded, PlanResult)
+        assert isinstance(excluded, PlanResult)
+        self.assertEqual(excluded.checklist_items, ())
+
+        unusable = _question_planning_snapshot(
+            checklist_items=(_question_checklist(evidence=()),),
+            questions=(_question("checklist-question", "checklist_applies"),),
+        )
+        self.assertEqual(
+            plan_stateless(unusable, _question_request(selected=True)),
+            InconclusiveResult("checklist_applicability_unknown"),
+        )
+
+    def test_optional_practical_preparation_unknown_does_not_block_or_ask(self) -> None:
+        knowledge = _question_planning_snapshot(
+            checklist_items=(_question_checklist(classification="practical_preparation"),),
+            questions=(_question("checklist-question", "checklist_applies"),),
+        )
+
+        result = plan_stateless(knowledge, _question_request(selected=True))
+        self.assertIsInstance(result, PlanResult)
+        assert isinstance(result, PlanResult)
+        self.assertEqual(result.checklist_items, ())
+
+    def test_step_question_and_shared_fact_progress_without_duplicate_questioning(self) -> None:
+        shared = "shared_applies"
+        knowledge = _question_planning_snapshot(
+            checklist_items=(_question_checklist(fact_key=shared),),
+            steps=(_question_step(fact_key=shared),),
+            questions=(_question("shared-question", shared),),
+        )
+
+        unanswered = plan_stateless(knowledge, _question_request(selected=True))
+        self.assertIsInstance(unanswered, NextQuestionResult)
+        assert isinstance(unanswered, NextQuestionResult)
+        self.assertEqual(unanswered.question.id, "shared-question")
+
+        answered = plan_stateless(
+            knowledge,
+            _question_request(selected=True, shared_applies=True),
+        )
+        self.assertIsInstance(answered, PlanResult)
+        assert isinstance(answered, PlanResult)
+        self.assertEqual([item.id for item in answered.checklist_items], ["requirement"])
+        self.assertEqual([item.id for item in answered.steps], ["step"])
+
+        false_answer = plan_stateless(
+            knowledge,
+            _question_request(selected=True, shared_applies=False),
+        )
+        self.assertIsInstance(false_answer, PlanResult)
+        assert isinstance(false_answer, PlanResult)
+        self.assertEqual(false_answer.checklist_items, ())
+        self.assertEqual(false_answer.steps, ())
+
+    def test_unusable_unknown_step_retains_inconclusive_fallback_instead_of_asking(self) -> None:
+        knowledge = _question_planning_snapshot(
+            steps=(_question_step(evidence=()),),
+            questions=(_question("step-question", "step_applies"),),
+        )
+        self.assertEqual(
+            plan_stateless(knowledge, _question_request(selected=True)),
+            InconclusiveResult("step_applicability_unknown"),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

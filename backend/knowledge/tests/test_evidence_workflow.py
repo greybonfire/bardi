@@ -9,7 +9,9 @@ from unittest.mock import patch
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.db import connection, transaction
 from django.test import RequestFactory, TransactionTestCase
+from django.test.utils import CaptureQueriesContext
 from planning import Predicate, PreparedFacts
 from planning.fees import select_fees
 from planning.trust import VerificationState
@@ -18,6 +20,7 @@ from knowledge.domain import load_knowledge_snapshot
 from knowledge.evidence_workflow import (
     EvidenceDiscrepancy,
     EvidenceReverificationEvent,
+    _lock_workflow_evidence,
     _overlay_item,
     _TrustOverlay,
     open_evidence_discrepancy,
@@ -26,6 +29,7 @@ from knowledge.evidence_workflow import (
 )
 from knowledge.evidence_workflow_temporal import (
     EvidenceDiscrepancyTransition,
+    _workflow_overlays_as_of,
     load_knowledge_snapshot_as_of,
 )
 from knowledge.fees import Fee
@@ -572,3 +576,96 @@ class EvidenceWorkflowTests(TransactionTestCase):
         self.assertFalse(discrepancy_admin.has_delete_permission(request))
         self.assertFalse(event_admin.has_add_permission(request))
         self.assertFalse(event_admin.has_delete_permission(request, event))
+
+    def test_open_discrepancy_survives_later_current_review(self) -> None:
+        self.publish()
+        self.open_discrepancy(
+            anchor_evidence_link=self.checklist_evidence,
+            evidence_links=(self.checklist_evidence,),
+            rationale="Keep discrepancy open while evidence is rechecked.",
+            outcome_state="disputed",
+            occurred_at=OPENED_AT,
+        )
+        reviewed_on = date(2026, 9, 6)
+        self.record_review(
+            anchor_evidence_link=self.checklist_evidence,
+            reviewed_evidence_links=(self.checklist_evidence,),
+            verification_state="current",
+            verified_on=reviewed_on,
+            reverify_on=RENEWED_DUE,
+            occurred_at=datetime(2026, 9, 6, 10, tzinfo=UTC),
+        )
+
+        owner_key = ("checklist", self.version.semantic_id, self.checklist.semantic_id)
+        overlay = _workflow_overlays_as_of(date(2026, 9, 7))[owner_key]
+
+        self.assertEqual(overlay.state, "disputed")
+        self.assertEqual(overlay.evidence_state, "current")
+        self.assertEqual(overlay.evidence_verified_on, reviewed_on)
+
+    def test_resolving_one_discrepancy_preserves_another_and_historical_open_state(self) -> None:
+        self.publish()
+        first = self.open_discrepancy(
+            anchor_evidence_link=self.checklist_evidence,
+            evidence_links=(self.checklist_evidence,),
+            rationale="First discrepancy",
+            outcome_state="needs_reverification",
+            occurred_at=OPENED_AT,
+        )
+        second = self.open_discrepancy(
+            anchor_evidence_link=self.checklist_evidence,
+            evidence_links=(self.checklist_evidence,),
+            rationale="Second discrepancy",
+            outcome_state="disputed",
+            occurred_at=datetime(2026, 9, 6, 9, tzinfo=UTC),
+        )
+        owner_key = ("checklist", self.version.semantic_id, self.checklist.semantic_id)
+
+        both_open = _workflow_overlays_as_of(date(2026, 9, 6))[owner_key]
+        self.assertEqual(both_open.state, "disputed")
+
+        self.resolve_discrepancy(
+            second,
+            outcome_state="current",
+            occurred_at=datetime(2026, 9, 7, 9, tzinfo=UTC),
+        )
+        one_open = _workflow_overlays_as_of(date(2026, 9, 7))[owner_key]
+        self.assertEqual(one_open.state, "needs_reverification")
+
+        historical = _workflow_overlays_as_of(date(2026, 9, 6))[owner_key]
+        self.assertEqual(historical.state, "disputed")
+
+        self.resolve_discrepancy(
+            first,
+            outcome_state="unknown",
+            occurred_at=datetime(2026, 9, 8, 9, tzinfo=UTC),
+        )
+        fully_resolved = _workflow_overlays_as_of(date(2026, 9, 8))[owner_key]
+        self.assertEqual(fully_resolved.state, "unknown")
+
+    def test_workflow_lock_helper_locks_all_versions_before_any_evidence(self) -> None:
+        successor = ProcedureVersion.objects.create(
+            semantic_id="workflow.procedure.v2.lock-order",
+            procedure=self.procedure,
+            text_ar="نسخة لاحقة",
+            text_en="Successor",
+            applicability=self.rule,
+        )
+
+        with transaction.atomic():
+            with CaptureQueriesContext(connection) as queries:
+                _lock_workflow_evidence(
+                    {self.checklist_evidence.pk},
+                    successor_version_id=successor.pk,
+                )
+
+        locking_sql = [query["sql"] for query in queries if "FOR UPDATE" in query["sql"].upper()]
+        version_lock_positions = [
+            index for index, sql in enumerate(locking_sql) if "knowledge_procedureversion" in sql
+        ]
+        evidence_lock_positions = [
+            index for index, sql in enumerate(locking_sql) if "knowledge_evidencelink" in sql
+        ]
+        self.assertTrue(version_lock_positions, locking_sql)
+        self.assertTrue(evidence_lock_positions, locking_sql)
+        self.assertLess(max(version_lock_positions), min(evidence_lock_positions), locking_sql)

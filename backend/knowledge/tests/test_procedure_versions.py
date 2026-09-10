@@ -21,8 +21,11 @@ from knowledge.models import (
     ServiceQuestion,
 )
 from knowledge.publication import (
+    ApplicabilityGate,
+    PublicationContext,
     PublicationDiagnostic,
     PublicationRejected,
+    _load_published_fact_definitions,
     publish_procedure_version,
     withdraw_procedure_version,
 )
@@ -377,3 +380,68 @@ class ConcurrentProcedureVersionPublicationTests(TransactionTestCase):
             ProcedureVersion.objects.filter(state=ProcedureVersion.State.DRAFT).count(), 1
         )
         self.assertEqual(ProcedureVersionAuditEvent.objects.count(), 1)
+
+
+class ProcedureVersionApplicabilityQuestionCoverageTests(TestCase):
+    def setUp(self) -> None:
+        self.actor = get_user_model().objects.create_user(username="version-applicability-coverage")
+        self.service = Service.objects.create(
+            semantic_id="version.coverage.service",
+            text_ar="خدمة",
+            text_en="Service",
+        )
+        self.other_service = Service.objects.create(
+            semantic_id="version.coverage.other-service",
+            text_ar="خدمة أخرى",
+            text_en="Other service",
+        )
+        self.fact = FactDefinition.objects.create(
+            key="version_coverage_applies",
+            kind=FactDefinition.Kind.BOOLEAN,
+            enum_values=[],
+            is_published=True,
+        )
+        procedure = Procedure.objects.create(
+            semantic_id="version.coverage.procedure",
+            text_ar="إجراء",
+            text_en="Procedure",
+            primary_service=self.service,
+        )
+        self.version = ProcedureVersion.objects.create(
+            semantic_id="version.coverage.procedure.v1",
+            procedure=procedure,
+            text_ar="نسخة",
+            text_en="Version",
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+        )
+
+    def diagnostics(self) -> set[tuple[str, str]]:
+        context = PublicationContext(
+            self.version,
+            self.actor,
+            _load_published_fact_definitions(),
+        )
+        return {(item.code, item.detail) for item in ApplicabilityGate().validate(context)}
+
+    def test_version_applicability_requires_same_service_question(self) -> None:
+        self.assertIn(("missing_service_question", self.fact.key), self.diagnostics())
+
+        ServiceQuestion.objects.create(
+            semantic_id="version.coverage.other-question",
+            service=self.other_service,
+            fact=self.fact,
+            text_ar="هل؟",
+            text_en="Does it apply?",
+            priority=10,
+        )
+        self.assertIn(("missing_service_question", self.fact.key), self.diagnostics())
+
+        ServiceQuestion.objects.create(
+            semantic_id="version.coverage.question",
+            service=self.service,
+            fact=self.fact,
+            text_ar="هل؟",
+            text_en="Does it apply?",
+            priority=10,
+        )
+        self.assertNotIn(("missing_service_question", self.fact.key), self.diagnostics())

@@ -241,6 +241,58 @@ class RoutingSelectionTests(unittest.TestCase):
             "unresolved",
         )
 
+    def test_empty_routing_after_expired_future_or_false_is_unresolved(self) -> None:
+        cases = (
+            replace(
+                self.association("expired", "point-a.v1"),
+                effective_to=TODAY - timedelta(days=1),
+            ),
+            replace(
+                self.association("future", "point-a.v1"),
+                effective_from=TODAY + timedelta(days=1),
+            ),
+            self.association("false", "point-a.v1", predicate=FALSE),
+        )
+        for association in cases:
+            with self.subTest(association=association.semantic_id):
+                snapshot, version = self.snapshot((association,))
+                result = select_service_points(
+                    snapshot,
+                    version,
+                    PreparedFacts({"route": True}, frozenset({"route"}), {}),
+                    TODAY,
+                )
+                self.assertEqual(result.status, "unresolved")
+                self.assertEqual(result.destinations, ())
+
+    def test_usable_route_plus_benign_skips_stays_resolved(self) -> None:
+        selected = self.association("selected", "point-a.v1")
+        skipped = (
+            replace(
+                self.association("expired", "point-a.v1"),
+                effective_to=TODAY - timedelta(days=1),
+            ),
+            replace(
+                self.association("future", "point-a.v1"),
+                effective_from=TODAY + timedelta(days=1),
+            ),
+            self.association("false", "point-a.v1", predicate=FALSE),
+        )
+        for association in skipped:
+            with self.subTest(association=association.semantic_id):
+                snapshot, version = self.snapshot((selected, association))
+                result = select_service_points(
+                    snapshot,
+                    version,
+                    PreparedFacts({"route": True}, frozenset({"route"}), {}),
+                    TODAY,
+                )
+                self.assertEqual(result.status, "resolved")
+                self.assertEqual(
+                    [item.association_id for item in result.destinations],
+                    ["selected"],
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

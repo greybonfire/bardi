@@ -206,4 +206,5 @@ class ProcedureServicePointAssociationInline(admin.TabularInline):  # type: igno
             return False
         return bool(obj and obj.state == ProcedureVersion.State.DRAFT)
 
+
 __all__ = ("ProcedureServicePointAssociationAdmin", "ServicePointAdmin", "ServicePointVersionAdmin")

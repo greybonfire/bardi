@@ -206,17 +206,4 @@ class ProcedureServicePointAssociationInline(admin.TabularInline):  # type: igno
             return False
         return bool(obj and obj.state == ProcedureVersion.State.DRAFT)
 
-
-def install_procedure_version_routing_inline() -> None:
-    from .admin import ProcedureVersionAdmin
-
-    if ProcedureServicePointAssociationInline not in ProcedureVersionAdmin.inlines:
-        ProcedureVersionAdmin.inlines = (
-            *ProcedureVersionAdmin.inlines,
-            ProcedureServicePointAssociationInline,
-        )  # type: ignore[assignment]
-
-
-install_procedure_version_routing_inline()
-
 __all__ = ("ProcedureServicePointAssociationAdmin", "ServicePointAdmin", "ServicePointVersionAdmin")

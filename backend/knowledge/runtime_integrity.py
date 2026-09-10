@@ -1,4 +1,4 @@
-"""Runtime integrity hooks installed after the complete knowledge model graph loads."""
+"""Runtime integrity hooks for production importer verification."""
 
 from __future__ import annotations
 
@@ -6,26 +6,7 @@ from collections.abc import Callable
 from functools import wraps
 from typing import Any, cast
 
-from django.core.exceptions import ValidationError
 from django.db import transaction
-
-from .models import EvidenceLink
-
-
-def install_evidence_identity_validation() -> None:
-    """Preserve EvidenceLink semantic-id validation after dynamic owner installers replace clean."""
-
-    current_clean = EvidenceLink.clean
-    if getattr(current_clean, "_validates_semantic_identity", False):
-        return
-
-    def clean(link: EvidenceLink) -> None:
-        current_clean(link)
-        if link.semantic_id and not link.semantic_id.strip():
-            raise ValidationError({"semantic_id": "Evidence identity cannot be whitespace."})
-
-    clean._validates_semantic_identity = True  # type: ignore[attr-defined]
-    EvidenceLink.clean = clean  # type: ignore[assignment]
 
 
 def install_passport_renewal_integrity_verification() -> None:
@@ -96,7 +77,6 @@ def install_temporary_family_exemption_integrity_verification() -> None:
 
 
 __all__ = (
-    "install_evidence_identity_validation",
     "install_national_id_renewal_integrity_verification",
     "install_passport_renewal_integrity_verification",
     "install_temporary_family_exemption_integrity_verification",

@@ -162,7 +162,7 @@ class EligibilityBasisKnowledgeTests(TestCase):
         )
         self.assertEqual(
             EligibilityBasis._meta.ordering,
-            ("procedure_version_id", "display_order", "semantic_id"),
+            ("procedure_version_id", "semantic_id"),
         )
         self.assertEqual(
             tuple(constraint.name for constraint in EligibilityBasis._meta.constraints),

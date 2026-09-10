@@ -698,4 +698,3 @@ class SafeAdminLifecycleTests(TransactionTestCase):
             "You do not have permission to perform that lifecycle action.",
             [str(message) for message in get_messages(response.wsgi_request)],
         )
-

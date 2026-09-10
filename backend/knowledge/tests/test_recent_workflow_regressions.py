@@ -166,13 +166,9 @@ class RecentWorkflowRegressionTests(TransactionTestCase):
                     successor_version_id=successor.pk,
                 )
 
-        locking_sql = [
-            query["sql"] for query in queries if "FOR UPDATE" in query["sql"].upper()
-        ]
+        locking_sql = [query["sql"] for query in queries if "FOR UPDATE" in query["sql"].upper()]
         version_lock_positions = [
-            index
-            for index, sql in enumerate(locking_sql)
-            if "knowledge_procedureversion" in sql
+            index for index, sql in enumerate(locking_sql) if "knowledge_procedureversion" in sql
         ]
         evidence_lock_positions = [
             index for index, sql in enumerate(locking_sql) if "knowledge_evidencelink" in sql

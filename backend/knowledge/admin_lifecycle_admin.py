@@ -1,8 +1,7 @@
-"""Permission-controlled Django Admin actions for the safe knowledge lifecycle."""
+"""Permission-controlled Django Admin behavior for the safe knowledge lifecycle."""
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from typing import Any, cast
 
 from django import forms
@@ -15,7 +14,6 @@ from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.template.response import TemplateResponse
 from planning.trust import VERIFICATION_CHOICES
 
-from .admin import EvidenceLinkAdmin, ProcedureVersionAdmin
 from .admin_lifecycle import clone_published_procedure_version
 from .evidence_workflow import record_evidence_reverification
 from .models import EvidenceLink, ProcedureVersion
@@ -84,175 +82,6 @@ def _validation_text(exc: ValidationError) -> str:
     return "; ".join(exc.messages)
 
 
-@admin.action(
-    description="Clone selected published versions to editable successor drafts",
-    permissions=["clone_procedureversion"],
-)
-def clone_selected_to_draft(
-    model_admin: ProcedureVersionAdmin,
-    request: HttpRequest,
-    queryset: models.QuerySet[ProcedureVersion],
-) -> None:
-    actor = cast(User, request.user)
-    for version in queryset.order_by("semantic_id"):
-        try:
-            successor = clone_published_procedure_version(version.pk, actor=actor)
-        except ValidationError as exc:
-            model_admin.message_user(
-                request,
-                f"{version.semantic_id}: {_validation_text(exc)}",
-                level=messages.ERROR,
-            )
-            continue
-        model_admin.message_user(
-            request,
-            f"{version.semantic_id}: cloned to editable draft {successor.semantic_id}.",
-            level=messages.SUCCESS,
-        )
-
-
-def has_clone_procedureversion_permission(
-    model_admin: ProcedureVersionAdmin,
-    request: HttpRequest,
-) -> bool:
-    del model_admin
-    return request.user.has_perm("knowledge.add_procedureversion") and request.user.has_perm(
-        "knowledge.change_procedureversion"
-    )
-
-
-@admin.action(
-    description="Record independent review or specialist approval",
-    permissions=["review_version"],
-)
-def approve_selected_versions(
-    model_admin: ProcedureVersionAdmin,
-    request: HttpRequest,
-    queryset: models.QuerySet[ProcedureVersion],
-) -> HttpResponse | None:
-    form = ReviewActionForm(request.POST if "apply" in request.POST else None)
-    if "apply" not in request.POST or not form.is_valid():
-        return _render_action_form(
-            model_admin,
-            request,
-            queryset,
-            title="Record Procedure Version review",
-            action_name="approve_selected_versions",
-            form=form,
-        )
-
-    actor = cast(User, request.user)
-    approval_kind, value = cast(str, form.cleaned_data["approval"]).split(":", 1)
-    for version in queryset.order_by("semantic_id"):
-        try:
-            if approval_kind == "dimension":
-                approve_review_dimension(version.pk, dimension=value, actor=actor)
-            else:
-                approve_specialist_risk(version.pk, risk_kind=value, actor=actor)
-        except ValidationError as exc:
-            model_admin.message_user(
-                request,
-                f"{version.semantic_id}: {_validation_text(exc)}",
-                level=messages.ERROR,
-            )
-            continue
-        model_admin.message_user(
-            request,
-            f"{version.semantic_id}: recorded {value} approval by {actor.get_username()}.",
-            level=messages.SUCCESS,
-        )
-    return None
-
-
-def has_review_version_permission(
-    model_admin: ProcedureVersionAdmin,
-    request: HttpRequest,
-) -> bool:
-    del model_admin
-    return request.user.has_perm(_REVIEW_PERMISSION) or any(
-        request.user.has_perm(permission) for permission in _SPECIALIST_PERMISSIONS.values()
-    )
-
-
-def _owner_key(link: EvidenceLink) -> tuple[str, int]:
-    owner = link.owner
-    if owner.pk is None:
-        raise ValidationError("Evidence owner must be saved before re-verification.")
-    return owner._meta.label_lower, owner.pk
-
-
-def _complete_owner_evidence(link: EvidenceLink) -> tuple[EvidenceLink, ...]:
-    manager = getattr(link.owner, "evidence_links", None)
-    if manager is None:
-        raise ValidationError("Evidence owner does not expose its evidence set.")
-    return tuple(manager.order_by("pk"))
-
-
-@admin.action(
-    description="Re-verify selected evidence subjects",
-    permissions=["reverify_evidence"],
-)
-def reverify_selected_evidence(
-    model_admin: EvidenceLinkAdmin,
-    request: HttpRequest,
-    queryset: models.QuerySet[EvidenceLink],
-) -> HttpResponse | None:
-    form = ReverificationActionForm(request.POST if "apply" in request.POST else None)
-    if "apply" not in request.POST or not form.is_valid():
-        return _render_action_form(
-            model_admin,
-            request,
-            queryset,
-            title="Record evidence re-verification",
-            action_name="reverify_selected_evidence",
-            form=form,
-        )
-
-    actor = cast(User, request.user)
-    seen: set[tuple[str, int]] = set()
-    for link in queryset.order_by("pk"):
-        try:
-            key = _owner_key(link)
-            if key in seen:
-                continue
-            seen.add(key)
-            reviewed = _complete_owner_evidence(link)
-            record_evidence_reverification(
-                anchor_evidence_link=link,
-                reviewed_evidence_links=reviewed,
-                verification_state=cast(Any, form.cleaned_data["verification_state"]),
-                verified_on=form.cleaned_data["verified_on"],
-                reverify_on=form.cleaned_data["reverify_on"],
-                rationale=form.cleaned_data["rationale"],
-                actor=actor,
-            )
-        except ValidationError as exc:
-            model_admin.message_user(
-                request,
-                f"{link.owner}: {_validation_text(exc)}",
-                level=messages.ERROR,
-            )
-            continue
-        model_admin.message_user(
-            request,
-            f"{link.owner}: re-verification recorded by {actor.get_username()}.",
-            level=messages.SUCCESS,
-        )
-    return None
-
-
-def has_reverify_evidence_permission(
-    model_admin: EvidenceLinkAdmin,
-    request: HttpRequest,
-) -> bool:
-    del model_admin
-    return request.user.has_perm(_REVERIFY_PERMISSION)
-
-
-def _append_actions(existing: Iterable[str], *names: str) -> tuple[str, ...]:
-    return tuple(dict.fromkeys((*existing, *names)))
-
-
 def _reject_unavailable_action(
     model_admin: admin.ModelAdmin[Any],
     request: HttpRequest,
@@ -271,70 +100,188 @@ def _reject_unavailable_action(
     return HttpResponseRedirect(request.path)
 
 
-_original_procedure_version_changelist_view = ProcedureVersionAdmin.changelist_view
-
-
-def procedure_version_changelist_view(
-    model_admin: ProcedureVersionAdmin,
-    request: HttpRequest,
-    extra_context: dict[str, Any] | None = None,
-) -> HttpResponse:
-    rejected = _reject_unavailable_action(
-        model_admin,
-        request,
-        frozenset({"clone_selected_to_draft", "approve_selected_versions"}),
+class ProcedureVersionLifecycleAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    @admin.action(
+        description="Clone selected published versions to editable successor drafts",
+        permissions=["clone_procedureversion"],
     )
-    if rejected is not None:
-        return rejected
-    return _original_procedure_version_changelist_view(model_admin, request, extra_context)
+    def clone_selected_to_draft(
+        self,
+        request: HttpRequest,
+        queryset: models.QuerySet[ProcedureVersion],
+    ) -> None:
+        actor = cast(User, request.user)
+        for version in queryset.order_by("semantic_id"):
+            try:
+                successor = clone_published_procedure_version(version.pk, actor=actor)
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"{version.semantic_id}: {_validation_text(exc)}",
+                    level=messages.ERROR,
+                )
+                continue
+            self.message_user(
+                request,
+                f"{version.semantic_id}: cloned to editable draft {successor.semantic_id}.",
+                level=messages.SUCCESS,
+            )
 
+    def has_clone_procedureversion_permission(self, request: HttpRequest) -> bool:
+        return request.user.has_perm("knowledge.add_procedureversion") and request.user.has_perm(
+            "knowledge.change_procedureversion"
+        )
 
-_original_evidence_link_changelist_view = EvidenceLinkAdmin.changelist_view
-
-
-def evidence_link_changelist_view(
-    model_admin: EvidenceLinkAdmin,
-    request: HttpRequest,
-    extra_context: dict[str, Any] | None = None,
-) -> HttpResponse:
-    rejected = _reject_unavailable_action(
-        model_admin,
-        request,
-        frozenset({"reverify_selected_evidence"}),
+    @admin.action(
+        description="Record independent review or specialist approval",
+        permissions=["review_version"],
     )
-    if rejected is not None:
-        return rejected
-    return _original_evidence_link_changelist_view(model_admin, request, extra_context)
+    def approve_selected_versions(
+        self,
+        request: HttpRequest,
+        queryset: models.QuerySet[ProcedureVersion],
+    ) -> HttpResponse | None:
+        form = ReviewActionForm(request.POST if "apply" in request.POST else None)
+        if "apply" not in request.POST or not form.is_valid():
+            return _render_action_form(
+                self,
+                request,
+                queryset,
+                title="Record Procedure Version review",
+                action_name="approve_selected_versions",
+                form=form,
+            )
+
+        actor = cast(User, request.user)
+        approval_kind, value = cast(str, form.cleaned_data["approval"]).split(":", 1)
+        for version in queryset.order_by("semantic_id"):
+            try:
+                if approval_kind == "dimension":
+                    approve_review_dimension(version.pk, dimension=value, actor=actor)
+                else:
+                    approve_specialist_risk(version.pk, risk_kind=value, actor=actor)
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"{version.semantic_id}: {_validation_text(exc)}",
+                    level=messages.ERROR,
+                )
+                continue
+            self.message_user(
+                request,
+                f"{version.semantic_id}: recorded {value} approval by {actor.get_username()}.",
+                level=messages.SUCCESS,
+            )
+        return None
+
+    def has_review_version_permission(self, request: HttpRequest) -> bool:
+        return request.user.has_perm(_REVIEW_PERMISSION) or any(
+            request.user.has_perm(permission) for permission in _SPECIALIST_PERMISSIONS.values()
+        )
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        rejected = _reject_unavailable_action(
+            self,
+            request,
+            frozenset({"clone_selected_to_draft", "approve_selected_versions"}),
+        )
+        if rejected is not None:
+            return rejected
+        return super().changelist_view(request, extra_context)
 
 
-_procedure_version_admin = cast(Any, ProcedureVersionAdmin)
-_procedure_version_admin.clone_selected_to_draft = clone_selected_to_draft
-_procedure_version_admin.has_clone_procedureversion_permission = (
-    has_clone_procedureversion_permission
-)
-_procedure_version_admin.approve_selected_versions = approve_selected_versions
-_procedure_version_admin.has_review_version_permission = has_review_version_permission
-_procedure_version_admin.changelist_view = procedure_version_changelist_view
-_procedure_version_admin.actions = _append_actions(
-    getattr(_procedure_version_admin, "actions", ()),
-    "clone_selected_to_draft",
-    "approve_selected_versions",
-)
+def _owner_key(link: EvidenceLink) -> tuple[str, int]:
+    owner = link.owner
+    if owner.pk is None:
+        raise ValidationError("Evidence owner must be saved before re-verification.")
+    return owner._meta.label_lower, owner.pk
 
-_evidence_link_admin = cast(Any, EvidenceLinkAdmin)
-_evidence_link_admin.reverify_selected_evidence = reverify_selected_evidence
-_evidence_link_admin.has_reverify_evidence_permission = has_reverify_evidence_permission
-_evidence_link_admin.changelist_view = evidence_link_changelist_view
-_evidence_link_admin.actions = _append_actions(
-    getattr(_evidence_link_admin, "actions", ()),
-    "reverify_selected_evidence",
-)
+
+def _complete_owner_evidence(link: EvidenceLink) -> tuple[EvidenceLink, ...]:
+    manager = getattr(link.owner, "evidence_links", None)
+    if manager is None:
+        raise ValidationError("Evidence owner does not expose its evidence set.")
+    return tuple(manager.order_by("pk"))
+
+
+class EvidenceLinkLifecycleAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
+    @admin.action(
+        description="Re-verify selected evidence subjects",
+        permissions=["reverify_evidence"],
+    )
+    def reverify_selected_evidence(
+        self,
+        request: HttpRequest,
+        queryset: models.QuerySet[EvidenceLink],
+    ) -> HttpResponse | None:
+        form = ReverificationActionForm(request.POST if "apply" in request.POST else None)
+        if "apply" not in request.POST or not form.is_valid():
+            return _render_action_form(
+                self,
+                request,
+                queryset,
+                title="Record evidence re-verification",
+                action_name="reverify_selected_evidence",
+                form=form,
+            )
+
+        actor = cast(User, request.user)
+        seen: set[tuple[str, int]] = set()
+        for link in queryset.order_by("pk"):
+            try:
+                key = _owner_key(link)
+                if key in seen:
+                    continue
+                seen.add(key)
+                reviewed = _complete_owner_evidence(link)
+                record_evidence_reverification(
+                    anchor_evidence_link=link,
+                    reviewed_evidence_links=reviewed,
+                    verification_state=cast(Any, form.cleaned_data["verification_state"]),
+                    verified_on=form.cleaned_data["verified_on"],
+                    reverify_on=form.cleaned_data["reverify_on"],
+                    rationale=form.cleaned_data["rationale"],
+                    actor=actor,
+                )
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"{link.owner}: {_validation_text(exc)}",
+                    level=messages.ERROR,
+                )
+                continue
+            self.message_user(
+                request,
+                f"{link.owner}: re-verification recorded by {actor.get_username()}.",
+                level=messages.SUCCESS,
+            )
+        return None
+
+    def has_reverify_evidence_permission(self, request: HttpRequest) -> bool:
+        return request.user.has_perm(_REVERIFY_PERMISSION)
+
+    def changelist_view(
+        self,
+        request: HttpRequest,
+        extra_context: dict[str, Any] | None = None,
+    ) -> HttpResponse:
+        rejected = _reject_unavailable_action(
+            self,
+            request,
+            frozenset({"reverify_selected_evidence"}),
+        )
+        if rejected is not None:
+            return rejected
+        return super().changelist_view(request, extra_context)
 
 
 __all__ = (
+    "EvidenceLinkLifecycleAdmin",
+    "ProcedureVersionLifecycleAdmin",
     "ReviewActionForm",
     "ReverificationActionForm",
-    "approve_selected_versions",
-    "clone_selected_to_draft",
-    "reverify_selected_evidence",
 )

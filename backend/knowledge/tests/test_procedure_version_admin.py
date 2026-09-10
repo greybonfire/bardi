@@ -340,6 +340,10 @@ class GuidanceAdminTests(TestCase):
         basis_admin = AuthoredEligibilityBasisAdmin(EligibilityBasis, admin.site)
 
         self.assertEqual(
+            basis_admin.get_ordering(self.request),
+            ("procedure_version_id", "display_order", "semantic_id"),
+        )
+        self.assertEqual(
             list(
                 basis_admin.get_queryset(self.request)
                 .filter(pk__in=(first.pk, second.pk))

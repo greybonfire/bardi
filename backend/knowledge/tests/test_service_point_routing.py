@@ -117,6 +117,12 @@ class ServicePointRoutingTests(RoutingFixtureMixin, TestCase):
     def setUp(self) -> None:
         self.build()
 
+    def test_service_point_material_start_contract_is_declared_on_model(self) -> None:
+        field = ServicePointVersion._meta.get_field("effective_from")
+        self.assertFalse(field.null)
+        self.assertFalse(field.blank)
+        self.assertEqual(ServicePointVersion.clean.__module__, "knowledge.service_point_routing")
+
     def test_validation_owner_union_admin_and_detached_loading(self) -> None:
         invalid = ProcedureServicePointAssociation(
             procedure_version=self.version,

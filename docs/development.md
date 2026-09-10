@@ -3,10 +3,9 @@
 The production backend scaffold uses Python 3.14 or newer, [uv](https://docs.astral.sh/uv/),
 Docker, and Docker Compose. PostgreSQL is required; there is no SQLite fallback.
 
-Python 3.14 is the supported production-development baseline: local development, production
-CI, and the eventual deployed backend should use the same runtime family. The frozen
-prototype keeps its historical 3.11–3.13 CI matrix and does not define the production
-runtime.
+Python 3.14 is the supported production-development baseline: local development, CI, and the
+eventual deployed backend should use the same runtime family. The retired research prototype is
+preserved in Git history and is not part of the supported development or CI surface.
 
 ## Setup
 
@@ -150,22 +149,19 @@ The broader production scaffold checks are:
 uv run ruff check backend
 uv run ruff format --check backend
 uv run mypy backend
-uv run python -m compileall -q backend prototype
+uv run python -m compileall -q backend
 uv run python backend/manage.py check --settings=bardi.settings.development
 uv run python backend/manage.py makemigrations --check --dry-run --settings=bardi.settings.test
 uv run python backend/manage.py migrate --noinput --settings=bardi.settings.test
 uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 (cd backend && uv run python manage.py test --settings=bardi.settings.test --noinput)
-python -m unittest discover -s prototype/tests -v
 ```
 
 Django test discovery intentionally runs without an app label **from the `backend/`
 directory** so it discovers the current tests and automatically includes future production
 apps. Procedure-Version tests require PostgreSQL: migrations install `btree_gist`, an
 inclusive-range exclusion constraint, and lifecycle immutability triggers. Concurrency tests
-must use separate database connections; SQLite is not a supported substitute. The prototype
-commands are retained as frozen reference coverage and are intentionally not included in the
-production Ruff or Mypy scope.
+must use separate database connections; SQLite is not a supported substitute.
 
 ## Service-scoped loader measurement
 

@@ -29,6 +29,7 @@ from `main` after production parity was established. The final `main` commit con
 complete executable prototype is `95128e22767edf8ffb9f3db838178b327b079aa0`; Git history is
 the canonical archive.
 
-The retained [prototype capability report](docs/prototype-capability-report.md), evidence packs,
+The retained [prototype capability report](docs/prototype-capability-report.md),
+[evidence packs](docs/evidence-packs/README.md),
 and historical ADRs document what the research phase proved and what remained unsupported.
 See [ADR 0018](docs/adr/0018-retire-research-prototype.md) for the retirement decision.

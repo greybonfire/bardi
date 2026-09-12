@@ -1,5 +1,9 @@
 # Ordinary domestic passport renewal evidence pack
 
+> Successor research (2026-09-12): see the [passport and National ID suite](../passport-national-id-suite/README.md)
+> and its [discrepancy register](../passport-national-id-suite/claims.md). This file remains a historical snapshot. The old
+> `PPAr.htm` locator currently serves a privacy policy; use the reviewed successor-source workflow, not an in-place historical rewrite.
+
 Issue: #2  
 Parent spec: #1  
 Research snapshot: 2026-08-25  

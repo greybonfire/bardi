@@ -1,5 +1,9 @@
 # Passport renewal sources and Evidence Links
 
+> Successor research (2026-09-12): see the [passport and National ID suite](../passport-national-id-suite/README.md)
+> and its [discrepancy register](../passport-national-id-suite/claims.md). This file remains a historical snapshot. The old
+> `PPAr.htm` locator currently serves a privacy policy; use the reviewed successor-source workflow, not an in-place historical rewrite.
+
 Research snapshot: 2026-08-25
 
 This file preserves the research provenance used by the ordinary domestic passport-renewal evidence pack. The pack prefers current first-party Ministry of Interior material. Older government pages and low-context web reports are retained only to expose temporal conflicts or research leads.

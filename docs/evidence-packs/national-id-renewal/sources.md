@@ -1,5 +1,8 @@
 # National ID renewal Sources and Evidence Links
 
+> Successor research (2026-09-12): see the [passport and National ID suite](../passport-national-id-suite/README.md)
+> and its [discrepancy register](../passport-national-id-suite/claims.md). This file remains a historical snapshot.
+
 Research snapshot: 2026-08-26
 
 This file preserves claim-level research provenance for `ordinary_domestic_national_id_renewal`. Sources are reusable records; Evidence Links state how a material administrative claim relies on a Source. Internal discrepancy notes are intentionally small and are not public-plan content.

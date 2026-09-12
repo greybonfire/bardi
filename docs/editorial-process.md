@@ -71,6 +71,10 @@ draft. One eligible reviewer may approve several ordinary dimensions.
 
 ## 3. Before entering data
 
+The [passport and National ID suite](evidence-packs/passport-national-id-suite/README.md)
+provides a production-oriented research example with claim-level evidence, unresolved gaps,
+and bounded implementation tasks. Its draft status does not satisfy the review gates below.
+
 Do the research first. Editorial data entry should transcribe an evidence-backed understanding,
 not become the place where unsupported assumptions are invented.
 

@@ -22,6 +22,12 @@ application interface and a separate Next.js web application. The planning engin
 component behind the Django application layer. The public API contract is documented in
 [`docs/api/v1.md`](docs/api/v1.md).
 
+## Current service research
+
+The [passport and National ID suite](docs/evidence-packs/passport-national-id-suite/README.md)
+catalogs transaction families, source-backed claims, unresolved guidance, and bounded production
+implementation tasks. It is a research draft, not approval to publish new services.
+
 ## Research history
 
 The framework-independent research prototype completed its pressure-test role and was retired

@@ -1,5 +1,8 @@
 # Ordinary domestic National ID renewal evidence pack
 
+> Successor research (2026-09-12): see the [passport and National ID suite](../passport-national-id-suite/README.md)
+> and its [discrepancy register](../passport-national-id-suite/claims.md). This file remains a historical snapshot.
+
 Issue: #3  
 Parent spec: #1  
 Research snapshot: 2026-08-26  

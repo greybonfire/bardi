@@ -7,8 +7,7 @@ one-way and are projected onto detached planning snapshots as trust/freshness ov
 from __future__ import annotations
 
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
-from datetime import date, datetime
+from datetime import date
 from typing import Any, cast
 
 from django.conf import settings
@@ -18,7 +17,6 @@ from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
-from planning.catalog import KnowledgeSnapshot
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
 from .models import EvidenceLink, ProcedureVersion, _required
@@ -574,131 +572,6 @@ class EvidenceWorkflowPublicationGate:
                     )
                 )
         return failures
-
-
-@dataclass(slots=True)
-class _TrustOverlay:
-    state: VerificationState | None = None
-    owner_verified_on: date | None = None
-    reverify_on: date | None = None
-    reverify_seen: bool = False
-    evidence_state: VerificationState | None = None
-    evidence_verified_on: date | None = None
-    evidence_reverify_on: date | None = None
-
-
-def _max_date(left: date | None, right: date | None) -> date | None:
-    if left is None:
-        return right
-    if right is None:
-        return left
-    return max(left, right)
-
-
-def _workflow_overlays() -> dict[tuple[str, str, str], _TrustOverlay]:
-    timeline: list[tuple[datetime, int, int, str, object]] = []
-    for discrepancy_row in EvidenceDiscrepancy.objects.select_related(
-        "anchor_evidence_link"
-    ).order_by("pk"):
-        occurred = (
-            discrepancy_row.resolved_at
-            if discrepancy_row.status == EvidenceDiscrepancy.Status.RESOLVED
-            else discrepancy_row.created_at
-        )
-        if occurred is not None:
-            timeline.append((occurred, 0, discrepancy_row.pk, "discrepancy", discrepancy_row))
-    for review_row in (
-        EvidenceReverificationEvent.objects.filter(meaning_changed=False)
-        .select_related("anchor_evidence_link")
-        .order_by("pk")
-    ):
-        timeline.append((review_row.occurred_at, 1, review_row.pk, "reverification", review_row))
-
-    overlays: dict[tuple[str, str, str], _TrustOverlay] = {}
-    for occurred, _, _, kind, raw in sorted(timeline, key=lambda item: item[:3]):
-        if kind == "discrepancy":
-            discrepancy = cast(EvidenceDiscrepancy, raw)
-            key = _owner_key(discrepancy.anchor_evidence_link)
-            overlay = overlays.setdefault(key, _TrustOverlay())
-            overlay.state = cast(VerificationState, discrepancy.outcome_state)
-            overlay.owner_verified_on = _max_date(overlay.owner_verified_on, occurred.date())
-        else:
-            review = cast(EvidenceReverificationEvent, raw)
-            key = _owner_key(review.anchor_evidence_link)
-            overlay = overlays.setdefault(key, _TrustOverlay())
-            established_on = max(review.verified_on, occurred.date())
-            overlay.state = cast(VerificationState, review.verification_state)
-            overlay.owner_verified_on = established_on
-            overlay.reverify_on = review.reverify_on
-            overlay.reverify_seen = True
-            overlay.evidence_state = cast(VerificationState, review.verification_state)
-            overlay.evidence_verified_on = established_on
-            overlay.evidence_reverify_on = review.reverify_on
-    return overlays
-
-
-def _overlay_item(item: Any, overlay: _TrustOverlay) -> Any:
-    links = item.evidence_links
-    if overlay.evidence_state is not None:
-        links = tuple(
-            replace(
-                link,
-                verification_state=overlay.evidence_state,
-                verified_on=overlay.evidence_verified_on,
-                reverify_on=overlay.evidence_reverify_on,
-            )
-            for link in links
-        )
-    return replace(
-        item,
-        verification_state=overlay.state or item.verification_state,
-        verified_on=_max_date(item.verified_on, overlay.owner_verified_on),
-        reverify_on=overlay.reverify_on if overlay.reverify_seen else item.reverify_on,
-        evidence_links=links,
-    )
-
-
-def _apply_workflow_overlays(snapshot: KnowledgeSnapshot) -> KnowledgeSnapshot:
-    overlays = _workflow_overlays()
-    if not overlays:
-        return snapshot
-
-    def version_items(version: Any, attribute: str, kind: str) -> tuple[Any, ...]:
-        return tuple(
-            _overlay_item(item, overlays[(kind, version.semantic_id, item.semantic_id)])
-            if (kind, version.semantic_id, item.semantic_id) in overlays
-            else item
-            for item in getattr(version, attribute)
-        )
-
-    versions = tuple(
-        replace(
-            version,
-            checklist_items=version_items(version, "checklist_items", "checklist"),
-            eligibility_bases=version_items(version, "eligibility_bases", "eligibility_basis"),
-            steps=version_items(version, "steps", "step"),
-            warnings=version_items(version, "warnings", "warning"),
-            fees=version_items(version, "fees", "fee"),
-            dependencies=version_items(version, "dependencies", "procedure_dependency"),
-            service_point_associations=version_items(
-                version,
-                "service_point_associations",
-                "procedure_service_point_association",
-            ),
-        )
-        for version in snapshot.procedure_versions
-    )
-    service_point_versions = tuple(
-        _overlay_item(item, overlays[("service_point_version", "", item.semantic_id)])
-        if ("service_point_version", "", item.semantic_id) in overlays
-        else item
-        for item in snapshot.service_point_versions
-    )
-    return replace(
-        snapshot,
-        procedure_versions=versions,
-        service_point_versions=service_point_versions,
-    )
 
 
 __all__ = (

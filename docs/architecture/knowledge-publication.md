@@ -46,6 +46,37 @@ global validation-only reads; Service DTOs, graph features, and as-of workflow o
 scoped. Both consistent loaders reject an already-open transaction and establish an outermost
 PostgreSQL `REPEATABLE READ, READ ONLY` transaction before any discovery or materialization.
 
+### Shared request-time validation policy
+
+`knowledge.snapshot_policy` owns the request-time decisions for the four existing stages:
+core material, Eligibility Bases, Procedure Dependencies, and Service Point routing. Its
+validators accept captured, typed plain rows, explicit Fact definitions, and lightweight
+Evidence Link summaries. They return decoded rules keyed by structural identity or raise
+`KnowledgeSnapshotLoadError`, still available from `knowledge.domain`. Diagnostic owner text
+is not an identity key; owner sorting and same-owner diagnostic order remain unchanged.
+
+The full materializers validate their existing captured rows before constructing each stage's
+claim DTOs. `knowledge.snapshot_validation` retains global scalar acquisition for scoped
+loads, calling the same policy. This shares decision trees, not read strategies: scoped loads
+intentionally repeat selected checks after global validation. Neither path adds a global
+preflight to full loading or changes transaction policy. Stage order remains core → Bases →
+Dependencies → routing, with failure in one stage preventing later stages from running.
+
+Core and routing Evidence Link owner precedence remain distinct; Basis and dependency reverse
+relations remain independent. Workflow owner resolution and temporal overlays stay outside
+this policy, as do publication-only gates. Preserved legacy edge cases are tracked separately
+in [`../operations/snapshot-validation-follow-ups.md`](../operations/snapshot-validation-follow-ups.md).
+
+The policy interfaces have database-free tests:
+
+```bash
+(cd backend && uv run python -m unittest \
+  knowledge.tests.test_snapshot_policy knowledge.tests.test_snapshot_feature_policy -v)
+```
+
+Loader tests continue to cover PostgreSQL acquisition, global fail-closed behavior, scoped
+graphs, detached DTOs, transaction isolation, historical overlays, and exact diagnostics.
+
 ## Implementation status: issue #40
 
 Checklist provenance is implemented relationally: Authorities, Document Types, and preserved

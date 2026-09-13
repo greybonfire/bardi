@@ -22,10 +22,9 @@ from planning.catalog import (
     ServicePointVersionSnapshot,
     SourceSnapshot,
 )
-from planning.diagnostics import ValidationDiagnostic
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
-from .domain import KnowledgeSnapshotLoadError, StoredRuleLoadDiagnostic, decode_stored_rule
+from .domain import decode_stored_rule
 from .models import (
     NONBLANK_PATTERN,
     Authority,
@@ -37,6 +36,16 @@ from .models import (
     _required,
 )
 from .publication import PublicationContext, PublicationDiagnostic
+from .snapshot_policy import (
+    AssociationRow,
+    EvidenceInfo,
+    EvidenceRow,
+    EvidenceSourceRow,
+    MaterialRow,
+    routing_evidence_owner,
+    summarize_evidence_rows,
+    validate_routing,
+)
 
 
 class ServicePoint(models.Model):
@@ -502,30 +511,6 @@ def _source_snapshot(row: dict[str, Any]) -> SourceSnapshot:
     )
 
 
-def _snapshot_evidence_is_adequate(links: tuple[EvidenceLinkSnapshot, ...]) -> bool:
-    adequate = False
-    for link in links:
-        if (
-            not link.passage.strip()
-            or not link.location.strip()
-            or not link.applicability_context.strip()
-        ):
-            return False
-        for source in link.sources:
-            if source.classification == Source.Classification.FIELD_REPORT and (
-                source.observation_date is None or not source.observation_context.strip()
-            ):
-                return False
-        if link.verification_state == "current" and link.support_status == "contradicts":
-            return False
-        adequate |= (
-            link.verification_state == "current"
-            and link.support_status == "supports"
-            and bool(link.sources)
-        )
-    return adequate
-
-
 def _routing_snapshots(
     snapshot: KnowledgeSnapshot, *, scope: Any | None = None
 ) -> KnowledgeSnapshot:
@@ -627,6 +612,29 @@ def _routing_snapshots(
             )
         ),
     )
+    summaries = summarize_evidence_rows(
+        cast(list[EvidenceRow], evidence), cast(list[EvidenceSourceRow], source_rows)
+    )
+    routing_evidence: dict[tuple[str, int], list[EvidenceInfo]] = defaultdict(list)
+    evidence_owners: dict[int, tuple[str, int]] = {}
+    for row in evidence:
+        owner = routing_evidence_owner(row)
+        if owner is not None:
+            # Preserve the full loader's legacy truthy-ID fallback after choosing
+            # the family. Scalar indexing historically uses the non-null ID instead.
+            owner = (
+                owner[0],
+                row["procedure_service_point_association_id"] or row["service_point_version_id"],
+            )
+            evidence_owners[row["id"]] = owner
+            routing_evidence[owner].append(summaries[row["id"]])
+    predicates = validate_routing(
+        cast(list[AssociationRow], associations),
+        cast(list[MaterialRow], materials),
+        snapshot.fact_definitions,
+        {owner: tuple(links) for owner, links in routing_evidence.items()},
+    )
+
     sources: dict[int, list[SourceSnapshot]] = defaultdict(list)
     for row in source_rows:
         sources[row["evidence_link_id"]].append(_source_snapshot(row))
@@ -647,37 +655,17 @@ def _routing_snapshots(
             row["reverify_on"],
             semantic_id=row["semantic_id"],
         )
-        target = (
-            evidence_assoc
-            if row["procedure_service_point_association_id"] is not None
-            else evidence_material
-        )
-        target[
-            row["procedure_service_point_association_id"] or row["service_point_version_id"]
-        ].append(link)
-    failures: list[StoredRuleLoadDiagnostic] = []
+        owner = evidence_owners.get(row["id"])
+        if owner is not None:
+            target = (
+                evidence_assoc
+                if owner[0] == "procedure_service_point_association"
+                else evidence_material
+            )
+            target[owner[1]].append(link)
     by_version: dict[str, list[ProcedureServicePointAssociationSnapshot]] = defaultdict(list)
     for row in associations:
-        decoded = decode_stored_rule(row["applicability"], snapshot.fact_definitions)
         links = tuple(evidence_assoc[row["id"]])
-        if (
-            decoded.predicate is None
-            or not links
-            or any(not link.sources for link in links)
-            or (
-                row["verification_state"] == "current" and not _snapshot_evidence_is_adequate(links)
-            )
-        ):
-            diagnostics = decoded.diagnostics or (
-                ValidationDiagnostic("invalid_routing_evidence", ("evidence",)),
-            )
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"service_point_association:{row['procedure_version__semantic_id']}:{row['semantic_id']}",
-                    diagnostics,
-                )
-            )
-            continue
         by_version[row["procedure_version__semantic_id"]].append(
             ProcedureServicePointAssociationSnapshot(
                 row["semantic_id"],
@@ -689,7 +677,7 @@ def _routing_snapshots(
                     ),
                     "",
                 ),
-                decoded.predicate,
+                predicates.associations[row["id"]],
                 row["effective_from"],
                 row["effective_to"],
                 cast(VerificationState, row["verification_state"]),
@@ -702,23 +690,6 @@ def _routing_snapshots(
     point_snapshots: dict[str, ServicePointSnapshot] = {}
     for row in materials:
         links = tuple(evidence_material[row["id"]])
-        if (
-            not row["address_ar"].strip()
-            or not row["address_en"].strip()
-            or row["availability"] not in ServicePointVersion.Availability.values
-            or not links
-            or any(not link.sources for link in links)
-            or (
-                row["verification_state"] == "current" and not _snapshot_evidence_is_adequate(links)
-            )
-        ):
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"service_point_version:{row['semantic_id']}",
-                    (ValidationDiagnostic("invalid_service_point_material", ()),),
-                )
-            )
-            continue
         point_snapshots[row["service_point__semantic_id"]] = ServicePointSnapshot(
             row["service_point__semantic_id"],
             LocalizedText(row["service_point__name_ar"], row["service_point__name_en"]),
@@ -737,8 +708,6 @@ def _routing_snapshots(
                 links,
             )
         )
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
     return KnowledgeSnapshot(
         snapshot.fact_definitions,
         snapshot.services,

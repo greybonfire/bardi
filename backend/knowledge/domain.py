@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
 from datetime import date
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, cast
@@ -26,11 +25,28 @@ from planning.catalog import (
     StepSnapshot,
     WarningSnapshot,
 )
-from planning.diagnostics import ValidationDiagnostic
 from planning.facts import FACT_DEFINITIONS, FactKind
 from planning.facts import FactDefinition as DomainFactDefinition
 from planning.rules import Predicate, RuleValidationResult, validate_rule_v1
 from planning.trust import VerificationState
+
+from .snapshot_policy import (
+    CandidateRow,
+    ClaimRow,
+    ContradictionRow,
+    CoreInputs,
+    EvidenceInfo,
+    FeeRow,
+    QuestionRow,
+    ServiceRow,
+    StepRow,
+    VersionRow,
+    WarningRow,
+    core_evidence_owner,
+    validate_core,
+)
+from .snapshot_policy import KnowledgeSnapshotLoadError as KnowledgeSnapshotLoadError
+from .snapshot_policy import StoredRuleLoadDiagnostic as StoredRuleLoadDiagnostic
 
 if TYPE_CHECKING:
     from .models import FactDefinition
@@ -95,25 +111,6 @@ def diagnostic_messages(result: RuleValidationResult) -> list[str]:
         f"{diagnostic.code} at {'.'.join(str(part) for part in diagnostic.path)}"
         for diagnostic in result.diagnostics
     ]
-
-
-@dataclass(frozen=True, slots=True)
-class StoredRuleLoadDiagnostic:
-    owner_id: str
-    diagnostics: tuple[ValidationDiagnostic, ...]
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "diagnostics", tuple(self.diagnostics))
-
-
-class KnowledgeSnapshotLoadError(Exception):
-    """A deterministic failure to decode one or more persisted catalog rules."""
-
-    def __init__(self, rule_diagnostics: Iterable[StoredRuleLoadDiagnostic]) -> None:
-        ordered = tuple(sorted(rule_diagnostics, key=lambda item: item.owner_id))
-        self.rule_diagnostics = ordered
-        self.owner_ids = tuple(item.owner_id for item in ordered)
-        super().__init__(", ".join(self.owner_ids))
 
 
 def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeSnapshot:
@@ -409,7 +406,6 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
     published_definitions = MappingProxyType(
         {row.key: to_domain_fact(row) for row in fact_rows if row.is_published}
     )
-    active_service_ids = {row["semantic_id"] for row in service_rows if row["is_active"]}
     question_links: dict[str, list[str]] = defaultdict(list)
     for question_link_row in question_link_rows:
         question_links[question_link_row["question__semantic_id"]].append(
@@ -455,19 +451,7 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
     evidence_by_owner: dict[tuple[str, int], list[EvidenceLinkSnapshot]] = defaultdict(list)
     for evidence_row in cast(list[dict[str, Any]], evidence_rows):
         sources = tuple(evidence_sources[evidence_row["id"]])
-        evidence_owner = next(
-            (
-                (kind, evidence_row[field])
-                for kind, field in (
-                    ("checklist", "checklist_item_id"),
-                    ("step", "step_id"),
-                    ("fee", "fee_id"),
-                    ("warning", "warning_id"),
-                )
-                if evidence_row[field] is not None
-            ),
-            None,
-        )
+        evidence_owner = core_evidence_owner(evidence_row)
         if evidence_owner is None:
             continue
         evidence_by_owner[evidence_owner].append(
@@ -486,54 +470,47 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
                 semantic_id=evidence_row["semantic_id"],
             )
         )
-    checklist_by_version: dict[str, list[ChecklistItemSnapshot]] = defaultdict(list)
-    failures: list[StoredRuleLoadDiagnostic] = []
-    # Database bypasses must not turn catalog-authored metadata into executable derivation.
-    # Only exact, production-pinned derived definitions may cross the public snapshot boundary.
-    for fact_row in fact_rows:
-        if not fact_row.is_published or not fact_row.derived:
-            continue
-        expected = FACT_DEFINITIONS.get(fact_row.key)
-        if expected is None or not expected.derived or compatibility_errors((fact_row,)):
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"fact:{fact_row.key}",
-                    (ValidationDiagnostic("unsupported_derived_fact", ("facts", fact_row.key)),),
-                )
+    # Validate the captured graph once; construction below only consumes decoded rules.
+    core_evidence = {
+        owner: tuple(
+            EvidenceInfo(
+                link.passage,
+                link.location,
+                link.applicability_context,
+                link.support_status,
+                link.verification_state,
+                tuple(
+                    (source.classification, source.observation_date, source.observation_context)
+                    for source in link.sources
+                ),
             )
-
+            for link in links
+        )
+        for owner, links in evidence_by_owner.items()
+    }
+    predicates = validate_core(
+        CoreInputs(
+            definitions,
+            published_definitions,
+            core_evidence,
+            services=cast(list[ServiceRow], service_rows),
+            checklist_items=cast(list[ClaimRow], checklist_rows),
+            steps=cast(list[StepRow], step_rows),
+            fees=cast(list[FeeRow], fee_rows),
+            warnings=cast(list[WarningRow], warning_rows),
+            candidates=cast(list[CandidateRow], candidate_rows),
+            versions=cast(list[VersionRow], version_rows),
+            contradictions=cast(list[ContradictionRow], contradiction_rows),
+            contradiction_facts=contradiction_link_rows,
+            questions=cast(list[QuestionRow], question_rows),
+            question_facts=question_link_rows,
+        )
+    )
+    checklist_by_version: dict[str, list[ChecklistItemSnapshot]] = defaultdict(list)
     for item_row in checklist_rows:
         version_id = item_row["procedure_version__semantic_id"]
-        raw_rule = item_row["applicability"]
-        predicate = None
-        if raw_rule != {}:
-            decoded = decode_stored_rule(raw_rule, published_definitions)
-            if decoded.predicate is None:
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        f"checklist_item:{version_id}:{item_row['semantic_id']}",
-                        decoded.diagnostics,
-                    )
-                )
-                continue
-            predicate = decoded.predicate
-        links = tuple(evidence_by_owner[("checklist", item_row["id"])])
-        if item_row["verification_state"] == "current" and not links:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"checklist_item:{version_id}:{item_row['semantic_id']}",
-                    (ValidationDiagnostic("missing_evidence_link", ("evidence",)),),
-                )
-            )
-            continue
-        if any(not link.sources for link in links):
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"checklist_item:{version_id}:{item_row['semantic_id']}",
-                    (ValidationDiagnostic("missing_evidence_source", ("evidence",)),),
-                )
-            )
-            continue
+        predicate = predicates.checklist_items[item_row["id"]]
+        links = tuple(evidence_by_owner[("checklist_item", item_row["id"])])
         checklist_by_version[version_id].append(
             ChecklistItemSnapshot(
                 item_row["semantic_id"],
@@ -565,55 +542,9 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
     fees_by_version: dict[str, list[FeeSnapshot]] = defaultdict(list)
     warnings_by_version: dict[str, list[WarningSnapshot]] = defaultdict(list)
 
-    def decoded_guidance_rule(raw: object, owner: str) -> Predicate | None | bool:
-        if raw == {}:
-            return None
-        decoded = decode_stored_rule(raw, published_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            return False
-        return decoded.predicate
-
-    def has_adequate_evidence(links: tuple[EvidenceLinkSnapshot, ...]) -> bool:
-        return any(
-            link.verification_state == "current"
-            and link.support_status == "supports"
-            and bool(link.sources)
-            and bool(link.passage.strip())
-            and bool(link.location.strip())
-            and bool(link.applicability_context.strip())
-            for link in links
-        ) and not any(
-            link.verification_state == "current" and link.support_status == "contradicts"
-            for link in links
-        )
-
     for row in cast(list[dict[str, Any]], step_rows):
-        owner = f"step:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        guidance_predicate = decoded_guidance_rule(row["applicability"], owner)
+        guidance_predicate = predicates.steps[row["id"]]
         links = tuple(evidence_by_owner[("step", row["id"])])
-        basis_broken = row["scope"] == "eligibility_basis" and (
-            row["eligibility_basis_id"] is None
-            or row["eligibility_basis__procedure_version_id"] != row["procedure_version_id"]
-        )
-        if (
-            guidance_predicate is False
-            or basis_broken
-            or (row["verification_state"] == "current" and not has_adequate_evidence(links))
-        ):
-            if basis_broken:
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        owner, (ValidationDiagnostic("invalid_basis_owner", ("scope",)),)
-                    )
-                )
-            elif guidance_predicate is not False:
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        owner, (ValidationDiagnostic("inadequate_evidence", ("evidence",)),)
-                    )
-                )
-            continue
         steps_by_version[row["procedure_version__semantic_id"]].append(
             StepSnapshot(
                 row["semantic_id"],
@@ -621,7 +552,7 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
                 row["phase"],
                 row["phase_order"],
                 row["slot"],
-                cast(Predicate | None, guidance_predicate),
+                guidance_predicate,
                 row["scope"],
                 row["eligibility_basis__semantic_id"],
                 row["effective_from"],
@@ -633,71 +564,9 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
             )
         )
 
-    def valid_fee_shape(row: dict[str, Any]) -> bool:
-        amount = row["amount"]
-        minimum = row["minimum_amount"]
-        maximum = row["maximum_amount"]
-        amount_ok = type(amount) is int and amount >= 0
-        range_ok = (
-            type(minimum) is int and type(maximum) is int and minimum >= 0 and maximum >= minimum
-        )
-        if row["value_state"] == "known":
-            return amount_ok and minimum is None and maximum is None
-        if row["value_state"] == "range":
-            return amount is None and range_ok
-        if row["value_state"] == "unknown":
-            return amount is None and minimum is None and maximum is None
-        if row["value_state"] == "unverified":
-            return (
-                (amount_ok and minimum is None and maximum is None) or (amount is None and range_ok)
-            ) and row["verification_state"] in {
-                "needs_reverification",
-                "stale",
-                "disputed",
-            }
-        return False
-
     for row in cast(list[dict[str, Any]], fee_rows):
-        owner = f"fee:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        fee_predicate = decoded_guidance_rule(row["applicability"], owner)
+        fee_predicate = predicates.fees[row["id"]]
         links = tuple(evidence_by_owner[("fee", row["id"])])
-        basis_broken = row["scope"] == "eligibility_basis" and (
-            row["eligibility_basis_id"] is None
-            or row["eligibility_basis__procedure_version_id"] != row["procedure_version_id"]
-        )
-        evidence_required = row["value_state"] in {"known", "range", "unverified"}
-        current_support_required = (
-            row["value_state"] in {"known", "range"} and row["verification_state"] == "current"
-        )
-        invalid = (
-            fee_predicate is False
-            or basis_broken
-            or not row["currency"].strip()
-            or not row["fee_type"].strip()
-            or not valid_fee_shape(row)
-            or (evidence_required and not links)
-            or (evidence_required and any(not link.sources for link in links))
-            or (current_support_required and not has_adequate_evidence(links))
-        )
-        if invalid:
-            if fee_predicate is False:
-                continue
-            if basis_broken:
-                code, path = "invalid_basis_owner", ("scope",)
-            elif not row["currency"].strip():
-                code, path = "missing_currency", ("currency",)
-            elif not row["fee_type"].strip():
-                code, path = "missing_fee_type", ("fee_type",)
-            elif not valid_fee_shape(row):
-                code, path = "invalid_fee_value", ("value_state",)
-            elif evidence_required and not links:
-                code, path = "missing_evidence_link", ("evidence",)
-            elif evidence_required and any(not link.sources for link in links):
-                code, path = "missing_evidence_source", ("evidence",)
-            else:
-                code, path = "inadequate_evidence", ("evidence",)
-            failures.append(StoredRuleLoadDiagnostic(owner, (ValidationDiagnostic(code, path),)))
-            continue
         fees_by_version[row["procedure_version__semantic_id"]].append(
             FeeSnapshot(
                 row["semantic_id"],
@@ -709,7 +578,7 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
                 row["currency"],
                 row["fee_type"],
                 row["display_order"],
-                cast(Predicate | None, fee_predicate),
+                fee_predicate,
                 row["scope"],
                 row["eligibility_basis__semantic_id"],
                 row["effective_from"],
@@ -722,22 +591,8 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
         )
 
     for row in cast(list[dict[str, Any]], warning_rows):
-        owner = f"warning:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        guidance_predicate = decoded_guidance_rule(row["applicability"], owner)
+        guidance_predicate = predicates.warnings[row["id"]]
         links = tuple(evidence_by_owner[("warning", row["id"])])
-        invalid = (row["kind"] == "product" and bool(links)) or (
-            row["kind"] == "administrative"
-            and row["verification_state"] == "current"
-            and not has_adequate_evidence(links)
-        )
-        if guidance_predicate is False or invalid:
-            if invalid:
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        owner, (ValidationDiagnostic("invalid_warning_evidence", ("evidence",)),)
-                    )
-                )
-            continue
         warnings_by_version[row["procedure_version__semantic_id"]].append(
             WarningSnapshot(
                 row["semantic_id"],
@@ -746,7 +601,7 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
                 row["kind"],
                 row["role"],
                 row["display_order"],
-                cast(Predicate | None, guidance_predicate),
+                guidance_predicate,
                 row["effective_from"],
                 row["effective_to"],
                 cast(VerificationState, row["verification_state"]),
@@ -759,17 +614,7 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
     for candidate_row in candidate_rows:
         service_id = candidate_row["service__semantic_id"]
         procedure_id = candidate_row["procedure__semantic_id"]
-        owner_definitions = (
-            published_definitions if service_id in active_service_ids else definitions
-        )
-        decoded = decode_stored_rule(candidate_row["selection_predicate"], owner_definitions)
-        if decoded.predicate is None:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"candidate:{service_id}:{procedure_id}", decoded.diagnostics
-                )
-            )
-            continue
+        candidate_predicate = predicates.candidates[(service_id, procedure_id)]
         candidates[service_id].append(
             ProcedureCandidateSnapshot(
                 procedure_id,
@@ -777,23 +622,18 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
                     candidate_row["procedure__text_ar"],
                     candidate_row["procedure__text_en"],
                 ),
-                decoded.predicate,
+                candidate_predicate,
             )
         )
     for version_row in version_rows:
         semantic_id = version_row["semantic_id"]
-        decoded = decode_stored_rule(version_row["applicability"], published_definitions)
-        if decoded.predicate is None:
-            failures.append(
-                StoredRuleLoadDiagnostic(f"procedure_version:{semantic_id}", decoded.diagnostics)
-            )
-            continue
+        version_predicate = predicates.versions[semantic_id]
         versions.append(
             ProcedureVersionSnapshot(
                 semantic_id,
                 version_row["procedure__semantic_id"],
                 LocalizedText(version_row["text_ar"], version_row["text_en"]),
-                decoded.predicate,
+                version_predicate,
                 version_row["rules_contract_version"],
                 version_row["state"],
                 version_row["effective_from"],
@@ -810,31 +650,10 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
     for contradiction_row in contradiction_rows:
         service_id = contradiction_row["service__semantic_id"]
         semantic_id = contradiction_row["semantic_id"]
-        owner_definitions = (
-            published_definitions if service_id in active_service_ids else definitions
-        )
-        decoded = decode_stored_rule(contradiction_row["condition"], owner_definitions)
-        if decoded.predicate is None:
-            failures.append(
-                StoredRuleLoadDiagnostic(f"contradiction:{semantic_id}", decoded.diagnostics)
-            )
-            continue
+        contradiction_predicate = predicates.contradictions[semantic_id]
         declared_keys = tuple(contradiction_links[semantic_id])
-        if service_id in active_service_ids:
-            unpublished_keys = sorted(set(declared_keys) - published_definitions.keys())
-            if unpublished_keys:
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        f"contradiction:{semantic_id}",
-                        tuple(
-                            ValidationDiagnostic("unpublished_fact", ("facts", key))
-                            for key in unpublished_keys
-                        ),
-                    )
-                )
-                continue
         contradictions[service_id].append(
-            ContradictionSnapshot(semantic_id, decoded.predicate, declared_keys)
+            ContradictionSnapshot(semantic_id, contradiction_predicate, declared_keys)
         )
 
     questions: dict[str, list[QuestionSnapshot]] = defaultdict(list)
@@ -844,19 +663,6 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
         primary_key = question_row["fact__key"]
         explicit_keys = question_links.get(semantic_id)
         resolved_keys = tuple(explicit_keys) if explicit_keys else (primary_key,)
-        if service_id in active_service_ids:
-            unpublished_keys = sorted({primary_key, *resolved_keys} - published_definitions.keys())
-            if unpublished_keys:
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        f"question:{semantic_id}",
-                        tuple(
-                            ValidationDiagnostic("unpublished_fact", ("facts", key))
-                            for key in unpublished_keys
-                        ),
-                    )
-                )
-                continue
         questions[service_id].append(
             QuestionSnapshot(
                 semantic_id,
@@ -866,9 +672,6 @@ def _materialize_core_knowledge_snapshot(scope: Any | None = None) -> KnowledgeS
                 resolved_keys,
             )
         )
-
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
 
     services = tuple(
         ServiceSnapshot(

@@ -77,6 +77,42 @@ The policy interfaces have database-free tests:
 Loader tests continue to cover PostgreSQL acquisition, global fail-closed behavior, scoped
 graphs, detached DTOs, transaction isolation, historical overlays, and exact diagnostics.
 
+### Date-aware evidence trust projection
+
+`knowledge.evidence_trust_projection.project_evidence_trust(snapshot, ordered_history)` owns
+pure temporal replay and detached-snapshot rewriting. Plain discrepancy-transition and
+re-verification records carry structural owner identities, not ORM objects or editorial
+rationale. Private overlay state, open-discrepancy precedence, verification-date handling,
+and all eight claim/material projections have one implementation. Authored values, rules,
+text, and provenance content remain unchanged.
+
+`knowledge.evidence_workflow_temporal` retains the PostgreSQL adapter and existing public
+loaders. It filters history by evaluation date and optional Evidence Link scope, eagerly reads
+transitions then reviews, and orders the combined timeline by timestamp, discrepancy before
+review, then within-kind primary key. Date admission retains PostgreSQL's active-timezone
+calendar semantics; the pure function does not repeat this filtering in Python.
+
+After both reads finish, the adapter resolves each preloaded workflow owner and yields its
+record for immediate replay before resolving the next owner. Consuming the returned history
+eagerly would change that failure sequence. The pure function consumes it once, without
+sorting again or discarding owners absent from the snapshot. Workflow ownership precedence,
+global visible-owner validation, transaction policy, models, signals, and editorial writes
+remain unchanged. Generic semantic loaders still apply no workflow projection; there is no
+alternative latest-state projection path.
+
+Pure snapshot-outcome tests replace private-overlay tests and run without Django settings or
+a database:
+
+```bash
+(cd backend && uv run python -m unittest knowledge.tests.test_evidence_trust_projection -v)
+```
+
+PostgreSQL tests retain persisted historical outcomes, scoped acquisition, publication/privacy
+checks, and lock/transaction behavior. Characterization also pins timestamp ties, active-timezone
+cutoffs, and history-read/owner-resolution order. Preserved compatibility observations are
+tracked separately in
+[`../operations/evidence-projection-follow-ups.md`](../operations/evidence-projection-follow-ups.md).
+
 ## Implementation status: issue #40
 
 Checklist provenance is implemented relationally: Authorities, Document Types, and preserved

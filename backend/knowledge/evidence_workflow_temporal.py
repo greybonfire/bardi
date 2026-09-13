@@ -7,7 +7,7 @@ evaluation date, so later editorial work cannot rewrite an earlier planning resu
 
 from __future__ import annotations
 
-from dataclasses import replace
+from collections.abc import Iterable
 from datetime import date, datetime
 from typing import Any, cast
 
@@ -21,11 +21,10 @@ from planning.trust import VERIFICATION_CHOICES, VerificationState
 
 from . import domain as knowledge_domain
 from . import evidence_workflow as workflow
-
-_OPEN_DISCREPANCY_PRECEDENCE: tuple[VerificationState, ...] = (
-    "disputed",
-    "needs_reverification",
-    "unknown",
+from .evidence_trust_projection import (
+    DiscrepancyTransition,
+    Reverification,
+    project_evidence_trust,
 )
 
 
@@ -155,11 +154,12 @@ def _owner_related_paths(anchor_path: str) -> tuple[str, ...]:
     )
 
 
-def _workflow_overlays_as_of(
+def _captured_history_as_of(
     evaluation_date: date,
     *,
     evidence_link_ids: frozenset[int] | None = None,
-) -> dict[tuple[str, str, str], workflow._TrustOverlay]:
+) -> Iterable[DiscrepancyTransition | Reverification]:
+    """Finish both history reads before yielding detached records in replay order."""
     timeline: list[tuple[datetime, int, int, str, object]] = []
     transitions = EvidenceDiscrepancyTransition.objects.filter(
         occurred_at__date__lte=evaluation_date
@@ -180,47 +180,31 @@ def _workflow_overlays_as_of(
     ).order_by("occurred_at", "pk"):
         timeline.append((review.occurred_at, 1, review.pk, "reverification", review))
 
-    overlays: dict[tuple[str, str, str], workflow._TrustOverlay] = {}
-    open_discrepancies: dict[tuple[str, str, str], dict[int, VerificationState]] = {}
-    for occurred, _, _, kind, raw in sorted(timeline, key=lambda item: item[:3]):
-        if kind == "discrepancy":
-            transition = cast(EvidenceDiscrepancyTransition, raw)
-            key = workflow._owner_key(transition.discrepancy.anchor_evidence_link)
-            state = cast(VerificationState, transition.verification_state)
-            if transition.event_type == EvidenceDiscrepancyTransition.EventType.OPENED:
-                open_discrepancies.setdefault(key, {})[transition.discrepancy_id] = state
-            elif transition.event_type == EvidenceDiscrepancyTransition.EventType.RESOLVED:
-                owner_open_discrepancies = open_discrepancies.get(key)
-                if owner_open_discrepancies is not None:
-                    owner_open_discrepancies.pop(transition.discrepancy_id, None)
-                    if not owner_open_discrepancies:
-                        del open_discrepancies[key]
+    # Resolve one preloaded owner, then let projection replay its record before the
+    # next owner is resolved. Eagerly converting this iterator to a list would move
+    # later owner failures ahead of earlier replay failures.
+    def records() -> Iterable[DiscrepancyTransition | Reverification]:
+        for occurred, _, _, kind, raw in sorted(timeline, key=lambda item: item[:3]):
+            if kind == "discrepancy":
+                transition = cast(EvidenceDiscrepancyTransition, raw)
+                yield DiscrepancyTransition(
+                    owner=workflow._owner_key(transition.discrepancy.anchor_evidence_link),
+                    occurred_at=occurred,
+                    discrepancy_id=transition.discrepancy_id,
+                    event_type=transition.event_type,
+                    verification_state=cast(VerificationState, transition.verification_state),
+                )
+            else:
+                review = cast(workflow.EvidenceReverificationEvent, raw)
+                yield Reverification(
+                    owner=workflow._owner_key(review.anchor_evidence_link),
+                    occurred_at=occurred,
+                    verification_state=cast(VerificationState, review.verification_state),
+                    verified_on=review.verified_on,
+                    reverify_on=review.reverify_on,
+                )
 
-            overlay = overlays.setdefault(key, workflow._TrustOverlay())
-            overlay.state = state
-            overlay.owner_verified_on = workflow._max_date(
-                overlay.owner_verified_on, occurred.date()
-            )
-            continue
-
-        review = cast(workflow.EvidenceReverificationEvent, raw)
-        key = workflow._owner_key(review.anchor_evidence_link)
-        overlay = overlays.setdefault(key, workflow._TrustOverlay())
-        established_on = max(review.verified_on, occurred.date())
-        overlay.state = cast(VerificationState, review.verification_state)
-        overlay.owner_verified_on = established_on
-        overlay.reverify_on = review.reverify_on
-        overlay.reverify_seen = True
-        overlay.evidence_state = cast(VerificationState, review.verification_state)
-        overlay.evidence_verified_on = established_on
-        overlay.evidence_reverify_on = review.reverify_on
-
-    for key, owner_open_discrepancies in open_discrepancies.items():
-        open_states = set(owner_open_discrepancies.values())
-        overlays[key].state = next(
-            state for state in _OPEN_DISCREPANCY_PRECEDENCE if state in open_states
-        )
-    return overlays
+    return records()
 
 
 def apply_evidence_workflow_as_of(
@@ -231,46 +215,8 @@ def apply_evidence_workflow_as_of(
 ) -> KnowledgeSnapshot:
     """Apply only workflow history established on or before ``evaluation_date``."""
 
-    overlays = _workflow_overlays_as_of(evaluation_date, evidence_link_ids=evidence_link_ids)
-    if not overlays:
-        return snapshot
-
-    def version_items(version: Any, attribute: str, kind: str) -> tuple[Any, ...]:
-        return tuple(
-            workflow._overlay_item(item, overlays[(kind, version.semantic_id, item.semantic_id)])
-            if (kind, version.semantic_id, item.semantic_id) in overlays
-            else item
-            for item in getattr(version, attribute)
-        )
-
-    versions = tuple(
-        replace(
-            version,
-            checklist_items=version_items(version, "checklist_items", "checklist"),
-            eligibility_bases=version_items(version, "eligibility_bases", "eligibility_basis"),
-            steps=version_items(version, "steps", "step"),
-            warnings=version_items(version, "warnings", "warning"),
-            fees=version_items(version, "fees", "fee"),
-            dependencies=version_items(version, "dependencies", "procedure_dependency"),
-            service_point_associations=version_items(
-                version,
-                "service_point_associations",
-                "procedure_service_point_association",
-            ),
-        )
-        for version in snapshot.procedure_versions
-    )
-    service_point_versions = tuple(
-        workflow._overlay_item(item, overlays[("service_point_version", "", item.semantic_id)])
-        if ("service_point_version", "", item.semantic_id) in overlays
-        else item
-        for item in snapshot.service_point_versions
-    )
-    return replace(
-        snapshot,
-        procedure_versions=versions,
-        service_point_versions=service_point_versions,
-    )
+    history = _captured_history_as_of(evaluation_date, evidence_link_ids=evidence_link_ids)
+    return project_evidence_trust(snapshot, history)
 
 
 def load_knowledge_snapshot_as_of(evaluation_date: date) -> KnowledgeSnapshot:

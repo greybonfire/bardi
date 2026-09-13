@@ -20,6 +20,7 @@ from knowledge.domain import (
     load_knowledge_snapshot,
 )
 from knowledge.models import (
+    ChecklistItem,
     FactDefinition,
     Procedure,
     ProcedureVersion,
@@ -95,6 +96,76 @@ class KnowledgeSnapshotTests(TestCase):
             },
         )
         set_contradiction_facts(self.contradiction, (source_b, source_a))
+
+    def test_claim_diagnostic_collision_preserves_both_predicates(self) -> None:
+        for version_id, claim_id, value in (("v1:x", "y", True), ("v1", "x:y", False)):
+            procedure = Procedure.objects.create(
+                semantic_id=f"procedure.{version_id}",
+                primary_service=self.service,
+                text_ar="إجراء",
+                text_en="Procedure",
+            )
+            version = ProcedureVersion.objects.create(
+                semantic_id=version_id,
+                procedure=procedure,
+                text_ar="نسخة",
+                text_en="Version",
+                applicability={"op": "eq", "fact": "is_student", "value": True},
+            )
+            ChecklistItem.objects.create(
+                procedure_version=version,
+                semantic_id=claim_id,
+                text_ar="مطلوب",
+                text_en="Required",
+                classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT,
+                verification_state="unknown",
+                applicability={"op": "eq", "fact": "is_student", "value": value},
+            )
+            ServiceProcedureCandidate.objects.create(
+                service=self.service,
+                procedure=procedure,
+                selection_predicate={"op": "eq", "fact": "is_student", "value": True},
+            )
+            publish_procedure_version(version.pk, actor=self.actor)
+        snapshot = load_knowledge_snapshot()
+        claims = {
+            (version.semantic_id, claim.semantic_id): claim.applicability
+            for version in snapshot.procedure_versions
+            for claim in version.checklist_items
+        }
+        self.assertEqual(
+            claims[("v1:x", "y")],
+            decode_stored_rule({"op": "eq", "fact": "is_student", "value": True}).predicate,
+        )
+        self.assertEqual(
+            claims[("v1", "x:y")],
+            decode_stored_rule({"op": "eq", "fact": "is_student", "value": False}).predicate,
+        )
+
+    def test_candidate_diagnostic_collision_preserves_both_predicates(self) -> None:
+        for service_id, procedure_id, value in (("s:x", "y", True), ("s", "x:y", False)):
+            service = Service.objects.create(
+                semantic_id=service_id, text_ar="خدمة", text_en="Service", is_active=True
+            )
+            procedure = Procedure.objects.create(
+                semantic_id=procedure_id,
+                primary_service=service,
+                text_ar="إجراء",
+                text_en="Procedure",
+            )
+            ServiceProcedureCandidate.objects.create(
+                service=service,
+                procedure=procedure,
+                selection_predicate={"op": "eq", "fact": "is_student", "value": value},
+            )
+        snapshot = load_knowledge_snapshot()
+        candidates = {
+            (service.semantic_id, candidate.procedure_semantic_id): candidate.selection_predicate
+            for service in snapshot.services
+            for candidate in service.candidates
+        }
+        self.assertIs(candidates[("s:x", "y")].value, True)
+        self.assertIs(candidates[("s", "x:y")].value, False)
 
     def test_loader_materializes_decodes_and_preserves_declared_order(self) -> None:
         publish_procedure_version(self.version.pk, actor=self.actor)

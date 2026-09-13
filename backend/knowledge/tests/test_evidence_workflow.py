@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Any, cast
@@ -10,12 +11,16 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import connection, transaction
+from django.db.models.query import ModelIterable
 from django.test import RequestFactory, TransactionTestCase
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 from planning import Predicate, PreparedFacts
+from planning.catalog import ChecklistItemSnapshot, EvidenceLinkSnapshot
 from planning.fees import select_fees
 from planning.trust import VerificationState
 
+from knowledge import evidence_workflow as workflow
 from knowledge.domain import load_knowledge_snapshot
 from knowledge.evidence_workflow import (
     EvidenceDiscrepancy,
@@ -30,6 +35,7 @@ from knowledge.evidence_workflow import (
 from knowledge.evidence_workflow_temporal import (
     EvidenceDiscrepancyTransition,
     _workflow_overlays_as_of,
+    apply_evidence_workflow_as_of,
     load_knowledge_snapshot_as_of,
 )
 from knowledge.fees import Fee
@@ -642,6 +648,168 @@ class EvidenceWorkflowTests(TransactionTestCase):
         )
         fully_resolved = _workflow_overlays_as_of(date(2026, 9, 8))[owner_key]
         self.assertEqual(fully_resolved.state, "unknown")
+
+    def test_timestamp_tie_replays_discrepancy_before_review(self) -> None:
+        self.publish()
+        discrepancy = self.open_discrepancy(
+            anchor_evidence_link=self.checklist_evidence,
+            evidence_links=(self.checklist_evidence,),
+            rationale="Resolved at precisely the review timestamp.",
+        )
+        # Create the review first: replay order must not be creation order across kinds.
+        self.record_review(
+            anchor_evidence_link=self.checklist_evidence,
+            reviewed_evidence_links=(self.checklist_evidence,),
+            verification_state="stale",
+            occurred_at=RESOLVED_AT,
+        )
+        self.resolve_discrepancy(discrepancy, occurred_at=RESOLVED_AT)
+
+        snapshot = load_knowledge_snapshot_as_of(AFTER_RESOLUTION)
+        item = snapshot.procedure_versions[0].checklist_items[0]
+        materials: tuple[ChecklistItemSnapshot | EvidenceLinkSnapshot, ...] = (
+            item,
+            *item.evidence_links,
+        )
+        for material in materials:
+            self.assertEqual(material.verification_state, "stale")
+            self.assertEqual(material.verified_on, RESOLVED_AT.date())
+            self.assertEqual(material.reverify_on, RENEWED_DUE)
+
+    def test_timestamp_ties_replay_primary_keys_within_each_history_kind(self) -> None:
+        self.publish()
+        discrepancy = self.open_discrepancy(
+            anchor_evidence_link=self.step_evidence,
+            evidence_links=(self.step_evidence,),
+            rationale="Open and resolve at the same instant.",
+            occurred_at=REVIEWED_AT,
+        )
+        self.resolve_discrepancy(discrepancy, outcome_state="unknown", occurred_at=REVIEWED_AT)
+        transitions = list(discrepancy.transitions.order_by("pk"))
+        self.assertEqual([row.event_type for row in transitions], ["opened", "resolved"])
+        self.assertEqual(transitions[0].occurred_at, transitions[1].occurred_at)
+        first = self.record_review(
+            anchor_evidence_link=self.checklist_evidence,
+            reviewed_evidence_links=(self.checklist_evidence,),
+            verified_on=AFTER_RESOLUTION,
+            occurred_at=REVIEWED_AT,
+        )
+        second = self.record_review(
+            anchor_evidence_link=self.checklist_evidence,
+            reviewed_evidence_links=(self.checklist_evidence,),
+            verification_state="stale",
+            verified_on=BEFORE_WORKFLOW,
+            reverify_on=None,
+            occurred_at=REVIEWED_AT,
+        )
+        self.assertLess(first.pk, second.pk)
+        self.assertEqual(first.occurred_at, second.occurred_at)
+
+        version = load_knowledge_snapshot_as_of(TODAY).procedure_versions[0]
+        step = version.steps[0]
+        self.assertEqual(step.verification_state, "unknown")
+        self.assertEqual(step.verified_on, TODAY)
+        self.assertIsNone(step.reverify_on)
+        self.assertEqual(step.evidence_links[0].verification_state, "current")
+        self.assertEqual(step.evidence_links[0].verified_on, date(2026, 9, 1))
+        item = version.checklist_items[0]
+        materials: tuple[ChecklistItemSnapshot | EvidenceLinkSnapshot, ...] = (
+            item,
+            *item.evidence_links,
+        )
+        for material in materials:
+            self.assertEqual(material.verification_state, "stale")
+            # The later PK assigns its date, rather than retaining the first review's maximum.
+            self.assertEqual(material.verified_on, TODAY)
+            self.assertIsNone(material.reverify_on)
+
+    def test_active_timezone_cutoff_differs_from_timestamp_date_establishment(self) -> None:
+        self.publish()
+        occurred_at = datetime(2026, 9, 6, 0, 30, tzinfo=UTC)
+        self.open_discrepancy(
+            anchor_evidence_link=self.step_evidence,
+            evidence_links=(self.step_evidence,),
+            rationale="UTC tomorrow, Los Angeles today.",
+            occurred_at=occurred_at,
+        )
+        self.record_review(
+            anchor_evidence_link=self.checklist_evidence,
+            reviewed_evidence_links=(self.checklist_evidence,),
+            verification_state="stale",
+            verified_on=BEFORE_WORKFLOW,
+            occurred_at=occurred_at,
+        )
+
+        with timezone.override("UTC"):
+            excluded = load_knowledge_snapshot_as_of(TODAY).procedure_versions[0]
+        with timezone.override("America/Los_Angeles"):
+            included = load_knowledge_snapshot_as_of(TODAY).procedure_versions[0]
+
+        for item in (excluded.steps[0], excluded.checklist_items[0]):
+            self.assertEqual(item.verification_state, "current")
+            self.assertEqual(item.verified_on, date(2026, 9, 1))
+        self.assertEqual(included.steps[0].verification_state, "disputed")
+        self.assertEqual(included.steps[0].verified_on, occurred_at.date())
+        self.assertEqual(included.steps[0].evidence_links[0].verified_on, date(2026, 9, 1))
+        materials: tuple[ChecklistItemSnapshot | EvidenceLinkSnapshot, ...] = (
+            included.checklist_items[0],
+            *included.checklist_items[0].evidence_links,
+        )
+        for material in materials:
+            self.assertEqual(material.verification_state, "stale")
+            self.assertEqual(material.verified_on, occurred_at.date())
+            self.assertEqual(material.reverify_on, RENEWED_DUE)
+
+    def test_history_reads_finish_before_owners_resolve_in_timeline_order(self) -> None:
+        self.publish()
+        snapshot = load_knowledge_snapshot_as_of(BEFORE_WORKFLOW)
+        # Acquisition reads transitions first, but the earlier review must replay first.
+        self.open_discrepancy(
+            anchor_evidence_link=self.step_evidence,
+            evidence_links=(self.step_evidence,),
+            rationale="Later transition acquired first.",
+            occurred_at=RESOLVED_AT,
+        )
+        self.record_review(
+            anchor_evidence_link=self.checklist_evidence,
+            reviewed_evidence_links=(self.checklist_evidence,),
+        )
+        observations: list[tuple[str, object]] = []
+        original_iter = ModelIterable.__iter__
+        original_owner_key = workflow._owner_key
+
+        def observe_iteration(iterable: ModelIterable[Any]) -> Iterator[Any]:
+            yield from original_iter(iterable)
+            if iterable.queryset.model in (
+                EvidenceDiscrepancyTransition,
+                EvidenceReverificationEvent,
+            ):
+                observations.append(("read", iterable.queryset.model))
+
+        def observe_owner(link: EvidenceLink) -> tuple[str, str, str]:
+            observations.append(("owner", link.pk))
+            return original_owner_key(link)
+
+        with (
+            patch.object(ModelIterable, "__iter__", observe_iteration),
+            patch.object(workflow, "_owner_key", side_effect=observe_owner),
+        ):
+            projected = apply_evidence_workflow_as_of(snapshot, AFTER_RESOLUTION)
+
+        self.assertEqual(
+            observations,
+            [
+                ("read", EvidenceDiscrepancyTransition),
+                ("read", EvidenceReverificationEvent),
+                ("owner", self.checklist_evidence.pk),
+                ("owner", self.step_evidence.pk),
+            ],
+        )
+        version = projected.procedure_versions[0]
+        self.assertEqual(version.checklist_items[0].verified_on, TODAY)
+        self.assertEqual(version.checklist_items[0].reverify_on, RENEWED_DUE)
+        self.assertEqual(version.steps[0].verification_state, "disputed")
+        self.assertEqual(version.steps[0].verified_on, RESOLVED_AT.date())
 
     def test_workflow_lock_helper_locks_all_versions_before_any_evidence(self) -> None:
         successor = ProcedureVersion.objects.create(

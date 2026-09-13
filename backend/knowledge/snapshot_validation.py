@@ -18,19 +18,19 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from planning.facts import FactDefinition as DomainFactDefinition
 
-from .domain import (
-    KnowledgeSnapshotLoadError,
-    StoredRuleLoadDiagnostic,
-    decode_stored_rule,
-    to_domain_fact,
-)
+from .domain import to_domain_fact
 from .snapshot_policy import (
+    AssociationRow,
+    BasisRow,
     CandidateRow,
     ClaimRow,
     ContradictionFactRow,
     ContradictionRow,
     CoreInputs,
+    DependencyRow,
+    EvidenceRow,
     FeeRow,
+    MaterialRow,
     QuestionFactRow,
     QuestionRow,
     ServiceRow,
@@ -38,7 +38,12 @@ from .snapshot_policy import (
     VersionRow,
     WarningRow,
     core_evidence_owner,
+    routing_evidence_owner,
+    summarize_evidence_rows,
+    validate_bases,
     validate_core,
+    validate_dependencies,
+    validate_routing,
 )
 from .snapshot_policy import EvidenceInfo as _EvidenceInfo
 
@@ -58,7 +63,6 @@ _OWNER_FIELDS = (
 _MATERIALIZER_OWNER_GROUPS = (
     ("eligibility_basis",),
     ("procedure_dependency",),
-    ("procedure_service_point_association", "service_point_version"),
 )
 _PUBLIC_VERSION_STATES = ("published", "withdrawn")
 
@@ -105,17 +109,6 @@ class _ValidationData:
     evidence: Mapping[tuple[str, int], tuple[_EvidenceInfo, ...]]
 
 
-def _failure(owner: str, code: str, path: tuple[str | int, ...]) -> StoredRuleLoadDiagnostic:
-    from planning.diagnostics import ValidationDiagnostic
-
-    return StoredRuleLoadDiagnostic(owner, (ValidationDiagnostic(code, path),))
-
-
-def _raise(failures: list[StoredRuleLoadDiagnostic]) -> None:
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
-
-
 def _load_validation_data() -> _ValidationData:
     from .models import EvidenceLinkSource, FactDefinition
 
@@ -149,29 +142,16 @@ def _load_validation_data() -> _ValidationData:
             "source__observation_context",
         )
     )
-    sources_by_link: dict[int, list[tuple[str, date | None, str]]] = {}
-    for row in source_rows:
-        sources_by_link.setdefault(row["evidence_link_id"], []).append(
-            (
-                row["source__classification"],
-                row["source__observation_date"],
-                row["source__observation_context"],
-            )
-        )
-
+    summaries = summarize_evidence_rows(cast(list[EvidenceRow], link_rows), source_rows)
     evidence: dict[tuple[str, int], list[_EvidenceInfo]] = {}
     for row in link_rows:
-        info = _EvidenceInfo(
-            row["passage"],
-            row["location"],
-            row["applicability_context"],
-            row["support_status"],
-            row["verification_state"],
-            tuple(sources_by_link.get(row["id"], ())),
-        )
+        info = summaries[row["id"]]
         core_owner = core_evidence_owner(row)
         if core_owner is not None:
             evidence.setdefault(core_owner, []).append(info)
+        routing_owner = routing_evidence_owner(row)
+        if routing_owner is not None:
+            evidence.setdefault(routing_owner, []).append(info)
         for fields in _MATERIALIZER_OWNER_GROUPS:
             owner = next(
                 ((field, row[f"{field}_id"]) for field in fields if row[f"{field}_id"] is not None),
@@ -347,11 +327,7 @@ def _load_core_inputs(data: _ValidationData) -> CoreInputs:
     )
 
 
-def _source_presence(data: _ValidationData, field: str, owner_id: int) -> tuple[_EvidenceInfo, ...]:
-    return data.evidence.get((field, owner_id), ())
-
-
-def _validate_bases(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _validate_bases(data: _ValidationData) -> None:
     from .models import EligibilityBasis, ProcedureVersion
 
     rows = list(
@@ -370,33 +346,10 @@ def _validate_bases(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             "qualification",
         )
     )
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for row in rows:
-        owner = f"eligibility_basis:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        if row["reachability"] != {}:
-            decoded = decode_stored_rule(row["reachability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-        if row["qualification"] == {}:
-            failures.append(_failure(owner, "missing_qualification", ("qualification",)))
-            continue
-        decoded = decode_stored_rule(row["qualification"], data.published_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
-        links = _source_presence(data, "eligibility_basis", row["id"])
-        if (
-            not row["text_ar"].strip()
-            or not row["text_en"].strip()
-            or not links
-            or any(not link.sources for link in links)
-        ):
-            failures.append(_failure(owner, "invalid_basis_evidence", ("evidence",)))
-    return failures
+    validate_bases(cast(list[BasisRow], rows), data.published_definitions, data.evidence)
 
 
-def _validate_dependencies(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _validate_dependencies(data: _ValidationData) -> None:
     from .models import ProcedureVersion
     from .procedure_dependencies import ProcedureDependency
 
@@ -419,63 +372,12 @@ def _validate_dependencies(data: _ValidationData) -> list[StoredRuleLoadDiagnost
             "satisfied_when",
         )
     )
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for row in rows:
-        owner = f"procedure_dependency:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        if row["relation"] != ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
-            failures.append(_failure(owner, "unsupported_dependency_relation", ("relation",)))
-            continue
-        if row["procedure_version__procedure_id"] == row["target_procedure_id"]:
-            failures.append(_failure(owner, "self_dependency", ("target_procedure",)))
-            continue
-        if row["applicability"] != {}:
-            decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-        if row["satisfied_when"] == {}:
-            failures.append(_failure(owner, "missing_satisfied_when", ("satisfied_when",)))
-            continue
-        decoded = decode_stored_rule(row["satisfied_when"], data.published_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
-        links = _source_presence(data, "procedure_dependency", row["id"])
-        if (
-            not row["text_ar"].strip()
-            or not row["text_en"].strip()
-            or not links
-            or any(not link.sources for link in links)
-        ):
-            failures.append(_failure(owner, "invalid_dependency_evidence", ("evidence",)))
-    return failures
+    validate_dependencies(
+        cast(list[DependencyRow], rows), data.published_definitions, data.evidence
+    )
 
 
-def _snapshot_evidence_is_adequate(links: tuple[_EvidenceInfo, ...]) -> bool:
-    adequate = False
-    for link in links:
-        if (
-            not link.passage.strip()
-            or not link.location.strip()
-            or not link.applicability_context.strip()
-        ):
-            return False
-        if any(
-            classification == "field_report" and (observation_date is None or not context.strip())
-            for classification, observation_date, context in link.sources
-        ):
-            return False
-        if link.verification_state == "current" and link.support_status == "contradicts":
-            return False
-        adequate |= (
-            link.verification_state == "current"
-            and link.support_status == "supports"
-            and bool(link.sources)
-        )
-    return adequate
-
-
-def _validate_routing(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _validate_routing(data: _ValidationData) -> None:
     from .models import ProcedureVersion
     from .service_point_routing import ProcedureServicePointAssociation, ServicePointVersion
 
@@ -511,50 +413,12 @@ def _validate_routing(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for row in associations:
-        owner = (
-            f"service_point_association:{row['procedure_version__semantic_id']}:"
-            f"{row['semantic_id']}"
-        )
-        decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-        links = _source_presence(data, "procedure_service_point_association", row["id"])
-        if (
-            decoded.predicate is None
-            or not links
-            or any(not link.sources for link in links)
-            or (
-                row["verification_state"] == "current" and not _snapshot_evidence_is_adequate(links)
-            )
-        ):
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    decoded.diagnostics
-                    or (_diagnostic("invalid_routing_evidence", ("evidence",)),),
-                )
-            )
-    for row in materials:
-        owner = f"service_point_version:{row['semantic_id']}"
-        links = _source_presence(data, "service_point_version", row["id"])
-        if (
-            not row["address_ar"].strip()
-            or not row["address_en"].strip()
-            or row["availability"] not in ServicePointVersion.Availability.values
-            or not links
-            or any(not link.sources for link in links)
-            or (
-                row["verification_state"] == "current" and not _snapshot_evidence_is_adequate(links)
-            )
-        ):
-            failures.append(_failure(owner, "invalid_service_point_material", ()))
-    return failures
-
-
-def _diagnostic(code: str, path: tuple[str | int, ...]) -> Any:
-    from planning.diagnostics import ValidationDiagnostic
-
-    return ValidationDiagnostic(code, path)
+    validate_routing(
+        cast(list[AssociationRow], associations),
+        cast(list[MaterialRow], materials),
+        data.published_definitions,
+        data.evidence,
+    )
 
 
 def _validate_workflow_owners(evaluation_date: date) -> None:
@@ -683,9 +547,9 @@ def validate_global_catalog(evaluation_date: date | None = None) -> None:
 
     data = _load_validation_data()
     validate_core(_load_core_inputs(data))
-    _raise(_validate_bases(data))
-    _raise(_validate_dependencies(data))
-    _raise(_validate_routing(data))
+    _validate_bases(data)
+    _validate_dependencies(data)
+    _validate_routing(data)
     if evaluation_date is not None:
         _validate_workflow_owners(evaluation_date)
 

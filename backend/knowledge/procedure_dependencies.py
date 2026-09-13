@@ -18,11 +18,10 @@ from planning.catalog import (
     ProcedureDependencySnapshot,
     SourceSnapshot,
 )
-from planning.diagnostics import ValidationDiagnostic
 from planning.rules import Predicate
 from planning.trust import VERIFICATION_CHOICES, VerificationState
 
-from .domain import KnowledgeSnapshotLoadError, StoredRuleLoadDiagnostic, decode_stored_rule
+from .domain import decode_stored_rule
 from .eligibility_bases import _source_fact_keys
 from .models import (
     NONBLANK_PATTERN,
@@ -36,6 +35,7 @@ from .models import (
     _required,
 )
 from .publication import PublicationContext, PublicationDiagnostic
+from .snapshot_policy import DependencyRow, EvidenceInfo, validate_dependencies
 
 
 class ProcedureDependency(VersionOwnedModel):
@@ -423,65 +423,48 @@ def _dependency_snapshots(
     if not rows:
         return snapshot
 
-    failures: list[StoredRuleLoadDiagnostic] = []
+    # Every relation traversed here is select_related/prefetched above. The policy
+    # receives only plain rows and provenance, never model instances or managers.
+    plain_rows: list[DependencyRow] = []
+    evidence: dict[tuple[str, int], tuple[EvidenceInfo, ...]] = {}
+    for dependency in rows:
+        plain_rows.append(
+            DependencyRow(
+                id=dependency.pk,
+                procedure_version__semantic_id=dependency.procedure_version.semantic_id,
+                procedure_version__procedure_id=dependency.procedure_version.procedure_id,
+                target_procedure_id=dependency.target_procedure_id,
+                semantic_id=dependency.semantic_id,
+                text_ar=dependency.text_ar,
+                text_en=dependency.text_en,
+                relation=dependency.relation,
+                applicability=dependency.applicability,
+                satisfied_when=dependency.satisfied_when,
+            )
+        )
+        evidence[("procedure_dependency", dependency.pk)] = tuple(
+            EvidenceInfo(
+                link.passage,
+                link.location,
+                link.applicability_context,
+                link.support_status,
+                link.verification_state,
+                tuple(
+                    (
+                        source_link.source.classification,
+                        source_link.source.observation_date,
+                        source_link.source.observation_context,
+                    )
+                    for source_link in link.source_links.all()
+                ),
+            )
+            for link in dependency.evidence_links.all()
+        )
+    predicates = validate_dependencies(plain_rows, snapshot.fact_definitions, evidence)
     by_version: dict[str, list[ProcedureDependencySnapshot]] = defaultdict(list)
     for dependency in rows:
-        owner = (
-            f"procedure_dependency:{dependency.procedure_version.semantic_id}:"
-            f"{dependency.semantic_id}"
-        )
-        if dependency.relation != ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    (ValidationDiagnostic("unsupported_dependency_relation", ("relation",)),),
-                )
-            )
-            continue
-        if dependency.procedure_version.procedure_id == dependency.target_procedure_id:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    (ValidationDiagnostic("self_dependency", ("target_procedure",)),),
-                )
-            )
-            continue
-
-        applicability: Predicate | None = None
-        if dependency.applicability != {}:
-            decoded = decode_stored_rule(dependency.applicability, snapshot.fact_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-            applicability = decoded.predicate
-        if dependency.satisfied_when == {}:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    (ValidationDiagnostic("missing_satisfied_when", ("satisfied_when",)),),
-                )
-            )
-            continue
-        decoded = decode_stored_rule(dependency.satisfied_when, snapshot.fact_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
-
+        rules = predicates[dependency.pk]
         links = tuple(_evidence_snapshot(link) for link in dependency.evidence_links.all())
-        invalid = (
-            not dependency.text_ar.strip()
-            or not dependency.text_en.strip()
-            or not links
-            or any(not link.sources for link in links)
-        )
-        if invalid:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    (ValidationDiagnostic("invalid_dependency_evidence", ("evidence",)),),
-                )
-            )
-            continue
 
         by_version[dependency.procedure_version.semantic_id].append(
             ProcedureDependencySnapshot(
@@ -493,8 +476,8 @@ def _dependency_snapshots(
                     dependency.target_procedure.text_en,
                 ),
                 dependency.relation,
-                applicability,
-                decoded.predicate,
+                rules.applicability,
+                rules.satisfied_when,
                 dependency.display_order,
                 dependency.effective_from,
                 dependency.effective_to,
@@ -504,9 +487,6 @@ def _dependency_snapshots(
                 links,
             )
         )
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
-
     return KnowledgeSnapshot(
         snapshot.fact_definitions,
         snapshot.services,

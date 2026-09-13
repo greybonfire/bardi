@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from .catalog import KnowledgeSnapshot, QuestionSnapshot
 from .evaluator import Evaluation, TruthValue, evaluate
 from .facts import PreparedFacts
+from .questions import pick_procedure_selection_question
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,40 +125,8 @@ def select_procedure(
             if item.evaluation.value is TruthValue.UNKNOWN
         )
     )
-    source_facts: set[str] = set()
-    dependency_defects: set[str] = set()
-    for key in consequential:
-        definition = snapshot.fact_definitions.get(key)
-        if definition is None or not definition.derived:
-            source_facts.add(key)
-            continue
-        dependencies = prepared_facts.missing_source_dependencies.get(key)
-        if not dependencies or any(
-            snapshot.fact_definitions.get(source) is not None
-            and snapshot.fact_definitions[source].derived
-            for source in dependencies
-        ):
-            dependency_defects.add(f"missing_source_dependencies:{key}")
-        else:
-            source_facts.update(dependencies)
-
-    if dependency_defects:
-        return SelectionConfigurationDefect(tuple(sorted(dependency_defects)), evaluations)
-
-    covered = {
-        fact_key for question in service.questions for fact_key in question.resolved_fact_keys
-    }
-    uncovered = source_facts - covered
-    if uncovered:
-        return SelectionConfigurationDefect(
-            tuple(f"missing_procedure_selection_question:{key}" for key in sorted(uncovered)),
-            evaluations,
-        )
-
-    covering_questions = (
-        question
-        for question in service.questions
-        if source_facts.intersection(question.resolved_fact_keys)
-    )
-    question = min(covering_questions, key=lambda item: (item.priority, item.semantic_id))
-    return SelectionQuestion(question, evaluations)
+    question = pick_procedure_selection_question(snapshot, service, prepared_facts, consequential)
+    if question.diagnostic_codes:
+        return SelectionConfigurationDefect(question.diagnostic_codes, evaluations)
+    assert question.question is not None
+    return SelectionQuestion(question.question, evaluations)

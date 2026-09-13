@@ -1,4 +1,4 @@
-"""Characterize both existing picker policies before consolidating their implementation.
+"""Pin both compatibility profiles of the shared Missing-Fact Picker.
 
 Malformed catalog/preparation handoffs below intentionally bypass publication validation;
 these are compatibility observations, not claims that such knowledge can be published.
@@ -11,13 +11,18 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from planning import (
+    AnswerDefinition,
     CandidateEvaluation,
     FactDefinition,
+    InvalidResult,
     KnowledgeSnapshot,
     LocalizedText,
+    NextQuestionResult,
     Predicate,
     PreparedFacts,
     ProcedureCandidateSnapshot,
+    PublicDiagnostic,
+    PublicQuestion,
     QuestionSnapshot,
     SelectionConfigurationDefect,
     SelectionQuestion,
@@ -26,7 +31,12 @@ from planning import (
     select_procedure,
 )
 from planning.evaluator import Evaluation, EvaluationTrace, evaluate
-from planning.questions import ConsequentialQuestion, pick_consequential_question
+from planning.questions import (
+    ConsequentialQuestion,
+    pick_consequential_question,
+    pick_procedure_selection_question,
+    question_result,
+)
 
 
 def question(
@@ -73,6 +83,14 @@ class MissingFactPolicyCharacterizationTests(unittest.TestCase):
         selection_expected: QuestionSnapshot | tuple[str, ...],
         later_expected: QuestionSnapshot | tuple[str, ...],
     ) -> None:
+        picked = pick_procedure_selection_question(
+            snapshot, snapshot.services[0], prepared, missing
+        )
+        if isinstance(selection_expected, QuestionSnapshot):
+            self.assertEqual(picked, ConsequentialQuestion(selection_expected))
+            self.assertIs(picked.question, selection_expected)
+        else:
+            self.assertEqual(picked, ConsequentialQuestion(None, selection_expected))
         selection = select_procedure(snapshot, "service", prepared)
         expected_evaluations = tuple(
             CandidateEvaluation(
@@ -225,6 +243,67 @@ class MissingFactPolicyCharacterizationTests(unittest.TestCase):
                     PreparedFacts({}, frozenset(), {}),
                     winner,
                     winner,
+                )
+
+    def test_diagnostic_prefix_is_preserved_verbatim(self) -> None:
+        snapshot = knowledge(frozenset())
+        for prefix in ("custom", "", "custom:phase:"):
+            for missing, suffix in ((frozenset({"a"}), "a"), (frozenset(), "no_source_fact")):
+                with self.subTest(prefix=prefix, missing=missing):
+                    self.assertEqual(
+                        pick_consequential_question(
+                            snapshot,
+                            snapshot.services[0],
+                            PreparedFacts({}, frozenset(), {}),
+                            missing,
+                            diagnostic_prefix=prefix,
+                        ),
+                        ConsequentialQuestion(None, (f"{prefix}:{suffix}",)),
+                    )
+
+    def test_empty_selection_picker_retains_min_error(self) -> None:
+        snapshot = knowledge(frozenset(), (question(),))
+        with self.assertRaisesRegex(ValueError, "min\\(\\) (arg|iterable argument) is empty"):
+            pick_procedure_selection_question(
+                snapshot, snapshot.services[0], PreparedFacts({}, frozenset(), {}), frozenset()
+            )
+
+    def test_question_result_rejects_undefined_and_derived_answers_with_redaction(self) -> None:
+        snapshot = knowledge(frozenset())
+        for answers in (("a", "undefined"), ("a", "derived_a"), ("undefined", "derived_a")):
+            with self.subTest(answers=answers):
+                self.assertEqual(
+                    question_result(snapshot, "service", question(answers=answers)),
+                    InvalidResult((PublicDiagnostic("knowledge_configuration_invalid", ()),)),
+                )
+
+    def test_question_result_preserves_authored_projection_including_empty_answers(self) -> None:
+        snapshot = replace(
+            knowledge(frozenset()),
+            fact_definitions={
+                "a": FactDefinition("a", "enum", enum_values=("z", "a")),
+                "b": FactDefinition("b", "integer", minimum=2),
+            },
+        )
+        for keys, answers in (
+            (
+                ("b", "a", "b"),
+                (
+                    AnswerDefinition("b", "integer", (), 2),
+                    AnswerDefinition("a", "enum", ("z", "a")),
+                    AnswerDefinition("b", "integer", (), 2),
+                ),
+            ),
+            ((), ()),
+        ):
+            with self.subTest(keys=keys):
+                authored = replace(question(answers=keys), primary_fact_key="undefined")
+                self.assertEqual(
+                    question_result(snapshot, "chosen-service", authored),
+                    NextQuestionResult(
+                        "chosen-service",
+                        PublicQuestion(authored.semantic_id, authored.text, answers),
+                    ),
                 )
 
     def test_empty_later_input_returns_no_source_fact(self) -> None:

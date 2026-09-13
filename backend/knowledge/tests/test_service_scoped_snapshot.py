@@ -1279,6 +1279,63 @@ class ServiceScopedSnapshotTests(TransactionTestCase):
             execute_planning(planning_input, snapshot_loader=lambda: full),
         )
 
+    def test_routing_pk_zero_preserves_legacy_full_loader_failure(self) -> None:
+        _, version = self._draft_procedure(self.requested, "scoped.pk-zero", "Routing PK zero")
+        point = ServicePoint.objects.create(
+            semantic_id="scoped.pk-zero.point", name_ar="نقطة", name_en="Point"
+        )
+        material = ServicePointVersion.objects.create(
+            semantic_id="scoped.pk-zero.material",
+            service_point=point,
+            address_ar="عنوان",
+            address_en="Address",
+            availability=ServicePointVersion.Availability.AVAILABLE,
+            effective_from=date(2026, 1, 1),
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        association = ProcedureServicePointAssociation.objects.create(
+            pk=0,
+            procedure_version=version,
+            semantic_id="routing",
+            service_point_version=material,
+            applicability={"op": "eq", "fact": self.fact.key, "value": True},
+            verification_state="current",
+            verified_on=date(2026, 8, 1),
+        )
+        source_link = self.evidence_by_service[self.requested.semantic_id].source_links.first()
+        assert source_link is not None
+        for owner in (
+            {"procedure_service_point_association": association},
+            {"service_point_version": material},
+        ):
+            link = EvidenceLink.objects.create(
+                **owner,
+                semantic_id="routing.evidence",
+                passage="Routing passage",
+                location="Section 4",
+                applicability_context="Requested jurisdiction",
+                verification_state="current",
+                verified_on=date(2026, 8, 1),
+                support_status=EvidenceLink.SupportStatus.SUPPORTS,
+            )
+            set_evidence_link_sources(link, (source_link.source,))
+        publish_procedure_version(version.pk, actor=self.actor)
+        association.refresh_from_db()
+        self.assertEqual(association.pk, 0)
+
+        # Characterize, not repair: scoped validation accepts the non-null owner,
+        # but both public loaders then use the routing materializer's truthy-ID
+        # fallback, which stores this association's evidence under None, not 0.
+        self._assert_exact_loader_diagnostics(
+            (
+                (
+                    "service_point_association:scoped.pk-zero.v1:routing",
+                    (("invalid_routing_evidence", ("evidence",)),),
+                ),
+            )
+        )
+
     def test_shared_service_point_material_is_loaded_without_unrelated_association(self) -> None:
         point = ServicePoint.objects.create(
             semantic_id="scoped.shared-point",

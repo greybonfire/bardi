@@ -552,6 +552,219 @@ class ServiceScopedSnapshotTests(TransactionTestCase):
             )
         self.assertEqual(full_error.exception.owner_ids, scoped_error.exception.owner_ids)
 
+    def _assert_exact_loader_diagnostics(
+        self, expected: tuple[tuple[str, tuple[tuple[str, tuple[str, ...]], ...]], ...]
+    ) -> None:
+        """Pin each loader independently, including repeated owners and diagnostic order."""
+        for loader in ("full", "scoped"):
+            with self.subTest(loader=loader):
+                with self.assertRaises(KnowledgeSnapshotLoadError) as caught:
+                    if loader == "full":
+                        load_knowledge_snapshot_as_of(date(2026, 9, 1))
+                    else:
+                        load_consistent_service_knowledge_snapshot_as_of(
+                            self.requested.semantic_id, date(2026, 9, 1)
+                        )
+                self.assertEqual(caught.exception.owner_ids, tuple(row[0] for row in expected))
+                self.assertEqual(
+                    tuple(
+                        (row.owner_id, tuple((item.code, item.path) for item in row.diagnostics))
+                        for row in caught.exception.rule_diagnostics
+                    ),
+                    expected,
+                )
+
+    def test_malformed_core_rules_preserve_same_owner_diagnostics_and_fee_suppression(
+        self,
+    ) -> None:
+        from knowledge.fees import Fee
+
+        _, foreign_version = self._draft_procedure(
+            self.unrelated, "characterization.foreign", "Foreign Basis owner"
+        )
+        foreign_basis = EligibilityBasis.objects.create(
+            procedure_version=foreign_version,
+            semantic_id="foreign-basis",
+            text_ar="أساس",
+            text_en="Basis",
+            qualification={"op": "eq", "fact": self.fact.key, "value": True},
+        )
+        _, version = self._draft_procedure(
+            self.requested, "characterization.core", "Malformed core"
+        )
+        common = {
+            "procedure_version": version,
+            "text_ar": "فحص",
+            "text_en": "Probe",
+            "applicability": {"op": "not-a-rule"},
+            "verification_state": "current",
+        }
+        # bulk_create bypasses authoring validation, not database constraints. The
+        # foreign draft Basis makes ownership invalid without an ownerless row.
+        Step.objects.bulk_create(
+            [
+                Step(
+                    **common,
+                    semantic_id="step",
+                    phase="probe",
+                    scope="eligibility_basis",
+                    eligibility_basis=foreign_basis,
+                )
+            ]
+        )
+        Fee.objects.bulk_create(
+            [
+                Fee(
+                    **common,
+                    semantic_id="fee",
+                    scope="eligibility_basis",
+                    eligibility_basis=foreign_basis,
+                    value_state="known",
+                    amount=100,
+                    currency="EGP",
+                )
+            ]
+        )
+        Warning.objects.bulk_create(
+            [
+                Warning(
+                    **common,
+                    semantic_id="warning",
+                    kind=Warning.Kind.ADMINISTRATIVE,
+                    severity=Warning.Severity.IMPORTANT,
+                )
+            ]
+        )
+        self._promote_corrupt_probe_version(version)
+        rule = (("unsupported_rule_operator:not-a-rule", ("rule", "op")),)
+        # Owners are sorted, but equal-owner entries retain rule-before-owner/evidence
+        # order. Unlike Step and Warning, Fee reports only its malformed rule.
+        self._assert_exact_loader_diagnostics(
+            (
+                ("fee:characterization.core.v1:fee", rule),
+                ("step:characterization.core.v1:step", rule),
+                ("step:characterization.core.v1:step", (("invalid_basis_owner", ("scope",)),)),
+                ("warning:characterization.core.v1:warning", rule),
+                (
+                    "warning:characterization.core.v1:warning",
+                    (("invalid_warning_evidence", ("evidence",)),),
+                ),
+            )
+        )
+
+    def _characterize_validation_stage(self, first_stage: str) -> None:
+        """Later-stage corruption must remain hidden behind the first failing stage."""
+        _, version = self._draft_procedure(
+            self.requested, "characterization.stages", "Stage precedence"
+        )
+        common = {
+            "procedure_version": version,
+            "text_ar": "فحص",
+            "text_en": "Probe",
+            "verification_state": "current",
+        }
+        if first_stage == "core":
+            ChecklistItem.objects.bulk_create(
+                [
+                    ChecklistItem(
+                        **common,
+                        semantic_id="core",
+                        classification=ChecklistItem.Classification.OFFICIAL_REQUIREMENT,
+                    )
+                ]
+            )
+        if first_stage in {"core", "basis"}:
+            EligibilityBasis.objects.bulk_create(
+                [
+                    EligibilityBasis(
+                        **common,
+                        semantic_id="basis",
+                        reachability={},
+                        qualification={},
+                    )
+                ]
+            )
+        if first_stage in {"core", "basis", "dependency"}:
+            ProcedureDependency.objects.bulk_create(
+                [
+                    ProcedureDependency(
+                        **common,
+                        semantic_id="dependency",
+                        target_procedure=self.unrelated_procedure,
+                        relation=ProcedureDependency.Relation.BLOCKING_PREREQUISITE,
+                        applicability={},
+                        satisfied_when={},
+                    )
+                ]
+            )
+        point = ServicePoint.objects.create(
+            semantic_id="characterization.point", name_ar="نقطة", name_en="Point"
+        )
+        material = ServicePointVersion.objects.create(
+            semantic_id="characterization.point.v1",
+            service_point=point,
+            address_ar="عنوان",
+            address_en="Address",
+            availability=ServicePointVersion.Availability.AVAILABLE,
+            effective_from=date(2026, 1, 1),
+            verification_state="unknown",
+        )
+        ProcedureServicePointAssociation.objects.bulk_create(
+            [
+                ProcedureServicePointAssociation(
+                    procedure_version=version,
+                    semantic_id="routing",
+                    service_point_version=material,
+                    applicability={"op": "not-a-rule"},
+                    verification_state="current",
+                )
+            ]
+        )
+        self._promote_corrupt_probe_version(version)
+        expected = {
+            "core": (
+                (
+                    "checklist_item:characterization.stages.v1:core",
+                    (("missing_evidence_link", ("evidence",)),),
+                ),
+            ),
+            "basis": (
+                (
+                    "eligibility_basis:characterization.stages.v1:basis",
+                    (("missing_qualification", ("qualification",)),),
+                ),
+            ),
+            "dependency": (
+                (
+                    "procedure_dependency:characterization.stages.v1:dependency",
+                    (("missing_satisfied_when", ("satisfied_when",)),),
+                ),
+            ),
+            "routing": (
+                (
+                    "service_point_association:characterization.stages.v1:routing",
+                    (("unsupported_rule_operator:not-a-rule", ("rule", "op")),),
+                ),
+                (
+                    "service_point_version:characterization.point.v1",
+                    (("invalid_service_point_material", ()),),
+                ),
+            ),
+        }
+        self._assert_exact_loader_diagnostics(expected[first_stage])
+
+    def test_core_failure_precedes_basis_dependency_and_routing(self) -> None:
+        self._characterize_validation_stage("core")
+
+    def test_basis_qualification_failure_precedes_evidence_dependency_and_routing(self) -> None:
+        self._characterize_validation_stage("basis")
+
+    def test_dependency_satisfaction_failure_precedes_evidence_and_routing(self) -> None:
+        self._characterize_validation_stage("dependency")
+
+    def test_routing_rule_precedes_evidence_but_material_failure_coexists(self) -> None:
+        self._characterize_validation_stage("routing")
+
     def test_relevant_and_unrelated_invalid_checklist_rules_are_fail_closed(self) -> None:
         probes: list[tuple[Service, str]] = [
             (self.requested, "scoped.invalid.relevant-checklist"),

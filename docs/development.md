@@ -1,14 +1,15 @@
 # Local development
 
-The production backend scaffold uses Python 3.14 or newer, [uv](https://docs.astral.sh/uv/),
+The production backend uses Python 3.14 or newer, [uv](https://docs.astral.sh/uv/),
 Docker, and Docker Compose. PostgreSQL is required; there is no SQLite fallback.
+The Next.js frontend additionally uses a current **Node 22** release and npm.
 
 Python 3.14 is the supported production-development baseline: local development, production
 CI, and the eventual deployed backend should use the same runtime family. The frozen
 prototype keeps its historical 3.11–3.13 CI matrix and does not define the production
 runtime.
 
-## Setup
+## Backend setup
 
 From the repository root, copy the development environment contract and export it for
 host-run Django commands:
@@ -34,6 +35,35 @@ credentials in `.env.example` must never be used for a deployed database.
 
 The development settings include only local-safe defaults. Production settings fail
 closed and require every secret, host, origin, and PostgreSQL value to be provided.
+
+## Frontend setup
+
+Keep Django running in its own terminal at `http://localhost:8000`. In another terminal,
+from the repository root, set up and run the web app:
+
+```bash
+cp frontend/.env.example frontend/.env.local
+npm --prefix frontend ci
+npm --prefix frontend run dev
+```
+
+Open **http://localhost:3000/ar**. `/` redirects to Arabic (RTL); the **English** header
+link switches to the corresponding English (LTR) page. Next reads its own
+`frontend/.env.local`, not the root backend `.env`. The example uses server-only
+`BARDI_API_ORIGIN=http://127.0.0.1:8000` and SEO origin
+`BARDI_SITE_ORIGIN=http://localhost:3000`; do not copy backend secrets into it.
+
+Use the committed npm lock with `npm ci`. npm 10 encountered an Arborist bug during
+dependency updates; npm 11 installed the current lock. For dependency upgrades use npm 11,
+e.g. `(cd frontend && npx --yes npm@11 install <package>@<version>)`; no global npm upgrade
+is required. See [`frontend/README.md`](../frontend/README.md) for configuration and the
+complete frontend scope, security boundaries and test coverage.
+
+The Service directory is loaded from the backend, not bundled fake data. Only explicitly
+active Services are listed; publication alone does not activate one. Use the imports below
+and the normal independent Admin review/publish workflow to author usable guidance. Imports
+do not publish or approve knowledge. Empty navigation and API unavailability are explicit
+states, not a switch to a demo catalog or sample plan.
 
 ## Passport-renewal knowledge import and review
 
@@ -96,12 +126,76 @@ dimensions. Because the review policy flags both legal and military risk, indepe
 military specialist approvals are also required before a separate publisher uses the canonical
 Procedure Version **publish selected** action.
 
-Deployment-specific HTTPS redirect, proxy-header, and HSTS policy is intentionally deferred
-until the production ingress topology is selected and hardened under issue #54.
+The backend's trusted HTTPS ingress, proxy-header, HSTS and rate-limit requirements are
+in [`operations/private-pilot.md`](operations/private-pilot.md). The Next integration does
+not provision or replace them: only the two public `/v1` routes are proxied, without browser
+cookies, credentials or forwarded client IP headers. Django normally sees a shared Next
+proxy IP, so hardened edge rate limits and privacy-safe logging remain required. Production
+API access requires a valid server-only `BARDI_API_ORIGIN`; set `BARDI_SITE_ORIGIN` to the
+actual public SEO origin. No production domain, deployment or migration is introduced here.
 
-## Checks
+## Frontend checks and API schema
 
-Run the production scaffold checks with a running PostgreSQL service:
+These checks require Node 22, npm, Python 3.14 and uv, but **no PostgreSQL**. The frontend
+unit suite includes the real database-free schema-export regression. From the repository root:
+
+```bash
+uv sync --locked
+uv run python tools/export_web_api.py --check
+npm --prefix frontend run api:generate
+git diff --exit-code -- frontend/api-schema.json frontend/src/api/generated.d.ts
+npm --prefix frontend run lint
+npm --prefix frontend run typecheck
+npm --prefix frontend run test
+npm --prefix frontend run build
+```
+
+The exporter imports Django Ninja's declarations without connecting to a database. When
+intentionally changing the public API, regenerate both committed contract files, review
+them with the backend contract change, and then rerun the checks:
+
+```bash
+uv run python tools/export_web_api.py
+npm --prefix frontend run api:generate
+```
+
+`--check` rejects a missing/stale `frontend/api-schema.json`; CI also regenerates
+`frontend/src/api/generated.d.ts` and checks the two exact paths for drift. Do not hand-edit
+generated types.
+
+For production-build Playwright tests, install the managed browser and build with the
+synthetic test origins:
+
+```bash
+(cd frontend && npx playwright install chromium)
+BARDI_API_ORIGIN=http://127.0.0.1:8451 BARDI_SITE_ORIGIN=http://localhost:3010 \
+  npm --prefix frontend run build
+npm --prefix frontend run test:e2e
+```
+
+The configuration starts a test-only API stand-in on `127.0.0.1:8451` and the built Next
+server at `http://localhost:3010` (bound to `127.0.0.1`); keep both ports free. Build with
+the same site origin so build-time SEO metadata matches. It does not start Django or PostgreSQL.
+On Linux CI, browser installation uses `npx playwright install --with-deps chromium` from
+`frontend/`. To use an existing local Chromium-compatible browser instead of downloading one:
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/absolute/path/to/chromium \
+  npm --prefix frontend run test:e2e
+```
+
+Use only synthetic cases for browser tests and debugging; do not publish traces, screenshots
+or other artifacts containing real case data. This browser suite does not replace the
+backend's researched-family acceptance tests. The frontend's single-case `sessionStorage`,
+shared-device clearing and print/export caveats are documented in
+[`frontend/README.md`](../frontend/README.md). Keep Next configured with `logging: false`
+and `experimental.serverComponentsHmrCache: false`: the development HMR cache otherwise
+caches even `no-store` POSTs. Never attach Facts, Fact keys, bodies, planning responses,
+exceptions or traces to Next/APM/ingress logs or analytics.
+
+## Backend checks
+
+Run the production backend checks with a running PostgreSQL service:
 
 The planning validation domain has a database-free fast suite:
 
@@ -226,7 +320,11 @@ The complete raw result, including per-queryset counts and limitations, is prese
 
 ## Teardown
 
-Stop the local service normally with:
+Stop the Next and Django processes with `Ctrl-C` in their respective terminals. Clear any
+case in the browser before leaving a shared device; closing a tab may not erase a restored
+browser session, and printing/exported copies require separate safe disposal.
+
+Stop the local database service normally with:
 
 ```bash
 docker compose down

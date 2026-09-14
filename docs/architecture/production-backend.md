@@ -12,9 +12,13 @@ The first production system is a **Django/PostgreSQL modular monolith**. Django 
 ## System boundary
 
 ```text
-Next.js web application
+Browser: bilingual pages and tab-scoped Anonymous Case
         |
-        | Django Ninja HTTP interface
+        | same-origin public HTTP interface
+        v
+Next.js web application (pages and public API route handlers)
+        |
+        | fixed Django Ninja endpoints; server-only upstream origin
         v
 Django application layer
         |
@@ -82,6 +86,85 @@ The four public discriminators are `next_question`, `plan`, `inconclusive`, and 
 
 The web client keeps in-progress answers client-side and resubmits the current Fact set. A future saved-profile feature requires a separate privacy/product decision; it is not part of the initial backend contract. The first deployment assumes same-origin or reverse-proxied Next.js; cross-origin CORS policy is a separate deployment decision.
 
+## Next.js web boundary
+
+The application under `frontend/` implements the client seam accepted in
+[ADR 0004](../adr/0004-do-not-persist-case-facts.md),
+[ADR 0005](../adr/0005-use-nextjs-with-django-ninja.md) and
+[ADR 0006](../adr/0006-expose-one-stateless-planning-operation.md). It owns Arabic-default
+RTL and English LTR pages, public Service navigation/introduction pages, SEO metadata, the
+interactive questionnaire and presentation/printing of every public planning result. It
+does not implement administrative rules, infer eligibility, rank Bases/offices, recursively
+plan dependencies or replace unknown guidance with a closest match.
+
+Navigation is loaded from the active-Service API, never a bundled fake catalog. Authored
+knowledge enters through the normal import, independent Admin review and canonical publish
+workflow; these are separate operations. Service activation remains explicit and independent
+of publication. Empty navigation and unavailable services remain honest states, not demo
+fallbacks.
+
+### Same-origin transport
+
+The browser uses only `GET /v1/services` and `POST /v1/planning` for the public application
+interface. Next's Node route handlers proxy those exact operations; the server-rendered
+Service loader uses the same validated upstream client directly. There is no generic URL
+proxy or proxy for Django Admin, authentication, health or authoring endpoints.
+
+- `BARDI_API_ORIGIN` is a server-only HTTP(S) origin and must be configured for production
+  API access. Credentials, queries, fragments and non-root paths are rejected. It must
+  never be exposed through a `NEXT_PUBLIC_` variable. Missing/invalid configuration fails
+  closed; only development has an unconfigured localhost fallback.
+- `BARDI_SITE_ORIGIN` is the exact trusted public origin for browser POST validation as
+  well as canonical/alternate-language and sitemap/robots URLs. Planning fails closed if
+  it is absent/invalid outside development. It accepts no trailing slash, path, credentials,
+  query or fragment; listener and forwarded host/scheme metadata are not trust anchors.
+  Hosting must set the actual public site origin; the implementation otherwise falls back
+  to `http://localhost:3000`. This does not select or invent a production domain.
+- Fetches omit credentials and use `no-store` with no referrer. Next constructs fixed
+  upstream paths and headers; it forwards no incoming query, cookie, authorization,
+  request ID, forwarded request headers or browser IP. Upstream redirects are not followed.
+- Planning request streams are bounded to 512 KiB (524,288 bytes), including absent or
+  understated `Content-Length`. A 10-second deadline covers request reads, upstream fetch
+  and response-body consumption, with cancellation on disconnect. This does not prevent
+  earlier platform/server buffering or replace ingress body/connection limits.
+- Public JSON responses are checked against strict nested field allow-lists. Proxy replies
+  use locally constructed `no-store` headers; the only retained upstream header value is
+  a validated bounded delta-seconds `Retry-After`. Unexpected bodies, debug pages, private
+  fields and exception details do not pass through to the browser.
+
+Django therefore normally sees a **shared Next proxy IP**, not each browser's IP. Its
+process-local rate limiter may share a bucket across users. A different client-identity
+boundary requires a separately hardened trusted ingress; do not forward untrusted IP
+headers to evade limits. Preserve the backend's private application port, trusted HTTPS
+proxy-header handling, hardened edge rate limits and privacy-safe logging requirements in
+[`../operations/private-pilot.md`](../operations/private-pilot.md). Next is not a replacement
+for those controls. This integration adds no production deployment, migration or infrastructure.
+
+### Tab-scoped case and browser protections
+
+The client uses `sessionStorage` for one active Service case per tab: format version,
+Service ID, current source Facts, minimal answer history (Question IDs and Fact keys), and
+calendar evaluation date. Starting a different Service questionnaire replaces the previous
+case; it does not create a case archive. Plans, response objects, Derived Facts and authored
+Question text remain out of storage. Submitted answers can be restored and re-evaluated;
+unsubmitted drafts need not survive refresh. Storage failures allow memory-only continuation
+with an explicit notice.
+
+Case data does not enter `localStorage`, cookies, URLs, server sessions or server-side
+Case records. Browser session restoration or tab duplication can retain tab data: closing
+a tab is not a secure-deletion guarantee. The interface provides confirmed clearing and
+shared-device guidance; if browser storage cannot be cleared, the person must remove site
+data through browser settings. Printing or saving a PDF produces a separate potentially
+sensitive copy that must be protected/disposed of independently; clearing the case does not
+delete exports.
+
+Fonts are self-hosted; the application embeds no third-party tracking. Its static CSP limits
+connections/fonts to self, blocks framing/objects and accompanies no-referrer, nosniff and
+permissions restrictions. Script/style `'unsafe-inline'` remains a Next hydration/style
+tradeoff, with script `'unsafe-eval'` limited to development. A nonce-based production CSP
+requires separate hardening and verification; these application headers are not a complete
+ingress policy. Questionnaire `noindex` metadata is not authentication or data protection.
+
 ## Snapshot composition
 
 `knowledge.domain` explicitly composes each semantic snapshot in this order: stable internal
@@ -101,7 +184,10 @@ lazy relations cross into planning.
 ## Privacy and observability
 
 - Do not persist raw Anonymous Case Facts in version 1.
-- Do not log request bodies containing raw Facts.
+- Do not log request bodies containing raw Facts, in Django, Next or upstream infrastructure.
+- Next's `logging: false` and `experimental.serverComponentsHmrCache: false` are mandatory
+  privacy controls. The development HMR fetch cache otherwise caches POSTs even when
+  requests specify `no-store`. Do not enable framework request/fetch logging for debugging.
 - The application logging boundary recognizes the planning route across API and Django
   request/server/security logging. It removes request objects, exceptions, stacks, and custom
   record attributes before configured output. The only permitted fields are HTTP method, the
@@ -113,9 +199,11 @@ lazy relations cross into planning.
   events only from the same explicit coarse allow-list; merely redacting known sensitive keys
   from a richer object is not sufficient.
 - Evaluation Traces are transient editor/test diagnostics, not public responses or general application logs.
-- Deployment ingress, reverse-proxy, platform access logging, and tracing are outside the
-  application boundary and must be configured not to capture planning request bodies. The
-  application filter is not a substitute for that deployment control.
+- Next/APM, deployment ingress, reverse-proxy, platform access logging, tracing, analytics
+  and error reporting must not capture Facts, Fact keys, request bodies, planning responses,
+  exceptions, stacks, query strings or Evaluation Traces. Application filters and Next's
+  logging/cache settings do not configure those external sinks. Use only an explicit coarse
+  allow-list, never a richer payload with known keys redacted.
 - No document upload or implied document verification is required by the core planning flow.
 
 ## Initial infrastructure constraints
@@ -140,6 +228,16 @@ The backend requires:
 - API contract tests for public discriminated results;
 - acceptance tests ported from the three researched prototype Procedure families, including exact temporal and conditional-question edges;
 - privacy tests that ensure raw Facts do not enter persistent/logged structures.
+
+The frontend adds generated-contract/runtime-schema checks, API proxy/privacy and bounded
+transport tests, typed questionnaire/state/storage tests, bilingual full/partial Plan rendering
+and print tests, and production-build Playwright integration tests against a synthetic,
+test-only API stand-in. The OpenAPI exporter and frontend checks require Python 3.14/uv
+and Node 22 but no PostgreSQL. The committed `frontend/api-schema.json` must match Django
+Ninja's declarations, and `frontend/src/api/generated.d.ts` must match type generation;
+CI fails on either drift. Browser fixtures are not backend acceptance evidence or production
+navigation data. Full scope and commands are in
+[`../../frontend/README.md`](../../frontend/README.md).
 
 A production implementation is not considered semantically complete merely because its ORM and endpoints work; it must reproduce the intended planning behavior captured by the authoritative rules contract and acceptance scenarios.
 

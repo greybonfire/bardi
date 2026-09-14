@@ -206,20 +206,85 @@ jobs:
           --exclude-tag=production_acceptance
           --settings=bardi.settings.test
 
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      BARDI_API_ORIGIN: http://127.0.0.1:8451
+      BARDI_SITE_ORIGIN: http://localhost:3010
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up Python 3.14 for the database-free API exporter
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v10.0.1
+        with:
+          enable-cache: true
+
+      - name: Install locked API exporter dependencies
+        run: uv sync --locked
+
+      - name: Install locked frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Check public OpenAPI snapshot without PostgreSQL
+        run: uv run python tools/export_web_api.py --check
+
+      - name: Check generated API types
+        run: |
+          npm --prefix frontend run api:generate
+          git diff --exit-code -- frontend/api-schema.json frontend/src/api/generated.d.ts
+
+      - name: Lint frontend
+        run: npm --prefix frontend run lint
+
+      - name: Type-check frontend
+        run: npm --prefix frontend run typecheck
+
+      - name: Run frontend unit and component tests
+        run: npm --prefix frontend run test
+
+      - name: Build production frontend
+        run: npm --prefix frontend run build
+
+      - name: Install managed Chromium and system dependencies
+        run: cd frontend && npx playwright install --with-deps chromium
+
+      - name: Run production-build browser tests with the test-only API
+        run: npm --prefix frontend run test:e2e
+
   required:
     name: CI required
     needs:
       - test
       - production
+      - frontend
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 2
 
     steps:
-      - name: Verify prototype and production tracks passed
+      - name: Verify all three tracks passed
         env:
           PROTOTYPE_RESULT: ${{ needs.test.result }}
           PRODUCTION_RESULT: ${{ needs.production.result }}
+          FRONTEND_RESULT: ${{ needs.frontend.result }}
         run: |
           test "$PROTOTYPE_RESULT" = "success"
           test "$PRODUCTION_RESULT" = "success"
+          test "$FRONTEND_RESULT" = "success"

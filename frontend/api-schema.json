@@ -1,0 +1,1177 @@
+{
+  "components": {
+    "schemas": {
+      "AnswerDefinitionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "enum_options": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Enum Options",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "enum",
+              "integer",
+              "boolean",
+              "date",
+              "string"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "enum_options",
+          "minimum"
+        ],
+        "title": "AnswerDefinitionResponse",
+        "type": "object"
+      },
+      "ChecklistItemResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "classification": {
+            "enum": [
+              "official_requirement",
+              "practical_preparation"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "classification_label": {
+            "title": "Classification Label",
+            "type": "string"
+          },
+          "copy_quantity": {
+            "title": "Copy Quantity",
+            "type": "integer"
+          },
+          "document_type_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Type Id"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "original_quantity": {
+            "title": "Original Quantity",
+            "type": "integer"
+          },
+          "quantity": {
+            "title": "Quantity",
+            "type": "integer"
+          },
+          "scope": {
+            "enum": [
+              "procedure",
+              "eligibility_basis"
+            ],
+            "title": "Scope",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "classification",
+          "classification_label",
+          "quantity",
+          "original_quantity",
+          "copy_quantity",
+          "document_type_id",
+          "scope",
+          "sources",
+          "freshness"
+        ],
+        "title": "ChecklistItemResponse",
+        "type": "object"
+      },
+      "DiagnosticResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "path": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Path",
+            "type": "array"
+          }
+        },
+        "required": [
+          "code",
+          "path"
+        ],
+        "title": "DiagnosticResponse",
+        "type": "object"
+      },
+      "EligibilityBasisResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checklist_item_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Checklist Item Ids",
+            "type": "array"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "step_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Step Ids",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "checklist_item_ids",
+          "step_ids",
+          "sources",
+          "freshness"
+        ],
+        "title": "EligibilityBasisResponse",
+        "type": "object"
+      },
+      "EvaluationContext": {
+        "additionalProperties": false,
+        "properties": {
+          "evaluation_date": {
+            "format": "date",
+            "title": "Evaluation Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evaluation_date"
+        ],
+        "title": "EvaluationContext",
+        "type": "object"
+      },
+      "FeeResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Amount"
+          },
+          "currency": {
+            "title": "Currency",
+            "type": "string"
+          },
+          "current_value_unknown": {
+            "title": "Current Value Unknown",
+            "type": "boolean"
+          },
+          "fee_type": {
+            "title": "Fee Type",
+            "type": "string"
+          },
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "maximum_amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum Amount"
+          },
+          "minimum_amount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum Amount"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "value_state": {
+            "enum": [
+              "known",
+              "range",
+              "unknown",
+              "unverified"
+            ],
+            "title": "Value State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "value_state",
+          "amount",
+          "minimum_amount",
+          "maximum_amount",
+          "currency",
+          "fee_type",
+          "current_value_unknown",
+          "sources",
+          "freshness"
+        ],
+        "title": "FeeResponse",
+        "type": "object"
+      },
+      "FreshnessResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "reverify_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reverify On"
+          },
+          "state": {
+            "enum": [
+              "current",
+              "needs_reverification",
+              "stale",
+              "disputed",
+              "unknown"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "verified_on": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified On"
+          }
+        },
+        "required": [
+          "state",
+          "verified_on",
+          "reverify_on"
+        ],
+        "title": "FreshnessResponse",
+        "type": "object"
+      },
+      "GuidanceSourceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "authority_id": {
+            "title": "Authority Id",
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "official",
+              "field_report",
+              "secondary"
+            ],
+            "title": "Classification",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "retrieved_on": {
+            "format": "date",
+            "title": "Retrieved On",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "authority_id",
+          "title",
+          "locator",
+          "classification",
+          "retrieved_on"
+        ],
+        "title": "GuidanceSourceResponse",
+        "type": "object"
+      },
+      "InconclusiveResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "message": {
+            "title": "Message",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "type": {
+            "const": "inconclusive",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "reason",
+          "message"
+        ],
+        "title": "InconclusiveResponse",
+        "type": "object"
+      },
+      "InvalidResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticResponse"
+            },
+            "title": "Diagnostics",
+            "type": "array"
+          },
+          "type": {
+            "const": "invalid",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "diagnostics"
+        ],
+        "title": "InvalidResponse",
+        "type": "object"
+      },
+      "LocalizedTitleResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "ar": {
+            "title": "Ar",
+            "type": "string"
+          },
+          "en": {
+            "title": "En",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ar",
+          "en"
+        ],
+        "title": "LocalizedTitleResponse",
+        "type": "object"
+      },
+      "NavigationResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/ServiceNavigationItem"
+            },
+            "title": "Services",
+            "type": "array"
+          }
+        },
+        "required": [
+          "services"
+        ],
+        "title": "NavigationResponse",
+        "type": "object"
+      },
+      "NextQuestionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "question": {
+            "$ref": "#/components/schemas/QuestionResponse"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "string"
+          },
+          "type": {
+            "const": "next_question",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "service_id",
+          "question"
+        ],
+        "title": "NextQuestionResponse",
+        "type": "object"
+      },
+      "PlanResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "checklist_items": {
+            "items": {
+              "$ref": "#/components/schemas/ChecklistItemResponse"
+            },
+            "title": "Checklist Items",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "$ref": "#/components/schemas/ProcedureDependencyResponse"
+            },
+            "title": "Dependencies",
+            "type": "array"
+          },
+          "eligibility_bases": {
+            "items": {
+              "$ref": "#/components/schemas/EligibilityBasisResponse"
+            },
+            "title": "Eligibility Bases",
+            "type": "array"
+          },
+          "fees": {
+            "items": {
+              "$ref": "#/components/schemas/FeeResponse"
+            },
+            "title": "Fees",
+            "type": "array"
+          },
+          "inconclusive_basis_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Inconclusive Basis Ids",
+            "type": "array"
+          },
+          "inconclusive_sections": {
+            "items": {
+              "enum": [
+                "checklist_items",
+                "steps"
+              ],
+              "type": "string"
+            },
+            "title": "Inconclusive Sections",
+            "type": "array"
+          },
+          "procedure_id": {
+            "title": "Procedure Id",
+            "type": "string"
+          },
+          "procedure_version_id": {
+            "title": "Procedure Version Id",
+            "type": "string"
+          },
+          "routing": {
+            "$ref": "#/components/schemas/RoutingResponse"
+          },
+          "service_id": {
+            "title": "Service Id",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepResponse"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "type": {
+            "const": "plan",
+            "title": "Type",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/WarningResponse"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "type",
+          "service_id",
+          "procedure_id",
+          "procedure_version_id",
+          "title",
+          "eligibility_bases",
+          "inconclusive_basis_ids",
+          "inconclusive_sections",
+          "dependencies",
+          "checklist_items",
+          "steps",
+          "fees",
+          "warnings",
+          "routing"
+        ],
+        "title": "PlanResponse",
+        "type": "object"
+      },
+      "PlanningRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "evaluation_context": {
+            "$ref": "#/components/schemas/EvaluationContext"
+          },
+          "facts": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/TransportValue"
+            },
+            "maxProperties": 128,
+            "propertyNames": {
+              "maxLength": 128
+            },
+            "title": "Facts",
+            "type": "object"
+          },
+          "locale": {
+            "enum": [
+              "ar",
+              "en"
+            ],
+            "title": "Locale",
+            "type": "string"
+          },
+          "service_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": ".*\\S.*",
+            "title": "Service Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "service_id",
+          "facts",
+          "locale",
+          "evaluation_context"
+        ],
+        "title": "PlanningRequest",
+        "type": "object"
+      },
+      "PlanningResponse": {
+        "discriminator": {
+          "mapping": {
+            "inconclusive": "#/components/schemas/InconclusiveResponse",
+            "invalid": "#/components/schemas/InvalidResponse",
+            "next_question": "#/components/schemas/NextQuestionResponse",
+            "plan": "#/components/schemas/PlanResponse"
+          },
+          "propertyName": "type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/NextQuestionResponse"
+          },
+          {
+            "$ref": "#/components/schemas/PlanResponse"
+          },
+          {
+            "$ref": "#/components/schemas/InconclusiveResponse"
+          },
+          {
+            "$ref": "#/components/schemas/InvalidResponse"
+          }
+        ]
+      },
+      "ProcedureDependencyResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "relation": {
+            "const": "blocking_prerequisite",
+            "title": "Relation",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "satisfied",
+              "blocking",
+              "unsupported_target",
+              "inconclusive"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target_procedure": {
+            "title": "Target Procedure",
+            "type": "string"
+          },
+          "target_procedure_id": {
+            "title": "Target Procedure Id",
+            "type": "string"
+          },
+          "target_procedure_version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Procedure Version Id"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "relation",
+          "status",
+          "target_procedure_id",
+          "target_procedure",
+          "target_procedure_version_id",
+          "sources",
+          "freshness"
+        ],
+        "title": "ProcedureDependencyResponse",
+        "type": "object"
+      },
+      "QuestionResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerDefinitionResponse"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "answers"
+        ],
+        "title": "QuestionResponse",
+        "type": "object"
+      },
+      "RoutingResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "destinations": {
+            "items": {
+              "$ref": "#/components/schemas/ServicePointResponse"
+            },
+            "title": "Destinations",
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "resolved",
+              "partially_resolved",
+              "unresolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "verification_sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Verification Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "status",
+          "destinations",
+          "verification_sources"
+        ],
+        "title": "RoutingResponse",
+        "type": "object"
+      },
+      "ServiceNavigationItem": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "$ref": "#/components/schemas/LocalizedTitleResponse"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ServiceNavigationItem",
+        "type": "object"
+      },
+      "ServicePointResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "address": {
+            "title": "Address",
+            "type": "string"
+          },
+          "association_id": {
+            "title": "Association Id",
+            "type": "string"
+          },
+          "availability": {
+            "enum": [
+              "available",
+              "unknown"
+            ],
+            "title": "Availability",
+            "type": "string"
+          },
+          "effective_from": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective From"
+          },
+          "effective_to": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective To"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "service_point_id": {
+            "title": "Service Point Id",
+            "type": "string"
+          },
+          "service_point_version_id": {
+            "title": "Service Point Version Id",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          }
+        },
+        "required": [
+          "service_point_id",
+          "service_point_version_id",
+          "association_id",
+          "name",
+          "address",
+          "availability",
+          "effective_from",
+          "effective_to",
+          "sources"
+        ],
+        "title": "ServicePointResponse",
+        "type": "object"
+      },
+      "StepResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "phase",
+          "sources",
+          "freshness"
+        ],
+        "title": "StepResponse",
+        "type": "object"
+      },
+      "TransportValue": {
+        "anyOf": [
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "integer"
+          },
+          {
+            "maxLength": 2048,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "WarningResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "freshness": {
+            "$ref": "#/components/schemas/FreshnessResponse"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "administrative",
+              "product"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "general",
+              "regeneration",
+              "limitation"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "severity": {
+            "enum": [
+              "info",
+              "important"
+            ],
+            "title": "Severity",
+            "type": "string"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/GuidanceSourceResponse"
+            },
+            "title": "Sources",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "severity",
+          "kind",
+          "role",
+          "sources",
+          "freshness"
+        ],
+        "title": "WarningResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Stateless planning API. Pinned Fact derivation and redacted contradiction handling run before Procedure selection, version resolution, applicability, trust evaluation, and evidence-backed Checklist assembly.",
+    "title": "Bardi public API",
+    "version": "1.0.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/v1/planning": {
+      "post": {
+        "operationId": "api_api_planning",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanningRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanningResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InconclusiveResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Planning"
+      }
+    },
+    "/v1/services": {
+      "get": {
+        "operationId": "api_api_services",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NavigationResponse"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InconclusiveResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Services"
+      }
+    }
+  },
+  "servers": []
+}

@@ -8,7 +8,41 @@ Python 3.14 is the supported production-development baseline: local development,
 eventual deployed backend should use the same runtime family. The retired research prototype is
 preserved in Git history and is not part of the supported development or CI surface.
 
-## Backend setup
+## Full-stack Docker Compose setup
+
+For a one-command development environment, from the repository root copy the local
+configuration and start the stack:
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Compose starts PostgreSQL, Django, and Next.js. Open **http://localhost:3000/ar**; the
+Django Admin is at `http://localhost:8000/admin/`. The backend container applies pending
+migrations before starting Django, and the frontend waits for the backend health check.
+Source directories are mounted so Django and Next.js reload during development. Compose
+uses `postgres` as the database hostname and `backend` as the server-side frontend API
+hostname; these overrides are kept inside `compose.yaml` and do not change the host-run
+`.env` contract.
+
+Create an Admin user from another terminal after the stack is healthy:
+
+```bash
+docker compose exec backend \
+  python backend/manage.py createsuperuser --settings=bardi.settings.development
+```
+
+Stop the services while preserving the database volume with:
+
+```bash
+docker compose down
+```
+
+Use `docker compose down -v` only when intentionally deleting the local database. This
+Compose setup is for local development; it is not a production deployment definition.
+
+## Backend setup (host-run workflow)
 
 From the repository root, copy the development environment contract and export it for
 host-run Django commands:

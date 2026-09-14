@@ -7,7 +7,11 @@ The web app presents authored guidance, not government decisions or an applicati
 ## Local development
 
 Use a current **Node 22** release (`frontend/.nvmrc`) and npm. Run commands from the
-repository root unless a command explicitly changes directory.
+repository root unless a command explicitly changes directory. For a one-command
+containerized development environment, use the full-stack workflow in
+[`docs/development.md`](../docs/development.md); it starts PostgreSQL, Django, and Next.js
+together. The host-run workflow below remains available when you prefer local Python and
+Node processes.
 
 1. Set up PostgreSQL and Django using [`docs/development.md`](../docs/development.md).
    Keep Django running separately at `http://localhost:8000`; Admin is at `/admin/`.

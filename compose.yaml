@@ -15,5 +15,81 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    env_file:
+      - .env
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1,backend
+      CSRF_TRUSTED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command:
+      - sh
+      - -c
+      - >-
+        python backend/manage.py migrate --settings=bardi.settings.development &&
+        python backend/manage.py runserver 0.0.0.0:8000 --settings=bardi.settings.development
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://127.0.0.1:8000/v1/services')
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      BARDI_API_ORIGIN: http://backend:8000
+      BARDI_SITE_ORIGIN: http://localhost:3000
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/app
+      - frontend_node_modules:/app/node_modules
+      - frontend_next:/app/.next
+    command:
+      - sh
+      - -c
+      - >-
+        npm ci --prefer-offline --no-audit --no-fund &&
+        ./node_modules/.bin/next dev --hostname 0.0.0.0
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - >-
+          fetch('http://127.0.0.1:3000/ar')
+          .then((response) => { if (!response.ok) process.exit(1); })
+          .catch(() => process.exit(1))
+      interval: 5s
+      timeout: 5s
+      retries: 18
+      start_period: 15s
+
 volumes:
   postgres_data:
+  frontend_node_modules:
+  frontend_next:

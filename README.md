@@ -17,22 +17,27 @@ and PostgreSQL-backed checks. See [`docs/development.md`](docs/development.md) f
 and validation. Editors should use [`docs/editorial-process.md`](docs/editorial-process.md) for the
 end-to-end authoring, review, publication, and programmatic-import workflow.
 
-Start PostgreSQL and run Django at `http://localhost:8000` in a separate terminal using
-[`docs/development.md`](docs/development.md). Then, from the repository root:
+For the quickest local full-stack setup, from the repository root run:
 
 ```bash
-cp frontend/.env.example frontend/.env.local
-npm --prefix frontend ci
-npm --prefix frontend run dev
+cp .env.example .env
+docker compose up --build
 ```
 
-Open **http://localhost:3000/ar**; **English** switches to `/en`. Services come from the
-backend, never a bundled demo fallback. Import authored knowledge, complete independent
-Admin review and publish it through the normal workflow; empty or unavailable services
-are shown honestly. See [`frontend/README.md`](frontend/README.md) for configuration,
-case privacy, schema generation, unit/browser tests and deployment-security caveats.
-[`docs/ci-cd.md`](docs/ci-cd.md) describes the two independent CI tracks. There is no
-production deployment automation for Django or Next.js.
+This starts PostgreSQL, Django at `http://localhost:8000`, and Next.js at
+**http://localhost:3000/ar**. The Compose setup is development-only; source files are
+mounted for reloads, the backend applies migrations when it starts, and the frontend
+reconciles its mounted `node_modules` with the committed lockfile before starting. Stop it
+with `docker compose down` (the database volume is preserved). To use the host-run workflow
+instead, or to create an Admin user, see [`docs/development.md`](docs/development.md).
+
+**English** switches to `/en`. Services come from the backend, never a bundled demo
+fallback. Import authored knowledge, complete independent Admin review and publish it
+through the normal workflow; empty or unavailable services are shown honestly. See
+[`frontend/README.md`](frontend/README.md) for configuration, case privacy, schema
+generation, unit/browser tests and deployment-security caveats. [`docs/ci-cd.md`](docs/ci-cd.md)
+describes the three required CI tracks. There is no production deployment automation
+for Django or Next.js.
 
 ## Production design
 

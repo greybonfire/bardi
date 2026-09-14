@@ -26,8 +26,9 @@ docker compose up --build
 
 This starts PostgreSQL, Django at `http://localhost:8000`, and Next.js at
 **http://localhost:3000/ar**. The Compose setup is development-only; source files are
-mounted for reloads and the backend applies migrations when it starts. Stop it with
-`docker compose down` (the database volume is preserved). To use the host-run workflow
+mounted for reloads, the backend applies migrations when it starts, and the frontend
+reconciles its mounted `node_modules` with the committed lockfile before starting. Stop it
+with `docker compose down` (the database volume is preserved). To use the host-run workflow
 instead, or to create an Admin user, see [`docs/development.md`](docs/development.md).
 
 **English** switches to `/en`. Services come from the backend, never a bundled demo
@@ -35,7 +36,7 @@ fallback. Import authored knowledge, complete independent Admin review and publi
 through the normal workflow; empty or unavailable services are shown honestly. See
 [`frontend/README.md`](frontend/README.md) for configuration, case privacy, schema
 generation, unit/browser tests and deployment-security caveats. [`docs/ci-cd.md`](docs/ci-cd.md)
-describes the two independent CI tracks. There is no production deployment automation
+describes the three required CI tracks. There is no production deployment automation
 for Django or Next.js.
 
 ## Production design

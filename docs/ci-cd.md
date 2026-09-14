@@ -5,7 +5,7 @@ The repository uses GitHub Actions for production continuous integration.
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual
-`workflow_dispatch` runs. It has two deliberately separate tracks:
+`workflow_dispatch` runs. It has three deliberately separate required tracks:
 
 - The Python 3.14 **Production backend** job runs against PostgreSQL 17. It installs
   only from the committed `uv.lock`, then runs Ruff lint and format checks, Mypy, Python
@@ -18,21 +18,29 @@ The repository uses GitHub Actions for production continuous integration.
   a production Next build and Playwright browser tests. Managed Chromium and its Linux
   dependencies are installed with `npx playwright install --with-deps chromium` from
   `frontend/`; no locally installed browser is assumed in CI.
+- A **Development Compose** job copies the safe development `.env.example`, validates
+  `compose.yaml`, builds the backend and frontend development images, starts PostgreSQL,
+  Django and Next.js together, and waits for real HTTP 200 responses from both
+  `GET /v1/services` and `/ar`. It tears down the disposable volumes after every run.
+  This catches Dockerfile, Compose wiring, container-DNS and startup regressions that the
+  backend and frontend jobs intentionally do not exercise.
 
 Production CI intentionally uses the same Python runtime family as local backend development.
 The retired research prototype is no longer compiled or tested on `main`; production acceptance
 tests are authoritative for supported behavior.
 
-The final `CI required` job depends on both tracks and succeeds only when
-`PRODUCTION_RESULT` and `FRONTEND_RESULT` are each exactly `success`.
+The final `CI required` job depends on all three tracks and succeeds only when
+`PRODUCTION_RESULT`, `FRONTEND_RESULT`, and `COMPOSE_RESULT` are each exactly `success`.
 A failure, cancellation or skipped dependency cannot pass the aggregate. This stable name
-remains the branch-protection check; the frontend gate does not weaken or replace the
-production-backend track.
+remains the branch-protection check; the frontend and Compose gates do not weaken or replace
+the production-backend track.
 
 The workflow uses read-only repository permissions. CI supplies explicit test-only
 PostgreSQL credentials, a strong Django secret, allowed hosts, and a valid HTTPS CSRF
 origin for the backend job. The Frontend job uses only loopback test origins and disables
-Next telemetry; it needs no production secrets or PostgreSQL service.
+Next telemetry; it needs no production secrets or PostgreSQL service. The Compose job uses
+only the repository's safe development example values and destroys its database volume when
+it finishes.
 
 ### Frontend contract and browser gates
 
@@ -69,6 +77,18 @@ browser. Dependency upgrades can use npm 11 through `npx` without a global insta
 encountered an Arborist dependency-update bug, while npm 11 installed the current lock.
 CI uses ordinary locked `npm ci`; disabling install scripts is not assumed safe without
 verifying the complete frontend checks.
+
+### Development Compose gate
+
+The Compose job exercises the same development topology documented in
+[`development.md`](development.md). It runs `docker compose config --quiet`, then
+`docker compose up --build -d`, polls the backend and frontend loopback endpoints, and always
+runs `docker compose down -v --remove-orphans` afterward.
+
+The frontend Compose service keeps `node_modules` in a named volume so the source bind mount
+does not hide dependencies from the image. Because named volumes survive ordinary container
+recreation, startup runs locked `npm ci` before Next so a changed `package-lock.json` cannot
+leave a stale dependency tree mounted over a freshly rebuilt image.
 
 After this workflow is merged and has produced a successful `CI required` check, protect
 `main` and require `CI required` before merge.

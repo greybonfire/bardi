@@ -1,0 +1,61 @@
+import { test, expect, expectNoOverflow, ui, answerLocation, answerPhotos, submitNote } from "./browser";
+import { questions, richPlan } from "./fixtures.mjs";
+
+test("390px Arabic RTL: keyboard-labelled questions, focus, source/review disclosures and no horizontal overflow", async ({ page }) => {
+  expect(page.viewportSize()?.width).toBe(390);
+  await page.goto("/ar");
+  await expect(page.locator("html")).toHaveAttribute("lang", "ar");
+  await expect(page.locator("html")).toHaveAttribute("dir", "rtl");
+  await expectNoOverflow(page);
+  await page.keyboard.press("Tab");
+  const skip = page.getByRole("link", { name: "روح للمحتوى", exact: true });
+  await expect(skip).toBeFocused();
+  await expect(skip).toBeInViewport();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("main")).toBeFocused();
+  await page.getByRole("link", { name: ui.ar.service, exact: true }).click();
+  await expect(page.getByRole("heading", { level: 1, name: ui.ar.service })).toBeVisible();
+  await expectNoOverflow(page);
+  await page.getByRole("link", { name: ui.ar.start, exact: true }).click();
+  const form = page.getByRole("form", { name: questions.ar[0], exact: true });
+  await expect(form.getByRole("group", { name: questions.ar[0], exact: true })).toBeVisible();
+  await expect(form.getByRole("radio", { checked: true })).toHaveCount(0);
+  await expectNoOverflow(page);
+  await form.getByRole("button", { name: ui.ar.continue, exact: true }).click();
+  const error = form.getByRole("alert");
+  await expect(error).toContainText("جاوب على خانة واحدة على الأقل");
+  await expect(error).toBeFocused();
+  // Tab from the error summary enters the named native radio group. Space is
+  // sufficient to choose; neither DOM mutation nor coordinate clicks are used.
+  await page.keyboard.press("Tab");
+  const inside = form.getByRole("radio", { name: ui.ar.inside, exact: true });
+  await expect(inside).toBeFocused();
+  expect(await inside.evaluate((element) => getComputedStyle(element).outlineStyle !== "none")).toBe(true);
+  await page.keyboard.press("Space");
+  await expect(inside).toBeChecked();
+  await page.keyboard.press("Tab");
+  await expect(form.getByRole("button", { name: ui.ar.continue, exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: questions.ar[1], exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: questions.ar[1], exact: true }).locator("../..")).toBeFocused();
+  await expectNoOverflow(page);
+  await answerPhotos(page, "ar", false);
+  await expect(page.getByRole("textbox", { name: questions.ar[2], exact: true })).toHaveAttribute("dir", "auto");
+  await expectNoOverflow(page);
+  await submitNote(page, "ar");
+  await expect(page.getByRole("article", { name: ui.ar.plan, exact: true })).toBeVisible();
+  await expectNoOverflow(page);
+  const row = page.getByRole("region", { name: "الورق والتحضير", exact: true })
+    .getByRole("listitem", { name: richPlan("ar").checklist_items[0].text, exact: true });
+  await row.locator("summary").click();
+  await expect(row.getByRole("link", { name: /https:\/\/example.org/ })).toBeVisible();
+  await expectNoOverflow(page);
+  await page.locator("summary").filter({ hasText: ui.ar.review }).click();
+  await expect(page.getByRole("button", { name: ui.ar.changeLocation, exact: true })).toBeVisible();
+  await expectNoOverflow(page);
+  await page.getByRole("button", { name: ui.ar.changeLocation, exact: true }).click();
+  await expect(page.getByRole("group", { name: questions.ar[0], exact: true })).toBeVisible();
+  await answerLocation(page, "ar");
+  await expect(page.getByRole("radio", { checked: true })).toHaveCount(0);
+  await expectNoOverflow(page);
+});

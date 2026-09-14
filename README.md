@@ -3,13 +3,36 @@
 Bardi is the production implementation of a sourced, bilingual planning system for Egyptian
 administrative services.
 
-## Production backend
+## Production applications
+
+- [`backend/`](backend/): Django/PostgreSQL authored knowledge, Admin review/publication,
+  and a stateless planning API. Development uses Python 3.14 and uv.
+- [`frontend/`](frontend/README.md): the Next.js web app, with Arabic by default, an English
+  switch, a backend-driven questionnaire and printable, sourced guidance. Use Node 22 and
+  npm with the committed lockfile.
 
 The Django/PostgreSQL backend provides environment-specific settings, Django Admin/authentication,
 deterministic planning, publication/review workflows, Django Ninja APIs, reproducible uv tooling,
 and PostgreSQL-backed checks. See [`docs/development.md`](docs/development.md) for local setup
 and validation. Editors should use [`docs/editorial-process.md`](docs/editorial-process.md) for the
 end-to-end authoring, review, publication, and programmatic-import workflow.
+
+Start PostgreSQL and run Django at `http://localhost:8000` in a separate terminal using
+[`docs/development.md`](docs/development.md). Then, from the repository root:
+
+```bash
+cp frontend/.env.example frontend/.env.local
+npm --prefix frontend ci
+npm --prefix frontend run dev
+```
+
+Open **http://localhost:3000/ar**; **English** switches to `/en`. Services come from the
+backend, never a bundled demo fallback. Import authored knowledge, complete independent
+Admin review and publish it through the normal workflow; empty or unavailable services
+are shown honestly. See [`frontend/README.md`](frontend/README.md) for configuration,
+case privacy, schema generation, unit/browser tests and deployment-security caveats.
+[`docs/ci-cd.md`](docs/ci-cd.md) describes the two independent CI tracks. There is no
+production deployment automation for Django or Next.js.
 
 ## Production design
 

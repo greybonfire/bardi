@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-12T09:05:25Z",
+  "title": "Design System: Bardi",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Deep green" },
+      "accent-hover": { "role": "primary", "displayName": "Deep green — hover" },
+      "accent-active": { "role": "primary", "displayName": "Deep green — pressed" },
+      "ink": { "role": "neutral", "displayName": "Green ink" },
+      "muted": { "role": "neutral", "displayName": "Muted green" },
+      "paper": { "role": "neutral", "displayName": "White" },
+      "tint": { "role": "neutral", "displayName": "Pale green" },
+      "tint-active": { "role": "neutral", "displayName": "Pale green — pressed" },
+      "line": { "role": "neutral", "displayName": "Shell rule" },
+      "detail-line": { "role": "neutral", "displayName": "Detail rule" },
+      "control-line": { "role": "neutral", "displayName": "Control stroke" },
+      "focus": { "displayName": "Shell focus outline" },
+      "error-line": { "displayName": "Error border" },
+      "error-text": { "displayName": "Error text" }
+    },
+    "typographyMeta": {
+      "body-ar": { "displayName": "Arabic body", "purpose": "Default locale stack for content, headings and controls; frontend/src/app/globals.css and [locale]/layout.tsx." },
+      "body-en": { "displayName": "English body", "purpose": "English locale stack for the same functional experience; frontend/src/app/globals.css and [locale]/layout.tsx." },
+      "display": { "displayName": "Page title", "purpose": "Shell page titles, not promotional display lettering. Locale tracking and narrow-screen exceptions remain in globals.css." },
+      "headline": { "displayName": "Shell section heading", "purpose": "Second-level headings outside planning and plan overrides; frontend/src/app/globals.css." },
+      "question": { "displayName": "Current question", "purpose": "The backend-authored prompt in QuestionForm; frontend/src/planning/questionnaire.css." },
+      "plan-headline": { "displayName": "Plan section heading", "purpose": "Indexed plan sections; frontend/src/components/plan-view.css." },
+      "plan-subheading": { "displayName": "Plan subheading", "purpose": "Checklist groups, Eligibility Bases and destinations; frontend/src/components/plan-view.css." },
+      "lead": { "displayName": "Introduction", "purpose": "Opening explanation; responsive and service-specific overrides remain in frontend/src/app/globals.css." },
+      "body-small": { "displayName": "Supporting text", "purpose": "Hints, metadata and disclosures; emphasis remains local rather than a separate display face." },
+      "button": { "displayName": "Action label", "purpose": "Filled and outlined actions. Size inherits the body, including its narrow-screen adjustment; frontend/src/app/globals.css." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "control-background", "value": "background-color 160ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Buttons and service-link rows, only under prefers-reduced-motion: no-preference; frontend/src/app/globals.css." },
+      { "name": "question-stage-background", "value": "background-color 180ms ease-out", "purpose": "Question/result stage loading fill, only under prefers-reduced-motion: no-preference; frontend/src/planning/questionnaire.css." }
+    ],
+    "breakpoints": [
+      { "name": "shell-compact-max", "value": "30rem" },
+      { "name": "planning-stack-max", "value": "35rem" },
+      { "name": "plan-index-columns-min", "value": "40rem" },
+      { "name": "directory-stack-max", "value": "48rem" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary action",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Continue in QuestionForm. Global button styles with the questionnaire's ink focus outline; frontend/src/app/globals.css and frontend/src/planning/questionnaire.css. Preview only, without submission logic.",
+      "html": "<div class=\"ds-primary-example\" lang=\"ar\" dir=\"rtl\"><button class=\"ds-primary\" type=\"button\">كمّل</button></div>",
+      "css": ".ds-primary-example { font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem 1.25rem; } .ds-primary { display: inline-flex; align-items: center; justify-content: center; gap: 0.875rem; inline-size: fit-content; max-inline-size: 100%; min-block-size: 3.1rem; padding: 0.65rem 1.4rem; border: 1px solid var(--accent, #215c50); border-radius: 0.375rem; font: inherit; font-weight: 600; line-height: 1.6; text-decoration: none; text-align: center; overflow-wrap: anywhere; color: var(--paper, #ffffff); background: var(--accent, #215c50); cursor: pointer; } .ds-primary:hover { color: var(--paper, #ffffff); background: var(--accent-hover, #174a3f); border-color: var(--accent-hover, #174a3f); } .ds-primary:active { background: #10392f; } .ds-primary:focus-visible { outline: 3px solid var(--ink, #20362f); outline-offset: 3px; } .ds-primary:disabled { opacity: 0.65; cursor: not-allowed; } @media (max-width: 35rem) { .ds-primary-example { align-items: stretch; } .ds-primary { flex: 1 1 100%; } } @media (max-width: 30rem) { .ds-primary-example { font-size: 1.0625rem; } } @media (prefers-reduced-motion: no-preference) { .ds-primary { transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1); } }"
+    },
+    {
+      "name": "Secondary action",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Regenerate for today, in the questionnaire's case tools. Sources: frontend/src/planning/questionnaire.tsx, questionnaire.css and frontend/src/app/globals.css. Preview does not regenerate a plan.",
+      "html": "<div class=\"ds-secondary-example\" lang=\"ar\" dir=\"rtl\"><button class=\"ds-secondary\" type=\"button\">جدّد بتاريخ النهارده</button></div>",
+      "css": ".ds-secondary-example { font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; display: flex; align-items: center; flex-wrap: wrap; gap: 0.75rem 1.25rem; } .ds-secondary { display: inline-flex; align-items: center; justify-content: center; gap: 0.875rem; inline-size: fit-content; max-inline-size: 100%; min-block-size: 3.1rem; padding: 0.65rem 1.4rem; border: 1px solid var(--accent, #215c50); border-radius: 0.375rem; font: inherit; font-weight: 600; line-height: 1.6; text-decoration: none; text-align: center; overflow-wrap: anywhere; color: var(--accent, #215c50); background: var(--paper, #ffffff); cursor: pointer; } .ds-secondary:hover { background: var(--tint, #eff5f2); text-decoration: none; } .ds-secondary:active { background: #dcebe3; } .ds-secondary:focus-visible { outline: 3px solid var(--ink, #20362f); outline-offset: 3px; } .ds-secondary:disabled { opacity: 0.65; cursor: not-allowed; } @media (max-width: 35rem) { .ds-secondary-example { align-items: stretch; } .ds-secondary { flex: 1 1 100%; } } @media (max-width: 30rem) { .ds-secondary-example { font-size: 1.0625rem; } } @media (prefers-reduced-motion: no-preference) { .ds-secondary { transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1); } }"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "The underlined correction action, not a filled tertiary button. Source: frontend/src/planning/questionnaire.css. Actual rewind and focus behavior belongs to questionnaire.tsx and state.ts, not this preview.",
+      "html": "<div class=\"ds-text-example\" lang=\"ar\" dir=\"rtl\"><button class=\"ds-text-action\" type=\"button\">غيّر الإجابة</button></div>",
+      "css": ".ds-text-example { font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; } .ds-text-action { min-block-size: 2.75rem; padding-block: 0.5rem; padding-inline: 0; border: 0; border-radius: 0.125rem; background: transparent; color: var(--accent, #215c50); font: inherit; text-align: start; text-decoration: underline; text-underline-offset: 0.2em; cursor: pointer; } .ds-text-action:hover { text-decoration-thickness: 2px; } .ds-text-action:active { color: var(--ink, #20362f); background-color: var(--tint, #eff5f2); } .ds-text-action:focus-visible { outline: 3px solid var(--ink, #20362f); outline-offset: 3px; } .ds-text-action:disabled { opacity: 0.65; cursor: not-allowed; } @media (max-width: 30rem) { .ds-text-example { font-size: 1.0625rem; } }"
+    },
+    {
+      "name": "Guidance date input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "A labelled native date field using the shared input treatment; preview date is illustrative. Source: frontend/src/planning/questionnaire.tsx and questionnaire.css. Text/integer QuestionForm fields use this same treatment with their own width and direction rules.",
+      "html": "<div class=\"ds-input-example\" lang=\"ar\" dir=\"rtl\"><label class=\"ds-field-label\" for=\"ds-guidance-date\">تاريخ الإرشادات</label><p class=\"ds-field-hint\" id=\"ds-date-hint\">بالتقويم الميلادي. تقدر تختار تاريخ سابق؛ جدّد الإرشادات بتاريخ النهارده قبل ما تتحرك.</p><input class=\"ds-date-input\" id=\"ds-guidance-date\" type=\"date\" dir=\"ltr\" min=\"0001-01-01\" max=\"9999-12-31\" value=\"2026-09-12\" aria-describedby=\"ds-date-hint\" aria-invalid=\"false\"></div>",
+      "css": ".ds-input-example { font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; color: var(--ink, #20362f); overflow-wrap: anywhere; } .ds-field-label { display: block; margin-block-end: 0.375rem; font-weight: 600; } .ds-field-hint { margin-block: 0 0.75rem; font-size: 1rem; color: var(--muted, #4f665c); } .ds-date-input { inline-size: 100%; max-inline-size: 14rem; min-inline-size: 0; min-block-size: 3rem; padding-block: 0.5rem; padding-inline: 0.75rem; border: 1px solid #77958a; border-radius: 0.375rem; color: var(--ink, #20362f); background-color: var(--paper, #ffffff); caret-color: var(--accent, #215c50); font: inherit; font-variant-numeric: tabular-nums; scroll-margin-block: 1.5rem; } .ds-date-input:hover { border-color: var(--accent, #215c50); } .ds-date-input:focus-visible { outline: 3px solid var(--ink, #20362f); outline-offset: 3px; } .ds-date-input[aria-invalid='true'] { border: 2px solid #963d29; } .ds-date-input:disabled { opacity: 0.65; cursor: not-allowed; } @media (max-width: 30rem) { .ds-input-example { font-size: 1.0625rem; } }"
+    },
+    {
+      "name": "Native radio choices",
+      "kind": "input",
+      "refersTo": "radio-choice",
+      "description": "Boolean choice appearance from frontend/src/planning/question-form.tsx and questionnaire.css. Presentation-only choices, with no administrative question or preselection; real groups retain their fieldset, legend and validation.",
+      "html": "<div class=\"ds-choices\" lang=\"ar\" dir=\"rtl\"><label class=\"ds-choice\"><input type=\"radio\" name=\"ds-answer-example\" value=\"true\"><span dir=\"auto\">أيوه</span></label><label class=\"ds-choice\"><input type=\"radio\" name=\"ds-answer-example\" value=\"false\"><span dir=\"auto\">لأ</span></label></div>",
+      "css": ".ds-choices { display: grid; gap: 0.625rem; font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; color: var(--ink, #20362f); overflow-wrap: anywhere; } .ds-choice { display: flex; align-items: flex-start; gap: 0.75rem; min-block-size: 3rem; padding-block: 0.75rem; padding-inline: 1rem; border: 1px solid #77958a; border-radius: 0.375rem; background-color: var(--paper, #ffffff); cursor: pointer; } .ds-choice:hover, .ds-choice:has(input:checked) { border-color: var(--accent, #215c50); background-color: var(--tint, #eff5f2); } .ds-choice:has(input:checked) { font-weight: 600; } .ds-choice:has(input:active) { background-color: #dcebe3; } .ds-choice input { flex: 0 0 auto; inline-size: 1.25rem; block-size: 1.25rem; margin-block: 0.35rem 0; margin-inline: 0; accent-color: var(--accent, #215c50); scroll-margin-block: 1.5rem; } .ds-choice input:focus-visible { outline: 3px solid var(--ink, #20362f); outline-offset: 3px; } .ds-choice input:disabled, .ds-choice:has(:disabled) { opacity: 0.65; cursor: not-allowed; } @media (max-width: 30rem) { .ds-choices { font-size: 1.0625rem; } }"
+    },
+    {
+      "name": "Bilingual masthead navigation",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Text wordmark and explicit locale switch from frontend/src/components/site-header.tsx and frontend/src/app/globals.css; not an approved logo or a government identity asset.",
+      "html": "<header class=\"ds-header\" lang=\"ar\" dir=\"rtl\"><div class=\"ds-header-inner\"><a href=\"/ar\" class=\"ds-wordmark\" aria-label=\"بردي — كل الخدمات\"><span lang=\"ar\" dir=\"rtl\">بردي</span><span lang=\"en\" dir=\"ltr\">bardi</span></a><nav class=\"ds-header-links\" aria-label=\"التنقل الرئيسي\"><a class=\"ds-services-link\" href=\"/ar\">كل الخدمات</a><a class=\"ds-language-link\" href=\"/en\" hreflang=\"en\" lang=\"en\" dir=\"ltr\">English</a></nav></div></header>",
+      "css": ".ds-header { border-block-start: 5px solid var(--accent, #215c50); border-block-end: 1px solid var(--line, #c7d8cf); background: var(--paper, #ffffff); color: var(--ink, #20362f); font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; } .ds-header-inner { inline-size: min(100% - 3rem, 72rem); margin-inline: auto; min-block-size: 6rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; } .ds-header a { color: var(--accent, #215c50); text-underline-offset: 0.25em; text-decoration-thickness: 1px; } .ds-header a:hover { color: var(--accent-hover, #174a3f); text-decoration-thickness: 2px; } .ds-header a:focus-visible { outline: 3px solid var(--focus, #a54917); outline-offset: 4px; } .ds-header .ds-wordmark { display: inline-flex; align-items: baseline; gap: 0.7rem; color: var(--ink, #20362f); text-decoration: none; } .ds-header .ds-wordmark:hover { color: var(--accent, #215c50); } .ds-wordmark [lang='ar'] { font-family: 'Noto Sans Arabic', sans-serif; font-size: 1.85rem; font-weight: 700; } .ds-wordmark [lang='en'] { font-family: 'Source Sans 3', sans-serif; font-size: 1.3rem; font-weight: 600; } .ds-header-links { display: flex; align-items: center; gap: 1.75rem; font-size: 1rem; } .ds-header-links a { padding-block: 0.7rem; } .ds-language-link { font-weight: 600; } @media (max-width: 30rem) { .ds-header { font-size: 1.0625rem; } .ds-header-inner { inline-size: calc(100% - 2rem); min-block-size: 5rem; } .ds-header-links { gap: 0.75rem; } .ds-header-links .ds-services-link { display: none; } }"
+    },
+    {
+      "name": "Continuous service-link row",
+      "kind": "nav",
+      "refersTo": "service-row",
+      "description": "ServiceDirectory's list treatment and authored 24px Arrow, from frontend/src/components/service-directory.tsx and frontend/src/app/globals.css. The preview title is explicitly illustrative, not a claim of service availability.",
+      "html": "<ul class=\"ds-service-list\" lang=\"ar\" dir=\"rtl\"><li><a href=\"#ds-service-preview\"><span id=\"ds-service-preview\">اسم الخدمة — معاينة بس</span><svg class=\"ds-direction-arrow\" width=\"24\" height=\"24\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\"></path></svg></a></li></ul>",
+      "css": ".ds-service-list { list-style: none; margin: 0; padding: 0; border-block-start: 1px solid var(--line, #c7d8cf); font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; line-height: 1.75; } .ds-service-list li { border-block-end: 1px solid var(--line, #c7d8cf); } .ds-service-list a { display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; padding: 1.4rem 0.25rem; font-size: 1.3rem; font-weight: 600; text-decoration: none; color: var(--accent, #215c50); } .ds-service-list a:hover { background: var(--tint, #eff5f2); color: var(--accent-hover, #174a3f); } .ds-service-list a:hover span { text-decoration: underline; text-underline-offset: 0.25em; } .ds-service-list a:focus-visible { outline: 3px solid var(--focus, #a54917); outline-offset: 4px; } .ds-service-list a span { overflow-wrap: anywhere; } .ds-direction-arrow { flex: 0 0 auto; vertical-align: middle; } .ds-service-list[dir='rtl'] .ds-direction-arrow { transform: rotate(180deg); } @media (max-width: 30rem) { .ds-service-list a { font-size: 1.125rem; padding-block: 1.25rem; } } @media (prefers-reduced-motion: no-preference) { .ds-service-list a { transition: background-color 160ms cubic-bezier(0.16, 1, 0.3, 1); } }"
+    },
+    {
+      "name": "Supporting notice",
+      "kind": "card",
+      "refersTo": "notice",
+      "description": "The reused notice container, not a decorative card library. This preview shows the existing restored-storage status copy from frontend/src/planning/copy.ts; styles come from globals.css and questionnaire.css. No restoration occurs in this sample.",
+      "html": "<p class=\"ds-notice\" lang=\"ar\" dir=\"rtl\" role=\"status\">رجّعنا إجاباتك من التبويب ده. هنراجعها تاني على التاريخ اللي اخترته.</p>",
+      "css": ".ds-notice { padding: 1.25rem 1.5rem; border: 1px solid var(--line, #c7d8cf); border-radius: 0.375rem; background: var(--tint, #eff5f2); color: var(--ink, #20362f); font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; margin-block: 0 0.75rem; overflow-wrap: anywhere; } @media (max-width: 30rem) { .ds-notice { padding: 1rem; font-size: 1.0625rem; } }"
+    },
+    {
+      "name": "Evidence disclosure",
+      "kind": "custom",
+      "refersTo": "evidence-disclosure",
+      "description": "Native progressive disclosure with a non-collapsible print copy from Evidence/Disclosure in frontend/src/components/plan-view.tsx and plan-view.css. Illustrates unknown freshness and no attached sources, not an administrative claim.",
+      "html": "<div class=\"ds-evidence\" lang=\"ar\" dir=\"rtl\"><p class=\"ds-freshness\">حالة المراجعة: <strong>غير معروفة</strong></p><details class=\"ds-disclosure ds-screen-only\"><summary>المصادر وتفاصيل المرجع</summary><div class=\"ds-disclosure-body\"><p>مفيش مصادر مرفقة بالبند ده في الخطة.</p></div></details><div class=\"ds-print-only\"><p><strong>المصادر وتفاصيل المرجع</strong></p><p>مفيش مصادر مرفقة بالبند ده في الخطة.</p></div></div>",
+      "css": ".ds-evidence { margin-block-start: 1rem; color: var(--ink, #20362f); font-family: 'Noto Sans Arabic', 'Source Sans 3', sans-serif; font-size: 1.125rem; line-height: 1.75; overflow-wrap: anywhere; } .ds-evidence p { margin-block: 0.65rem; } .ds-freshness, .ds-disclosure { font-size: 1rem; } .ds-disclosure { margin-block: 0.5rem; } .ds-disclosure summary { inline-size: fit-content; min-block-size: 2.75rem; padding-block: 0.4rem; color: var(--accent, #215c50); cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; } .ds-disclosure summary:hover { text-decoration-thickness: 2px; } .ds-disclosure summary:active, .ds-disclosure[open] summary { color: var(--ink, #20362f); background: var(--tint, #eff5f2); } .ds-disclosure summary:focus-visible { outline: 3px solid var(--ink, #20362f); outline-offset: 3px; border-radius: 2px; } .ds-disclosure-body { padding-block: 0.25rem 0.5rem; } .ds-print-only { display: none; } @media print { .ds-evidence { color: #000; font-size: 11pt; } .ds-screen-only { display: none !important; } .ds-print-only { display: block !important; font-size: 10pt; } }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The familiar conversational helper",
+    "overview": "A clear, spacious green-and-white interface for applicants and family helpers preparing Egyptian paperwork. Humanist Arabic and Latin type, ordinary controls and direct language support completing the task, not selling the product. GOV.UK and NHS are the user-chosen clarity and accessibility quality bar, not branding to reproduce.\n\nRecorded on **2026-09-12** from the implemented CSS, font imports and components, not browser-computed measurements. This is a code-led world with no approved comp or style-benchmark images. The bilingual text wordmark is not an approved logo asset; the shipped art is limited to an authored, decorative 24px arrow SVG. Fontsource WOFF/WOFF2 files are fonts, not rasters; no shipping raster assets require provenance.",
+    "keyCharacteristics": [
+      "One clear question and useful next action, without chat simulation.",
+      "Arabic-first reading and controls, with a complete English experience.",
+      "Visible sources and uncertainty, with official requirements distinct from practical preparation."
+    ],
+    "rules": [
+      { "name": "The Visible Uncertainty Rule", "body": "State the limit beside the affected guidance; green styling is never evidence of approval or completion.", "section": "colors" },
+      { "name": "The Two Registers Rule", "body": "Write frontend interface copy in conversational Egyptian Arabic with precise administrative terms, and provide full English equivalents; render backend-authored text verbatim in the requested locale.", "section": "typography" }
+    ],
+    "dos": [
+      "**Do** preserve locale direction, native controls, visible focus and reduced-motion behavior.",
+      "**Do** keep authored guidance exact, sources discoverable and uncertainty adjacent to the affected content.",
+      "**Do** reuse the code-backed roles and patterns here; update this reference and its sidecar together when an approved system change ships."
+    ],
+    "donts": [
+      "**Don't** turn the task client into marketing, simulated AI chat or government-branded UI.",
+      "**Don't** imply approval, complete coverage, known fees or guaranteed completion from an unanswered or unresolved state.",
+      "**Don't** add invented assets, tonal scales, saved-case promises or performance/accessibility certification claims to this reference."
+    ]
+  }
+}

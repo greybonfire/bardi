@@ -5,29 +5,86 @@ The repository uses GitHub Actions for production continuous integration.
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual
-`workflow_dispatch` runs.
+`workflow_dispatch` runs. It has two deliberately separate tracks:
 
-The Python 3.14 production-backend job runs against PostgreSQL 17. It installs only from the
-committed `uv.lock`, then runs Ruff lint and format checks, Mypy, Python compilation, Django
-deploy checks, migration consistency/rollback checks, PostgreSQL backup/restore verification,
-the focused cross-family production acceptance suite, and the broader domain/publication/API/
-privacy/Admin/hardening suites.
+- The Python 3.14 **Production backend** job runs against PostgreSQL 17. It installs
+  only from the committed `uv.lock`, then runs Ruff lint and format checks, Mypy, Python
+  compilation, Django deploy checks, migration consistency/rollback checks, PostgreSQL
+  backup/restore verification, the focused cross-family production acceptance suite,
+  and the broader domain/publication/API/privacy/Admin/hardening suites.
+- An independent **Frontend** job uses Node 22 and `npm ci` with the committed
+  `frontend/package-lock.json`. It checks the OpenAPI snapshot and generated TypeScript
+  types, then runs frontend lint, type checking, the complete Vitest unit/component suite,
+  a production Next build and Playwright browser tests. Managed Chromium and its Linux
+  dependencies are installed with `npx playwright install --with-deps chromium` from
+  `frontend/`; no locally installed browser is assumed in CI.
 
 Production CI intentionally uses the same Python runtime family as local backend development.
 The retired research prototype is no longer compiled or tested on `main`; production acceptance
 tests are authoritative for supported behavior.
 
-The stable `CI required` job depends on the production job and succeeds only when that job
-succeeds. This aggregate name is intended for branch protection.
+The final `CI required` job depends on both tracks and succeeds only when
+`PRODUCTION_RESULT` and `FRONTEND_RESULT` are each exactly `success`.
+A failure, cancellation or skipped dependency cannot pass the aggregate. This stable name
+remains the branch-protection check; the frontend gate does not weaken or replace the
+production-backend track.
 
-The workflow uses read-only repository permissions. CI supplies explicit test-only PostgreSQL
-credentials, a strong Django secret, allowed hosts, and a valid HTTPS CSRF origin. No production
-credentials are committed.
+The workflow uses read-only repository permissions. CI supplies explicit test-only
+PostgreSQL credentials, a strong Django secret, allowed hosts, and a valid HTTPS CSRF
+origin for the backend job. The Frontend job uses only loopback test origins and disables
+Next telemetry; it needs no production secrets or PostgreSQL service.
+
+### Frontend contract and browser gates
+
+The Frontend job also installs Python 3.14, uv and locked Python runtime dependencies
+(`uv sync --locked`). `tools/export_web_api.py` and its Vitest regression import the real
+Django Ninja API declarations, but build OpenAPI entirely in memory without a database
+connection, migrations or production settings/secrets. No backend test groups are duplicated
+in this job.
+
+The schema-drift gate runs from the repository root:
+
+```bash
+uv run python tools/export_web_api.py --check
+npm --prefix frontend run api:generate
+git diff --exit-code -- frontend/api-schema.json frontend/src/api/generated.d.ts
+```
+
+The snapshot must match the backend declarations, and regenerating types must leave the
+committed files unchanged. Runtime response schemas are also checked against the generated
+types by `npm --prefix frontend run typecheck`. An intentional API change includes both
+regenerated files, not just a manually patched TypeScript declaration.
+
+Playwright runs the built Next server at `http://localhost:3010` (bound to `127.0.0.1`)
+against a **test-only** API stand-in on `127.0.0.1:8451`. The job sets
+`BARDI_API_ORIGIN=http://127.0.0.1:8451` and `BARDI_SITE_ORIGIN=http://localhost:3010`
+for build/runtime consistency. These synthetic web integration tests
+do not establish Django/PostgreSQL correctness or replace the backend's researched-family
+acceptance coverage. The workflow uploads no browser traces, screenshots, videos or reports.
+Do not add artifacts or telemetry containing real case data.
+
+See [`frontend/README.md`](../frontend/README.md) for current test scope and local commands,
+including managed Chromium or `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for an existing local
+browser. Dependency upgrades can use npm 11 through `npx` without a global install: npm 10
+encountered an Arborist dependency-update bug, while npm 11 installed the current lock.
+CI uses ordinary locked `npm ci`; disabling install scripts is not assumed safe without
+verifying the complete frontend checks.
+
+After this workflow is merged and has produced a successful `CI required` check, protect
+`main` and require `CI required` before merge.
 
 ## Continuous delivery
 
 There is currently no application release or deployment workflow. The former prototype-only
-release workflow was retired with the executable prototype under ADR 0018.
+release workflow was retired with the executable prototype under
+[ADR 0018](adr/0018-retire-research-prototype.md). Frontend integration does not restore it
+or add production application deployment or migrations.
 
-When a deployable Django/Next.js application and hosting target exist, deployment jobs should be
-added behind an explicit GitHub Environment with deployment-specific credentials and approvals.
+A production Django/Next.js deployment still needs an explicitly selected and hardened
+hosting/ingress target and a separately authorized delivery workflow, for example behind a
+GitHub Environment with deployment-specific credentials and approvals. These CI additions
+choose no production domain or provider and do not change the backend ingress/security
+contract in [`operations/private-pilot.md`](operations/private-pilot.md). The Next proxy is
+not an Admin gateway or a substitute for trusted proxy-header handling, edge rate limits and
+privacy-safe platform logging; see
+[`architecture/production-backend.md`](architecture/production-backend.md).

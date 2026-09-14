@@ -216,3 +216,29 @@ __marimo__/
 
 # Local pi agents, extensions, and prompts
 .pi/
+
+# Next.js tooling and local browser artifacts
+!frontend/src/lib/
+!frontend/src/lib/**
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+.env.local
+.env.*.local
+playwright-report/
+test-results/
+
+# Impeccable working state (shared surface/design contracts remain tracked)
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/hook.pending.json
+.impeccable/*.png
+.impeccable/review/
+.impeccable/questions/
+.impeccable/live/server.json
+.impeccable/live/sessions/
+.impeccable/live/previews/
+.impeccable/live/annotations/
+.impeccable/live/cache/
+.impeccable/live/*.png

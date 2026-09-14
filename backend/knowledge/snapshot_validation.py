@@ -16,15 +16,36 @@ from typing import Any, cast
 
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from planning.facts import FACT_DEFINITIONS
+from planning.facts import FactDefinition as DomainFactDefinition
 
-from .domain import (
-    KnowledgeSnapshotLoadError,
-    StoredRuleLoadDiagnostic,
-    compatibility_errors,
-    decode_stored_rule,
-    to_domain_fact,
+from .domain import to_domain_fact
+from .snapshot_policy import (
+    AssociationRow,
+    BasisRow,
+    CandidateRow,
+    ClaimRow,
+    ContradictionFactRow,
+    ContradictionRow,
+    CoreInputs,
+    DependencyRow,
+    EvidenceRow,
+    FeeRow,
+    MaterialRow,
+    QuestionFactRow,
+    QuestionRow,
+    ServiceRow,
+    StepRow,
+    VersionRow,
+    WarningRow,
+    core_evidence_owner,
+    routing_evidence_owner,
+    summarize_evidence_rows,
+    validate_bases,
+    validate_core,
+    validate_dependencies,
+    validate_routing,
 )
+from .snapshot_policy import EvidenceInfo as _EvidenceInfo
 
 _OWNER_FIELDS = (
     "checklist_item",
@@ -40,10 +61,8 @@ _OWNER_FIELDS = (
 # Core and routing each choose their first non-null owner; basis and dependency adapters
 # independently read their reverse relation, even when a malformed link spans families.
 _MATERIALIZER_OWNER_GROUPS = (
-    ("checklist_item", "step", "fee", "warning"),
     ("eligibility_basis",),
     ("procedure_dependency",),
-    ("procedure_service_point_association", "service_point_version"),
 )
 _PUBLIC_VERSION_STATES = ("published", "withdrawn")
 
@@ -84,32 +103,10 @@ def _validation_evidence_queryset() -> Any:
 
 
 @dataclass(frozen=True, slots=True)
-class _EvidenceInfo:
-    passage: str
-    location: str
-    applicability_context: str
-    support_status: str
-    verification_state: str
-    sources: tuple[tuple[str, Any, str], ...]
-
-
-@dataclass(frozen=True, slots=True)
 class _ValidationData:
-    fact_rows: tuple[Any, ...]
-    definitions: Mapping[str, Any]
-    published_definitions: Mapping[str, Any]
+    definitions: Mapping[str, DomainFactDefinition]
+    published_definitions: Mapping[str, DomainFactDefinition]
     evidence: Mapping[tuple[str, int], tuple[_EvidenceInfo, ...]]
-
-
-def _failure(owner: str, code: str, path: tuple[str | int, ...]) -> StoredRuleLoadDiagnostic:
-    from planning.diagnostics import ValidationDiagnostic
-
-    return StoredRuleLoadDiagnostic(owner, (ValidationDiagnostic(code, path),))
-
-
-def _raise(failures: list[StoredRuleLoadDiagnostic]) -> None:
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
 
 
 def _load_validation_data() -> _ValidationData:
@@ -145,26 +142,16 @@ def _load_validation_data() -> _ValidationData:
             "source__observation_context",
         )
     )
-    sources_by_link: dict[int, list[tuple[str, Any, str]]] = {}
-    for row in source_rows:
-        sources_by_link.setdefault(row["evidence_link_id"], []).append(
-            (
-                row["source__classification"],
-                row["source__observation_date"],
-                row["source__observation_context"],
-            )
-        )
-
+    summaries = summarize_evidence_rows(cast(list[EvidenceRow], link_rows), source_rows)
     evidence: dict[tuple[str, int], list[_EvidenceInfo]] = {}
     for row in link_rows:
-        info = _EvidenceInfo(
-            row["passage"],
-            row["location"],
-            row["applicability_context"],
-            row["support_status"],
-            row["verification_state"],
-            tuple(sources_by_link.get(row["id"], ())),
-        )
+        info = summaries[row["id"]]
+        core_owner = core_evidence_owner(row)
+        if core_owner is not None:
+            evidence.setdefault(core_owner, []).append(info)
+        routing_owner = routing_evidence_owner(row)
+        if routing_owner is not None:
+            evidence.setdefault(routing_owner, []).append(info)
         for fields in _MATERIALIZER_OWNER_GROUPS:
             owner = next(
                 ((field, row[f"{field}_id"]) for field in fields if row[f"{field}_id"] is not None),
@@ -173,50 +160,14 @@ def _load_validation_data() -> _ValidationData:
             if owner is not None:
                 evidence.setdefault(owner, []).append(info)
     return _ValidationData(
-        fact_rows,
         definitions,
         published_definitions,
         {key: tuple(value) for key, value in evidence.items()},
     )
 
 
-def _has_adequate_core_evidence(links: tuple[_EvidenceInfo, ...]) -> bool:
-    """Match domain._materialize_core_knowledge_snapshot exactly."""
-
-    return any(
-        link.verification_state == "current"
-        and link.support_status == "supports"
-        and bool(link.sources)
-        and bool(link.passage.strip())
-        and bool(link.location.strip())
-        and bool(link.applicability_context.strip())
-        for link in links
-    ) and not any(
-        link.verification_state == "current" and link.support_status == "contradicts"
-        for link in links
-    )
-
-
-def _valid_fee_shape(row: Mapping[str, Any]) -> bool:
-    amount = row["amount"]
-    minimum = row["minimum_amount"]
-    maximum = row["maximum_amount"]
-    amount_ok = type(amount) is int and amount >= 0
-    range_ok = type(minimum) is int and type(maximum) is int and minimum >= 0 and maximum >= minimum
-    if row["value_state"] == "known":
-        return amount_ok and minimum is None and maximum is None
-    if row["value_state"] == "range":
-        return amount is None and range_ok
-    if row["value_state"] == "unknown":
-        return amount is None and minimum is None and maximum is None
-    if row["value_state"] == "unverified":
-        return (
-            (amount_ok and minimum is None and maximum is None) or (amount is None and range_ok)
-        ) and row["verification_state"] in {"needs_reverification", "stale", "disputed"}
-    return False
-
-
-def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _load_core_inputs(data: _ValidationData) -> CoreInputs:
+    """Capture the original scalar query sequence; all core decisions live in the policy."""
     from .fees import Fee
     from .models import (
         ChecklistItem,
@@ -226,26 +177,13 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
         ServiceQuestion,
     )
 
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for fact_row in data.fact_rows:
-        if not fact_row.is_published or not fact_row.derived:
-            continue
-        expected = FACT_DEFINITIONS.get(fact_row.key)
-        if expected is None or not expected.derived or compatibility_errors((fact_row,)):
-            failures.append(
-                _failure(
-                    f"fact:{fact_row.key}", "unsupported_derived_fact", ("facts", fact_row.key)
-                )
-            )
-
     service_rows = cast(
-        list[dict[str, Any]],
+        list[ServiceRow],
         list(Service.objects.order_by("semantic_id").values("semantic_id", "is_active")),
     )
-    active_service_ids = {row["semantic_id"] for row in service_rows if row["is_active"]}
 
     item_rows = cast(
-        list[dict[str, Any]],
+        list[ClaimRow],
         list(
             ChecklistItem.objects.filter(
                 procedure_version__state__in=("published", "withdrawn")
@@ -260,21 +198,6 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    for row in item_rows:
-        owner = f"checklist_item:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        raw_rule = row["applicability"]
-        if raw_rule != {}:
-            decoded = decode_stored_rule(raw_rule, data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-        links = data.evidence.get(("checklist_item", row["id"]), ())
-        if row["verification_state"] == "current" and not links:
-            failures.append(_failure(owner, "missing_evidence_link", ("evidence",)))
-            continue
-        if any(not link.sources for link in links):
-            failures.append(_failure(owner, "missing_evidence_source", ("evidence",)))
-
     from .models import (
         ServiceContradictionFact,
         ServiceProcedureCandidate,
@@ -284,7 +207,7 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
     )
 
     step_rows = cast(
-        list[dict[str, Any]],
+        list[StepRow],
         list(
             Step.objects.filter(procedure_version__state__in=("published", "withdrawn")).values(
                 "id",
@@ -299,30 +222,8 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    for row in step_rows:
-        owner = f"step:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        predicate_is_invalid = False
-        if row["applicability"] != {}:
-            decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                predicate_is_invalid = True
-        links = data.evidence.get(("step", row["id"]), ())
-        basis_broken = row["scope"] == "eligibility_basis" and (
-            row["eligibility_basis_id"] is None
-            or row["eligibility_basis__procedure_version_id"] != row["procedure_version_id"]
-        )
-        if predicate_is_invalid:
-            if basis_broken:
-                failures.append(_failure(owner, "invalid_basis_owner", ("scope",)))
-            continue
-        if basis_broken:
-            failures.append(_failure(owner, "invalid_basis_owner", ("scope",)))
-        elif row["verification_state"] == "current" and not _has_adequate_core_evidence(links):
-            failures.append(_failure(owner, "inadequate_evidence", ("evidence",)))
-
     fee_rows = cast(
-        list[dict[str, Any]],
+        list[FeeRow],
         list(
             Fee.objects.filter(procedure_version__state__in=("published", "withdrawn")).values(
                 "id",
@@ -343,42 +244,8 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    for row in fee_rows:
-        owner = f"fee:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        predicate_is_invalid = False
-        if row["applicability"] != {}:
-            decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                predicate_is_invalid = True
-        if predicate_is_invalid:
-            continue
-        links = data.evidence.get(("fee", row["id"]), ())
-        basis_broken = row["scope"] == "eligibility_basis" and (
-            row["eligibility_basis_id"] is None
-            or row["eligibility_basis__procedure_version_id"] != row["procedure_version_id"]
-        )
-        evidence_required = row["value_state"] in {"known", "range", "unverified"}
-        current_support_required = (
-            row["value_state"] in {"known", "range"} and row["verification_state"] == "current"
-        )
-        if basis_broken:
-            failures.append(_failure(owner, "invalid_basis_owner", ("scope",)))
-        elif not row["currency"].strip():
-            failures.append(_failure(owner, "missing_currency", ("currency",)))
-        elif not row["fee_type"].strip():
-            failures.append(_failure(owner, "missing_fee_type", ("fee_type",)))
-        elif not _valid_fee_shape(row):
-            failures.append(_failure(owner, "invalid_fee_value", ("value_state",)))
-        elif evidence_required and not links:
-            failures.append(_failure(owner, "missing_evidence_link", ("evidence",)))
-        elif evidence_required and any(not link.sources for link in links):
-            failures.append(_failure(owner, "missing_evidence_source", ("evidence",)))
-        elif current_support_required and not _has_adequate_core_evidence(links):
-            failures.append(_failure(owner, "inadequate_evidence", ("evidence",)))
-
     warning_rows = cast(
-        list[dict[str, Any]],
+        list[WarningRow],
         list(
             Warning.objects.filter(procedure_version__state__in=("published", "withdrawn")).values(
                 "id",
@@ -390,23 +257,8 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    for row in warning_rows:
-        owner = f"warning:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        if row["applicability"] != {}:
-            decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-        links = data.evidence.get(("warning", row["id"]), ())
-        invalid = (row["kind"] == "product" and bool(links)) or (
-            row["kind"] == "administrative"
-            and row["verification_state"] == "current"
-            and not _has_adequate_core_evidence(links)
-        )
-        if invalid:
-            failures.append(_failure(owner, "invalid_warning_evidence", ("evidence",)))
-
     candidate_rows = cast(
-        list[dict[str, Any]],
+        list[CandidateRow],
         list(
             ServiceProcedureCandidate.objects.order_by(
                 "service__semantic_id", "procedure__semantic_id"
@@ -417,38 +269,16 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    for row in candidate_rows:
-        service_id = row["service__semantic_id"]
-        definitions = (
-            data.published_definitions if service_id in active_service_ids else data.definitions
-        )
-        decoded = decode_stored_rule(row["selection_predicate"], definitions)
-        if decoded.predicate is None:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"candidate:{service_id}:{row['procedure__semantic_id']}", decoded.diagnostics
-                )
-            )
-
     version_rows = cast(
-        list[dict[str, Any]],
+        list[VersionRow],
         list(
             ProcedureVersion.objects.filter(
                 state__in=(ProcedureVersion.State.PUBLISHED, ProcedureVersion.State.WITHDRAWN)
             ).values("semantic_id", "applicability")
         ),
     )
-    for row in version_rows:
-        decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-        if decoded.predicate is None:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"procedure_version:{row['semantic_id']}", decoded.diagnostics
-                )
-            )
-
     contradiction_rows = cast(
-        list[dict[str, Any]],
+        list[ContradictionRow],
         list(
             ServiceContradiction.objects.order_by("service__semantic_id", "semantic_id").values(
                 "semantic_id", "service__semantic_id", "condition"
@@ -456,48 +286,15 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
         ),
     )
     contradiction_links = cast(
-        list[dict[str, Any]],
+        list[ContradictionFactRow],
         list(
             ServiceContradictionFact.objects.order_by(
                 "contradiction__semantic_id", "position", "fact__key"
             ).values("contradiction__semantic_id", "fact__key")
         ),
     )
-    contradiction_facts: dict[str, list[str]] = {}
-    for row in contradiction_links:
-        contradiction_facts.setdefault(row["contradiction__semantic_id"], []).append(
-            row["fact__key"]
-        )
-    for row in contradiction_rows:
-        service_id = row["service__semantic_id"]
-        definitions = (
-            data.published_definitions if service_id in active_service_ids else data.definitions
-        )
-        decoded = decode_stored_rule(row["condition"], definitions)
-        owner = f"contradiction:{row['semantic_id']}"
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
-        if service_id in active_service_ids:
-            unpublished = sorted(
-                set(contradiction_facts.get(row["semantic_id"], ()))
-                - data.published_definitions.keys()
-            )
-            if unpublished:
-                from planning.diagnostics import ValidationDiagnostic
-
-                failures.append(
-                    StoredRuleLoadDiagnostic(
-                        owner,
-                        tuple(
-                            ValidationDiagnostic("unpublished_fact", ("facts", key))
-                            for key in unpublished
-                        ),
-                    )
-                )
-
     question_rows = cast(
-        list[dict[str, Any]],
+        list[QuestionRow],
         list(
             ServiceQuestion.objects.order_by("service__semantic_id", "semantic_id").values(
                 "semantic_id", "service__semantic_id", "fact__key"
@@ -505,42 +302,32 @@ def _validate_core(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
         ),
     )
     question_links = cast(
-        list[dict[str, Any]],
+        list[QuestionFactRow],
         list(
             ServiceQuestionResolvedFact.objects.order_by(
                 "question__semantic_id", "position", "fact__key"
             ).values("question__semantic_id", "fact__key")
         ),
     )
-    resolved: dict[str, list[str]] = {}
-    for row in question_links:
-        resolved.setdefault(row["question__semantic_id"], []).append(row["fact__key"])
-    for row in question_rows:
-        service_id = row["service__semantic_id"]
-        if service_id not in active_service_ids:
-            continue
-        keys = {row["fact__key"], *resolved.get(row["semantic_id"], ())}
-        unpublished = sorted(keys - data.published_definitions.keys())
-        if unpublished:
-            from planning.diagnostics import ValidationDiagnostic
-
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    f"question:{row['semantic_id']}",
-                    tuple(
-                        ValidationDiagnostic("unpublished_fact", ("facts", key))
-                        for key in unpublished
-                    ),
-                )
-            )
-    return failures
+    return CoreInputs(
+        data.definitions,
+        data.published_definitions,
+        data.evidence,
+        services=service_rows,
+        checklist_items=item_rows,
+        steps=step_rows,
+        fees=fee_rows,
+        warnings=warning_rows,
+        candidates=candidate_rows,
+        versions=version_rows,
+        contradictions=contradiction_rows,
+        contradiction_facts=contradiction_links,
+        questions=question_rows,
+        question_facts=question_links,
+    )
 
 
-def _source_presence(data: _ValidationData, field: str, owner_id: int) -> tuple[_EvidenceInfo, ...]:
-    return data.evidence.get((field, owner_id), ())
-
-
-def _validate_bases(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _validate_bases(data: _ValidationData) -> None:
     from .models import EligibilityBasis, ProcedureVersion
 
     rows = list(
@@ -559,33 +346,10 @@ def _validate_bases(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             "qualification",
         )
     )
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for row in rows:
-        owner = f"eligibility_basis:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        if row["reachability"] != {}:
-            decoded = decode_stored_rule(row["reachability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-        if row["qualification"] == {}:
-            failures.append(_failure(owner, "missing_qualification", ("qualification",)))
-            continue
-        decoded = decode_stored_rule(row["qualification"], data.published_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
-        links = _source_presence(data, "eligibility_basis", row["id"])
-        if (
-            not row["text_ar"].strip()
-            or not row["text_en"].strip()
-            or not links
-            or any(not link.sources for link in links)
-        ):
-            failures.append(_failure(owner, "invalid_basis_evidence", ("evidence",)))
-    return failures
+    validate_bases(cast(list[BasisRow], rows), data.published_definitions, data.evidence)
 
 
-def _validate_dependencies(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _validate_dependencies(data: _ValidationData) -> None:
     from .models import ProcedureVersion
     from .procedure_dependencies import ProcedureDependency
 
@@ -608,63 +372,12 @@ def _validate_dependencies(data: _ValidationData) -> list[StoredRuleLoadDiagnost
             "satisfied_when",
         )
     )
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for row in rows:
-        owner = f"procedure_dependency:{row['procedure_version__semantic_id']}:{row['semantic_id']}"
-        if row["relation"] != ProcedureDependency.Relation.BLOCKING_PREREQUISITE:
-            failures.append(_failure(owner, "unsupported_dependency_relation", ("relation",)))
-            continue
-        if row["procedure_version__procedure_id"] == row["target_procedure_id"]:
-            failures.append(_failure(owner, "self_dependency", ("target_procedure",)))
-            continue
-        if row["applicability"] != {}:
-            decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-        if row["satisfied_when"] == {}:
-            failures.append(_failure(owner, "missing_satisfied_when", ("satisfied_when",)))
-            continue
-        decoded = decode_stored_rule(row["satisfied_when"], data.published_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
-        links = _source_presence(data, "procedure_dependency", row["id"])
-        if (
-            not row["text_ar"].strip()
-            or not row["text_en"].strip()
-            or not links
-            or any(not link.sources for link in links)
-        ):
-            failures.append(_failure(owner, "invalid_dependency_evidence", ("evidence",)))
-    return failures
+    validate_dependencies(
+        cast(list[DependencyRow], rows), data.published_definitions, data.evidence
+    )
 
 
-def _snapshot_evidence_is_adequate(links: tuple[_EvidenceInfo, ...]) -> bool:
-    adequate = False
-    for link in links:
-        if (
-            not link.passage.strip()
-            or not link.location.strip()
-            or not link.applicability_context.strip()
-        ):
-            return False
-        if any(
-            classification == "field_report" and (observation_date is None or not context.strip())
-            for classification, observation_date, context in link.sources
-        ):
-            return False
-        if link.verification_state == "current" and link.support_status == "contradicts":
-            return False
-        adequate |= (
-            link.verification_state == "current"
-            and link.support_status == "supports"
-            and bool(link.sources)
-        )
-    return adequate
-
-
-def _validate_routing(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
+def _validate_routing(data: _ValidationData) -> None:
     from .models import ProcedureVersion
     from .service_point_routing import ProcedureServicePointAssociation, ServicePointVersion
 
@@ -700,50 +413,12 @@ def _validate_routing(data: _ValidationData) -> list[StoredRuleLoadDiagnostic]:
             )
         ),
     )
-    failures: list[StoredRuleLoadDiagnostic] = []
-    for row in associations:
-        owner = (
-            f"service_point_association:{row['procedure_version__semantic_id']}:"
-            f"{row['semantic_id']}"
-        )
-        decoded = decode_stored_rule(row["applicability"], data.published_definitions)
-        links = _source_presence(data, "procedure_service_point_association", row["id"])
-        if (
-            decoded.predicate is None
-            or not links
-            or any(not link.sources for link in links)
-            or (
-                row["verification_state"] == "current" and not _snapshot_evidence_is_adequate(links)
-            )
-        ):
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    decoded.diagnostics
-                    or (_diagnostic("invalid_routing_evidence", ("evidence",)),),
-                )
-            )
-    for row in materials:
-        owner = f"service_point_version:{row['semantic_id']}"
-        links = _source_presence(data, "service_point_version", row["id"])
-        if (
-            not row["address_ar"].strip()
-            or not row["address_en"].strip()
-            or row["availability"] not in ServicePointVersion.Availability.values
-            or not links
-            or any(not link.sources for link in links)
-            or (
-                row["verification_state"] == "current" and not _snapshot_evidence_is_adequate(links)
-            )
-        ):
-            failures.append(_failure(owner, "invalid_service_point_material", ()))
-    return failures
-
-
-def _diagnostic(code: str, path: tuple[str | int, ...]) -> Any:
-    from planning.diagnostics import ValidationDiagnostic
-
-    return ValidationDiagnostic(code, path)
+    validate_routing(
+        cast(list[AssociationRow], associations),
+        cast(list[MaterialRow], materials),
+        data.published_definitions,
+        data.evidence,
+    )
 
 
 def _validate_workflow_owners(evaluation_date: date) -> None:
@@ -871,10 +546,10 @@ def validate_global_catalog(evaluation_date: date | None = None) -> None:
     """Run the request-time global integrity ledger without making a full DTO graph."""
 
     data = _load_validation_data()
-    _raise(_validate_core(data))
-    _raise(_validate_bases(data))
-    _raise(_validate_dependencies(data))
-    _raise(_validate_routing(data))
+    validate_core(_load_core_inputs(data))
+    _validate_bases(data)
+    _validate_dependencies(data)
+    _validate_routing(data)
     if evaluation_date is not None:
         _validate_workflow_owners(evaluation_date)
 

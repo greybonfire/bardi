@@ -10,7 +10,7 @@ from .case_preparation import (
     CasePreparationSuccess,
     prepare_case,
 )
-from .catalog import KnowledgeSnapshot, QuestionSnapshot
+from .catalog import KnowledgeSnapshot
 from .checklists import select_checklist_items
 from .dependencies import select_procedure_dependencies
 from .eligibility_bases import select_eligibility_bases
@@ -18,18 +18,15 @@ from .evaluator import TruthValue, evaluate
 from .facts import validate_submitted_facts
 from .fees import select_fees
 from .public import (
-    AnswerDefinition,
     InconclusiveResult,
     InconclusiveSection,
     InvalidResult,
-    NextQuestionResult,
     PlanningInput,
     PlanningResult,
     PlanResult,
     PublicDiagnostic,
-    PublicQuestion,
 )
-from .questions import pick_consequential_question
+from .questions import pick_consequential_question, question_result
 from .routing import select_service_points
 from .selection import (
     ProcedureSelected,
@@ -50,31 +47,6 @@ from .warnings import select_warnings
 
 def _configuration_invalid() -> InvalidResult:
     return InvalidResult((PublicDiagnostic("knowledge_configuration_invalid", ()),))
-
-
-def _question_result(
-    snapshot: KnowledgeSnapshot,
-    service_id: str,
-    question: QuestionSnapshot,
-) -> NextQuestionResult | InvalidResult:
-    answers = tuple(
-        AnswerDefinition(
-            key,
-            snapshot.fact_definitions[key].kind,
-            snapshot.fact_definitions[key].enum_values,
-            snapshot.fact_definitions[key].minimum,
-        )
-        for key in question.resolved_fact_keys
-        if key in snapshot.fact_definitions
-    )
-    if len(answers) != len(question.resolved_fact_keys) or any(
-        snapshot.fact_definitions[key].derived for key in question.resolved_fact_keys
-    ):
-        return _configuration_invalid()
-    return NextQuestionResult(
-        service_id,
-        PublicQuestion(question.semantic_id, question.text, answers),
-    )
 
 
 def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -> PlanningResult:
@@ -116,7 +88,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
 
     selection = select_procedure(snapshot, service.semantic_id, preparation.prepared_facts)
     if isinstance(selection, SelectionQuestion):
-        return _question_result(snapshot, service.semantic_id, selection.question)
+        return question_result(snapshot, service.semantic_id, selection.question)
     if isinstance(selection, SelectionConfigurationDefect):
         return _configuration_invalid()
     if isinstance(selection, (SelectionUnsupported, SelectionInconclusive)):
@@ -148,7 +120,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         if question.diagnostic_codes or question.question is None:
             return _configuration_invalid()
-        return _question_result(snapshot, service.semantic_id, question.question)
+        return question_result(snapshot, service.semantic_id, question.question)
     if version_applicability.value is TruthValue.FALSE:
         return InconclusiveResult("procedure_version_not_applicable")
 
@@ -169,7 +141,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         if question.diagnostic_codes or question.question is None:
             return _configuration_invalid()
-        return _question_result(snapshot, service.semantic_id, question.question)
+        return question_result(snapshot, service.semantic_id, question.question)
     if bases.no_applicable_basis:
         return InconclusiveResult("no_applicable_eligibility_basis")
 
@@ -191,7 +163,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         if question.diagnostic_codes or question.question is None:
             return _configuration_invalid()
-        return _question_result(snapshot, service.semantic_id, question.question)
+        return question_result(snapshot, service.semantic_id, question.question)
 
     matched_basis_ids = bases.trusted_matched_basis_ids
     checklist = select_checklist_items(
@@ -212,7 +184,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         if question.diagnostic_codes or question.question is None:
             return _configuration_invalid()
-        return _question_result(snapshot, service.semantic_id, question.question)
+        return question_result(snapshot, service.semantic_id, question.question)
     if checklist.applicability_inconclusive:
         return InconclusiveResult("checklist_applicability_unknown")
     steps = select_steps(
@@ -233,7 +205,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         if question.diagnostic_codes or question.question is None:
             return _configuration_invalid()
-        return _question_result(snapshot, service.semantic_id, question.question)
+        return question_result(snapshot, service.semantic_id, question.question)
     if steps.applicability_inconclusive:
         return InconclusiveResult("step_applicability_unknown")
     fees = select_fees(
@@ -254,7 +226,7 @@ def plan_stateless(snapshot: KnowledgeSnapshot, planning_input: PlanningInput) -
         )
         if question.diagnostic_codes or question.question is None:
             return _configuration_invalid()
-        return _question_result(snapshot, service.semantic_id, question.question)
+        return question_result(snapshot, service.semantic_id, question.question)
     if fees.applicability_inconclusive:
         return InconclusiveResult("fee_applicability_unknown")
     warnings = select_warnings(

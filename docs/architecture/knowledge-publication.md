@@ -46,6 +46,73 @@ global validation-only reads; Service DTOs, graph features, and as-of workflow o
 scoped. Both consistent loaders reject an already-open transaction and establish an outermost
 PostgreSQL `REPEATABLE READ, READ ONLY` transaction before any discovery or materialization.
 
+### Shared request-time validation policy
+
+`knowledge.snapshot_policy` owns the request-time decisions for the four existing stages:
+core material, Eligibility Bases, Procedure Dependencies, and Service Point routing. Its
+validators accept captured, typed plain rows, explicit Fact definitions, and lightweight
+Evidence Link summaries. They return decoded rules keyed by structural identity or raise
+`KnowledgeSnapshotLoadError`, still available from `knowledge.domain`. Diagnostic owner text
+is not an identity key; owner sorting and same-owner diagnostic order remain unchanged.
+
+The full materializers validate their existing captured rows before constructing each stage's
+claim DTOs. `knowledge.snapshot_validation` retains global scalar acquisition for scoped
+loads, calling the same policy. This shares decision trees, not read strategies: scoped loads
+intentionally repeat selected checks after global validation. Neither path adds a global
+preflight to full loading or changes transaction policy. Stage order remains core → Bases →
+Dependencies → routing, with failure in one stage preventing later stages from running.
+
+Core and routing Evidence Link owner precedence remain distinct; Basis and dependency reverse
+relations remain independent. Workflow owner resolution and temporal overlays stay outside
+this policy, as do publication-only gates. Preserved legacy edge cases are tracked separately
+in [`../operations/snapshot-validation-follow-ups.md`](../operations/snapshot-validation-follow-ups.md).
+
+The policy interfaces have database-free tests:
+
+```bash
+(cd backend && uv run python -m unittest \
+  knowledge.tests.test_snapshot_policy knowledge.tests.test_snapshot_feature_policy -v)
+```
+
+Loader tests continue to cover PostgreSQL acquisition, global fail-closed behavior, scoped
+graphs, detached DTOs, transaction isolation, historical overlays, and exact diagnostics.
+
+### Date-aware evidence trust projection
+
+`knowledge.evidence_trust_projection.project_evidence_trust(snapshot, ordered_history)` owns
+pure temporal replay and detached-snapshot rewriting. Plain discrepancy-transition and
+re-verification records carry structural owner identities, not ORM objects or editorial
+rationale. Private overlay state, open-discrepancy precedence, verification-date handling,
+and all eight claim/material projections have one implementation. Authored values, rules,
+text, and provenance content remain unchanged.
+
+`knowledge.evidence_workflow_temporal` retains the PostgreSQL adapter and existing public
+loaders. It filters history by evaluation date and optional Evidence Link scope, eagerly reads
+transitions then reviews, and orders the combined timeline by timestamp, discrepancy before
+review, then within-kind primary key. Date admission retains PostgreSQL's active-timezone
+calendar semantics; the pure function does not repeat this filtering in Python.
+
+After both reads finish, the adapter resolves each preloaded workflow owner and yields its
+record for immediate replay before resolving the next owner. Consuming the returned history
+eagerly would change that failure sequence. The pure function consumes it once, without
+sorting again or discarding owners absent from the snapshot. Workflow ownership precedence,
+global visible-owner validation, transaction policy, models, signals, and editorial writes
+remain unchanged. Generic semantic loaders still apply no workflow projection; there is no
+alternative latest-state projection path.
+
+Pure snapshot-outcome tests replace private-overlay tests and run without Django settings or
+a database:
+
+```bash
+(cd backend && uv run python -m unittest knowledge.tests.test_evidence_trust_projection -v)
+```
+
+PostgreSQL tests retain persisted historical outcomes, scoped acquisition, publication/privacy
+checks, and lock/transaction behavior. Characterization also pins timestamp ties, active-timezone
+cutoffs, and history-read/owner-resolution order. Preserved compatibility observations are
+tracked separately in
+[`../operations/evidence-projection-follow-ups.md`](../operations/evidence-projection-follow-ups.md).
+
 ## Implementation status: issue #40
 
 Checklist provenance is implemented relationally: Authorities, Document Types, and preserved
@@ -61,7 +128,8 @@ current public classifications. Inconclusive trust on an applicable Official Req
 only Checklist output inconclusive; unavailable Practical Preparation is omitted. Public
 responses use an explicit compact Source/freshness projection and never expose passages,
 evidence locations, applicability context, support flags, or other editorial Evidence Link
-structures. The frozen prototype remains reference-only and is not imported by production code.
+structures. The retired research prototype is preserved only in Git history and is not a
+production dependency.
 
 ## Implementation status: issue #55
 
@@ -245,7 +313,8 @@ compatibility path does not change claims, evidence, lifecycle state, or publica
 
 ## Migrating the researched fixtures
 
-The three evidence packs and frozen prototype fixtures are migration/reference inputs, not production runtime dependencies.
+The three evidence packs remain research/reference inputs. Historical prototype fixtures are
+preserved in Git history only and are not production runtime dependencies.
 
 Production seeding should create real production records through supported import/fixture services and then validate them using the production publication validator. The migration should preserve stable semantic IDs where useful for acceptance parity, but should not preserve prototype-only compatibility aliases or test-only synthetic structures.
 

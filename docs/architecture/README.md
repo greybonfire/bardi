@@ -12,7 +12,7 @@ When repository material conflicts, use this order:
 1. **Accepted ADRs** in `docs/adr/` control explicit architectural decisions and their rationale.
 2. **Authoritative production design documents** in this directory define the current intended system contract.
 3. `CONTEXT.md` provides shared domain vocabulary; it should be kept consistent with the authoritative documents but is not a substitute for them.
-4. `docs/prototype-capability-report.md`, evidence packs, and the frozen `prototype/` are supporting evidence and executable reference material.
+4. `docs/prototype-capability-report.md`, evidence packs, and the retired prototype preserved in Git history are supporting research evidence.
 5. Issue and PR discussion is historical context unless its decision has been promoted into an ADR or authoritative design document.
 
 An ADR may intentionally supersede an older ADR. The newer ADR must say so explicitly.
@@ -35,4 +35,8 @@ Implementation PRs should not silently redefine domain concepts through ORM conv
 
 ## Prototype relationship
 
-The prototype is frozen. Production may port its proven scenarios and semantic identifiers, but it must not import prototype modules or inherit prototype dataclass/persistence shapes. The prototype is an executable specification during migration, not a production dependency.
+The research prototype was retired from `main` after production parity became authoritative.
+Its final executable state is preserved in Git history at commit
+`95128e22767edf8ffb9f3db838178b327b079aa0`. Production contracts, production acceptance
+tests, and reviewed production data are authoritative; historical prototype class shapes and
+implementation details are not.

@@ -4,7 +4,8 @@
 **Initial contract version:** `v1`  
 **Effective:** 2026-09-01
 
-The production evaluator must preserve the externally observable semantics proven by the prototype without depending on prototype code.
+The production evaluator preserves the externally observable semantics carried forward from the
+retired research prototype through authoritative production contracts and acceptance tests.
 
 ## Facts
 
@@ -214,6 +215,40 @@ The system asks only source Facts that are consequential to a still-resolvable p
 A Question is selected deterministically by authored priority and then stable Question identifier. If a consequential missing source Fact has no authored Question for the Service, knowledge is defective; the evaluator must not invent wording or silently assume a value.
 
 Non-consequential UNKNOWNs remain unresolved. Routing UNKNOWN is explicitly local and does not block unrelated reliable plan material.
+
+### Runtime implementation ownership
+
+`planning.questions` owns runtime source expansion, coverage, ranking, and selected-Question
+answer validity through three pure functions:
+
+- `pick_procedure_selection_question` uses the fixed legacy Procedure-selection handoff policy.
+- `pick_consequential_question` retains the later-phase handoff policy and explicit diagnostic
+  prefix.
+- `question_result` validates and projects every answer key of an already selected Question
+  into the existing `next_question` or sanitized configuration-invalid result.
+
+The two picking functions share one implementation but preserve their existing malformed-handoff
+differences. Both return an unchecked authored Question or diagnostics; answer validation remains
+a separate step after ranking. A defective winner is not replaced by a valid runner-up. Answer
+order and existing duplicate-key behavior remain unchanged. Compatibility observations are
+recorded separately in
+[`../operations/missing-fact-picker-follow-ups.md`](../operations/missing-fact-picker-follow-ups.md).
+
+`planning.selection` retains candidate evaluation, outcome precedence, and traces. The planning
+operation retains explicit phase order, result handling, and fallback reasons; each existing
+phase still determines which Facts are consequential under its own date, scope, and trust policy.
+There is no generic phase pipeline, configurable Question strategy, eager whole-catalog answer
+validation, or new adapter. Pinned derivation, snapshot loading, and publication coverage remain
+separate responsibilities, and public result contracts are unchanged.
+
+Policy tests exercise these function interfaces directly; selection and stateless-operation
+tests retain caller integration, phase progression, trust, and redaction coverage. They run
+without Django settings or PostgreSQL:
+
+```bash
+(cd backend && uv run python -m unittest planning.tests.test_questions \
+  planning.tests.test_selection planning.tests.test_operation -v)
+```
 
 ## Contradictions
 

@@ -263,7 +263,7 @@ before running Playwright, which needs to own the same ports.
   Django/PostgreSQL or researched-family parity.
 
 See [`docs/ci-cd.md`](../docs/ci-cd.md) for the independent Frontend CI job and the required
-three-track aggregate. The architectural boundaries remain governed by
+two-track aggregate. The architectural boundaries remain governed by
 [ADR 0004](../docs/adr/0004-do-not-persist-case-facts.md),
 [ADR 0005](../docs/adr/0005-use-nextjs-with-django-ninja.md),
 [ADR 0006](../docs/adr/0006-expose-one-stateless-planning-operation.md),

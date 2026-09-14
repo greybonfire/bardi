@@ -19,12 +19,13 @@ Older ADRs predate the structured Status/Context/Decision/Consequences template;
 | [0009](0009-separate-eligibility-basis-reachability-and-qualification.md) | Separate Eligibility Basis reachability from qualification. |
 | [0010](0010-separate-service-point-identity-version-and-association.md) | Separate Service Point identity, material versions, and Procedure associations. |
 | [0011](0011-keep-planning-engine-independent-of-django-orm.md) | Keep the planning engine independent of Django ORM/request objects. |
-| [0012](0012-freeze-prototype-as-executable-reference.md) | Freeze the prototype as an executable reference, not a production dependency. |
+| [0012](0012-freeze-prototype-as-executable-reference.md) | Historical freeze decision; superseded by ADR 0018 after production parity. |
 | [0013](0013-own-planning-questions-at-goal-level.md) | Author planning Questions on the stable Procedure grouping so they are available before Procedure selection; current production name: Service. |
-| [0014](0014-use-service-as-production-procedure-grouping.md) | Use Service / خدمة as the production name for the stable Procedure grouping; keep Goal only in the frozen prototype and historical records. |
+| [0014](0014-use-service-as-production-procedure-grouping.md) | Use Service / خدمة as the production name for the stable Procedure grouping; keep Goal only in historical research records. |
 | [0015](0015-ask-source-questions-for-version-applicability.md) | Ask consequential source Questions for UNKNOWN Procedure Version applicability; preserve pinned rule meaning and published content. |
 | [0016](0016-ask-source-questions-for-checklists-and-steps.md) | Ask source Questions for usable official checklist and step applicability; preserve blocked research uncertainty. |
 | [0017](0017-ask-source-questions-for-fee-applicability.md) | Ask source Questions for trusted Fee applicability without weakening monetary evidence fallback. |
+| [0018](0018-retire-research-prototype.md) | Retire the executable research prototype after production parity becomes authoritative. |
 
 ## Adding or superseding an ADR
 

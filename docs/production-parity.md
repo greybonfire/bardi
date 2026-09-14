@@ -5,9 +5,9 @@
 
 ## Purpose
 
-The frozen prototype remains a behavioral reference, but production parity is proven through the production stack itself. The acceptance suite imports researched production records, publishes them through the production publication service, loads production snapshots, exercises the production planning domain, and verifies the public Django Ninja API contract. It does not import, wrap, or execute prototype modules.
+Production parity is proven through the production stack itself. The acceptance suite imports researched production records, publishes them through the production publication service, loads production snapshots, exercises the production planning domain, and verifies the public Django Ninja API contract.
 
-CI runs the focused production acceptance suite explicitly and runs the frozen prototype suite in its existing Python-version matrix. The remaining production backend tests run separately so the focused acceptance suite is not executed twice in CI.
+The research prototype was retired from `main` after this coverage became authoritative. Its final executable state remains available in Git history at commit `95128e22767edf8ffb9f3db838178b327b079aa0`. CI runs the focused production acceptance suite explicitly; the remaining production backend tests run separately so the focused acceptance suite is not executed twice.
 
 ## Acceptance coverage
 
@@ -36,6 +36,6 @@ Production does not copy prototype behavior merely to make outputs look identica
 - **National ID renewal:** production models ordinary domestic renewal of a held expired card with no recorded-data change. First issuance, lost/damaged cards, changed-data routes, and outside-Egypt handling remain separate or unsupported. The ordinary fee is explicitly unknown, and no nationwide office mapping is invented.
 - **Temporary family exemption:** production preserves six researched family Bases as `needs_reverification` candidates rather than treating them as binding eligibility decisions. The incapable-brother wording remains unresolved beyond the researched father-support sub-route. Only the researched Giza, Mansoura, and Zagazig jurisdiction mappings are asserted; there is no nearest-office, ranking, or nationwide-routing inference.
 - **Historical military evaluation:** material first verified or retrieved on 2026-08-26 is not backdated into March 2026. Historical planning therefore fails closed for routing and question behavior that would require future evidence, even when a historical Procedure Version exists.
-- **Prototype-only implementation details:** prototype dataclasses, loaders, internal traces, helper abstractions, and serialization shapes are not production contracts. Production parity is semantic and API-level, not an implementation clone.
+- **Retired prototype implementation details:** historical prototype dataclasses, loaders, internal traces, helper abstractions, and serialization shapes are not production contracts. Production parity is semantic and API-level, not an implementation clone.
 
 These differences are deliberate evidence and product boundaries, not missing parity work.

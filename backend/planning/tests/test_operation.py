@@ -6,6 +6,7 @@ from datetime import date
 from unittest.mock import patch
 
 from planning import (
+    AnswerDefinition,
     AuthoritySnapshot,
     ChecklistItemSnapshot,
     ContradictionSnapshot,
@@ -23,6 +24,8 @@ from planning import (
     Predicate,
     ProcedureCandidateSnapshot,
     ProcedureVersionSnapshot,
+    PublicDiagnostic,
+    PublicQuestion,
     QuestionSnapshot,
     SelectionUnsupported,
     ServiceSnapshot,
@@ -182,6 +185,131 @@ class PublicPlanningOperationTests(unittest.TestCase):
         assert isinstance(result, NextQuestionResult)
         self.assertEqual(result.type, "next_question")
         self.assertEqual(result.question.answers[0].key, "answer")
+
+    def test_invalid_winning_extra_answer_fails_without_trying_valid_runner(self) -> None:
+        # Malformed detached Questions bypass publication checks; runtime must fail closed.
+        facts: dict[str, object]
+        for phase in ("selection", "version"):
+            for extra in ("undefined", "age_years_on_evaluation_date"):
+                with self.subTest(phase=phase, extra=extra):
+                    base = snapshot(derived=True, version=True)
+                    winner = QuestionSnapshot(
+                        "winner",
+                        LocalizedText("سؤال", "Winner"),
+                        0,
+                        "answer",
+                        ("answer", extra),
+                    )
+                    runner = replace(
+                        winner, semantic_id="runner", priority=1, resolved_fact_keys=("answer",)
+                    )
+                    service = replace(
+                        base.services[0],
+                        candidates=(
+                            replace(
+                                base.services[0].candidates[0],
+                                selection_predicate=Predicate("eq", "answer", True),
+                            ),
+                        )
+                        if phase == "selection"
+                        else base.services[0].candidates,
+                        questions=(runner, winner),
+                    )
+                    knowledge = replace(base, services=(service,))
+                    facts = {} if phase == "selection" else {"birth_date": date(2000, 1, 1)}
+                    self.assertEqual(
+                        plan_stateless(knowledge, request(facts)),
+                        InvalidResult((PublicDiagnostic("knowledge_configuration_invalid", ()),)),
+                    )
+
+    def test_invalid_nonwinning_extra_answer_is_not_checked(self) -> None:
+        facts: dict[str, object]
+        for phase in ("selection", "version"):
+            for extra in ("undefined", "age_years_on_evaluation_date"):
+                with self.subTest(phase=phase, extra=extra):
+                    base = snapshot(derived=True, version=True)
+                    winner = QuestionSnapshot(
+                        "winner", LocalizedText("سؤال", "Winner"), 0, "answer", ("answer",)
+                    )
+                    runner = replace(
+                        winner,
+                        semantic_id="runner",
+                        priority=1,
+                        resolved_fact_keys=("answer", extra),
+                    )
+                    service = replace(
+                        base.services[0],
+                        candidates=(
+                            replace(
+                                base.services[0].candidates[0],
+                                selection_predicate=Predicate("eq", "answer", True),
+                            ),
+                        )
+                        if phase == "selection"
+                        else base.services[0].candidates,
+                        questions=(runner, winner),
+                    )
+                    facts = {} if phase == "selection" else {"birth_date": date(2000, 1, 1)}
+                    self.assertEqual(
+                        plan_stateless(replace(base, services=(service,)), request(facts)),
+                        NextQuestionResult(
+                            "service",
+                            PublicQuestion(
+                                "winner", winner.text, (AnswerDefinition("answer", "boolean"),)
+                            ),
+                        ),
+                    )
+
+    def test_question_projection_preserves_answer_order_duplicates_and_metadata(self) -> None:
+        facts: dict[str, object]
+        for phase in ("selection", "version"):
+            with self.subTest(phase=phase):
+                base = snapshot(derived=True, version=True)
+                authored = QuestionSnapshot(
+                    "multi",
+                    LocalizedText("سؤال متعدد", "Multi question"),
+                    0,
+                    "not_an_answer",
+                    ("count", "answer", "choice", "count"),
+                )
+                service = replace(
+                    base.services[0],
+                    candidates=(
+                        replace(
+                            base.services[0].candidates[0],
+                            selection_predicate=Predicate("eq", "answer", True),
+                        ),
+                    )
+                    if phase == "selection"
+                    else base.services[0].candidates,
+                    questions=(authored,),
+                )
+                knowledge = replace(
+                    base,
+                    services=(service,),
+                    fact_definitions={
+                        **base.fact_definitions,
+                        "count": FactDefinition("count", "integer", minimum=2),
+                        "choice": FactDefinition("choice", "enum", enum_values=("z", "a")),
+                    },
+                )
+                facts = {} if phase == "selection" else {"birth_date": date(2000, 1, 1)}
+                self.assertEqual(
+                    plan_stateless(knowledge, request(facts)),
+                    NextQuestionResult(
+                        "service",
+                        PublicQuestion(
+                            "multi",
+                            authored.text,
+                            (
+                                AnswerDefinition("count", "integer", (), 2),
+                                AnswerDefinition("answer", "boolean"),
+                                AnswerDefinition("choice", "enum", ("z", "a")),
+                                AnswerDefinition("count", "integer", (), 2),
+                            ),
+                        ),
+                    ),
+                )
 
     def test_invalid_facts_are_redacted_to_code_and_path(self) -> None:
         result = plan_stateless(snapshot(), request({"answer": None}))

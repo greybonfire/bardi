@@ -16,13 +16,10 @@ from planning.catalog import (
     LocalizedText,
     SourceSnapshot,
 )
-from planning.diagnostics import ValidationDiagnostic
 from planning.rules import Predicate
 from planning.trust import VerificationState
 
 from .domain import (
-    KnowledgeSnapshotLoadError,
-    StoredRuleLoadDiagnostic,
     decode_stored_rule,
     referenced_fact_keys,
 )
@@ -35,6 +32,14 @@ from .models import (
     Source,
 )
 from .publication import PublicationContext, PublicationDiagnostic
+from .snapshot_policy import (
+    BasisRow,
+    EvidenceInfo,
+    EvidenceRow,
+    EvidenceSourceRow,
+    summarize_evidence_rows,
+    validate_bases,
+)
 
 
 def _source_fact_keys(
@@ -302,6 +307,21 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot, *, scope: Any | None = None) -
             "source__authority__name_en",
         )
     )
+    summaries = summarize_evidence_rows(
+        cast(list[EvidenceRow], evidence_rows),
+        cast(list[EvidenceSourceRow], evidence_source_rows),
+    )
+    basis_evidence: dict[tuple[str, int], list[EvidenceInfo]] = defaultdict(list)
+    for captured_link in evidence_rows:
+        basis_evidence[("eligibility_basis", captured_link["eligibility_basis_id"])].append(
+            summaries[captured_link["id"]]
+        )
+    predicates = validate_bases(
+        cast(list[BasisRow], basis_rows),
+        snapshot.fact_definitions,
+        {owner: tuple(links) for owner, links in basis_evidence.items()},
+    )
+
     source_snapshots: dict[str, SourceSnapshot] = {}
     sources_by_link: dict[int, list[SourceSnapshot]] = defaultdict(list)
     for source_row in evidence_source_rows:
@@ -350,53 +370,16 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot, *, scope: Any | None = None) -
             )
         )
 
-    failures: list[StoredRuleLoadDiagnostic] = []
     by_version: dict[str, list[EligibilityBasisSnapshot]] = defaultdict(list)
     for basis_row in cast(list[dict[str, Any]], basis_rows):
-        owner = (
-            f"eligibility_basis:{basis_row['procedure_version__semantic_id']}:"
-            f"{basis_row['semantic_id']}"
-        )
-        reachability: Predicate | None = None
-        if basis_row["reachability"] != {}:
-            decoded = decode_stored_rule(basis_row["reachability"], snapshot.fact_definitions)
-            if decoded.predicate is None:
-                failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-                continue
-            reachability = decoded.predicate
-        if basis_row["qualification"] == {}:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    (ValidationDiagnostic("missing_qualification", ("qualification",)),),
-                )
-            )
-            continue
-        decoded = decode_stored_rule(basis_row["qualification"], snapshot.fact_definitions)
-        if decoded.predicate is None:
-            failures.append(StoredRuleLoadDiagnostic(owner, decoded.diagnostics))
-            continue
+        rules = predicates[basis_row["id"]]
         links = tuple(evidence_by_basis[basis_row["id"]])
-        invalid = (
-            not basis_row["text_ar"].strip()
-            or not basis_row["text_en"].strip()
-            or not links
-            or any(not link.sources for link in links)
-        )
-        if invalid:
-            failures.append(
-                StoredRuleLoadDiagnostic(
-                    owner,
-                    (ValidationDiagnostic("invalid_basis_evidence", ("evidence",)),),
-                )
-            )
-            continue
         by_version[basis_row["procedure_version__semantic_id"]].append(
             EligibilityBasisSnapshot(
                 basis_row["semantic_id"],
                 LocalizedText(basis_row["text_ar"], basis_row["text_en"]),
-                reachability,
-                decoded.predicate,
+                rules.reachability,
+                rules.qualification,
                 basis_row["display_order"],
                 basis_row["effective_from"],
                 basis_row["effective_to"],
@@ -406,9 +389,6 @@ def _basis_snapshots(snapshot: KnowledgeSnapshot, *, scope: Any | None = None) -
                 links,
             )
         )
-    if failures:
-        raise KnowledgeSnapshotLoadError(failures)
-
     return KnowledgeSnapshot(
         snapshot.fact_definitions,
         snapshot.services,

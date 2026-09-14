@@ -1,8 +1,8 @@
 """Deterministic production import for researched temporary family exemption knowledge.
 
 The importer transcribes the researched military family-exemption pack into production models.
-It deliberately does not import the frozen prototype and never records review approvals or
-publication metadata.
+It does not import the retired research prototype and never records review approvals or publication
+metadata.
 """
 
 from __future__ import annotations

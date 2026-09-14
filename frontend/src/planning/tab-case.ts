@@ -1,5 +1,5 @@
 import type { ApiErrorKind } from "@/api/client";
-import { localToday } from "./state";
+import { freshCase, localToday } from "./state";
 import type { ActiveCase } from "./state";
 import { createCaseStorage } from "./storage";
 import type { StorageNotice } from "./storage";
@@ -32,16 +32,24 @@ export function createTabCaseOwner() {
   requireBrowser();
   let current: TabCase | null = null;
   let owner: { cancel: () => void } | null = null;
+  let ignoreStoredCase = false;
+  let idleOnNextAttach = false;
+  let clearNotice: StorageNotice = null;
 
-  return (serviceId: string, cancel: () => void): CaseAttachment => {
+  const attach = (serviceId: string, cancel: () => void): CaseAttachment => {
     requireBrowser();
     owner?.cancel();
     if (!current || current.active.serviceId !== serviceId) {
       const storage = createCaseStorage(() => window.sessionStorage);
-      const loaded = storage.load(serviceId, localToday());
-      current = { ...loaded, storage, idle: false, failure: null, retryUntil: 0 };
-      if (!storage.save(current.active)) current.notice = "memory";
+      // A failed deletion must not revive old stored answers later in this
+      // document, even when a different Service is opened after clearing.
+      const loaded = ignoreStoredCase
+        ? { active: freshCase(serviceId), notice: clearNotice }
+        : storage.load(serviceId, localToday());
+      current = { ...loaded, storage, idle: idleOnNextAttach, failure: null, retryUntil: 0 };
+      if (!current.idle && !storage.save(current.active)) current.notice = "memory";
     }
+    idleOnNextAttach = false;
     const token = { cancel };
     owner = token;
     return {
@@ -55,6 +63,26 @@ export function createTabCaseOwner() {
       },
     };
   };
+
+  return Object.assign(attach, {
+    clear(): boolean {
+      requireBrowser();
+      const previous = owner;
+      owner = null; // Invalidate ignored AbortSignals before cancelling work.
+      ignoreStoredCase = true;
+      idleOnNextAttach = true;
+      if (current) {
+        current.active = freshCase(current.active.serviceId);
+        current.idle = true;
+        // Preserve any rate-limit deadline; clearing is not a retry bypass.
+      }
+      previous?.cancel();
+      const cleared = createCaseStorage(() => window.sessionStorage).clear();
+      clearNotice = cleared ? null : "clear_failed";
+      if (current) current.notice = clearNotice;
+      return cleared;
+    },
+  });
 }
 
 // Next's locale root-segment navigation remounts React without reloading the
@@ -65,4 +93,11 @@ export function attachTabCase(serviceId: string, cancel: () => void): CaseAttach
   requireBrowser();
   browserOwner ??= createTabCaseOwner();
   return browserOwner(serviceId, cancel);
+}
+
+// Privacy-page escape hatch. No Service lookup, saved-case decoding, or request.
+export function clearTabCase(): boolean {
+  requireBrowser();
+  browserOwner ??= createTabCaseOwner();
+  return browserOwner.clear();
 }

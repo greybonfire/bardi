@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ClearTabCase } from "@/planning/clear-tab-case";
 import { isLocale, pageAlternates, siteCopy } from "@/lib/site";
 
 type Props = { params: Promise<{ locale: string }> };
@@ -14,6 +15,7 @@ export default async function Privacy({ params }: Props) {
   const t = siteCopy(locale);
   return <article className="reading-page privacy-page">
     <Link className="back-link" href={`/${locale}`} prefetch={false}>{t.allServices}</Link><h1>{t.privacy}</h1>
+    <ClearTabCase locale={locale} />
     {locale === "ar" ? <>
       <p className="lead">تقدر تستخدم بردي من غير حساب. بنسألك عن المعلومات اللي نحتاجها عشان نجهّز إرشادات، مش عشان نقدّم طلب بالنيابة عنك.</p>
       <h2>إيه اللي بيتحفظ هنا؟</h2>
@@ -23,7 +25,7 @@ export default async function Privacy({ params }: Props) {
       <p>لما تبدأ أو تبعت إجابة، بنبعت معرّف الخدمة، وإجاباتك، واللغة، وتاريخ الإرشادات لخادم بردي عشان يحسب الإرشادات. إجاباتك مش بتتحفظ كحالة على الخادم، ومش بنحطها في عنوان الصفحة.</p>
       <p>العميل ده مفيهوش تحليلات استخدام أو تسجيل جلسات أو أدوات تتبّع للإجابات. الإرشادات نفسها بتفضل في ذاكرة الصفحة، ومش بنحفظ نسخة منها في تخزين التبويب.</p>
       <h2>لو الجهاز مشترك</h2>
-      <p>استخدم «امسح الإجابات وابدأ من جديد» في صفحة الأسئلة قبل ما تمشي. قفل التبويب لوحده مش ضمان للمسح: بعض المتصفحات بترجّع الجلسات. لو ظهر إن المسح ما تمّش، امسح بيانات الموقع من إعدادات المتصفح.</p>
+      <p>استخدم «امسح الإجابات وابدأ من جديد» هنا أو في صفحة الأسئلة قبل ما تمشي. قفل التبويب لوحده مش ضمان للمسح: بعض المتصفحات بترجّع الجلسات. لو ظهر إن المسح ما تمّش، امسح بيانات الموقع من إعدادات المتصفح.</p>
       <h2>الطباعة والروابط الخارجية</h2>
       <p>الطباعة أو الحفظ كملف PDF بيتم من متصفحك. النسخ دي ممكن تحتوي على معلومات شخصية، ومش بتتمسح لما تمسح إجاباتك من بردي. احتفظ بيها بأمان. روابط المصادر بتفتح مواقع مستقلة، ولكل موقع ممارساته الخاصة بالخصوصية.</p>
       <h2>اكتب المطلوب بس</h2>
@@ -37,7 +39,7 @@ export default async function Privacy({ params }: Props) {
       <p>When you start or submit an answer, the service identifier, answers, language, and guidance date are sent to Bardi’s server to calculate guidance. Answers are not saved as a server-side case or placed in the page address.</p>
       <p>This client has no usage analytics, session recording, or answer-tracking tools. Guidance stays in page memory; we do not save it in tab storage.</p>
       <h2>On a shared device</h2>
-      <p>Use “Clear answers and start again” on the questionnaire before leaving. Closing a tab alone does not guarantee deletion: some browsers restore sessions. If clearing fails, remove this site’s data through your browser settings.</p>
+      <p>Use “Clear answers and start again” here or on the questionnaire before leaving. Closing a tab alone does not guarantee deletion: some browsers restore sessions. If clearing fails, remove this site’s data through your browser settings.</p>
       <h2>Printing and external links</h2>
       <p>Printing or saving a PDF is handled by your browser. These copies may contain personal information and are not deleted when you clear your Bardi answers. Keep them safe. Source links open independent websites with their own privacy practices.</p>
       <h2>Enter only what is asked for</h2>

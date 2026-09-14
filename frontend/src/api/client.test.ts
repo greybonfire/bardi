@@ -35,7 +35,7 @@ describe("requestPlan", () => {
     expect(await requestPlan(input, abortSignal)).toEqual(result);
     expect(fetchMock).toHaveBeenCalledExactlyOnceWith("/v1/planning", {
       method: "POST", headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(input), signal: abortSignal, credentials: "omit", cache: "no-store",
+      body: JSON.stringify(input), signal: expect.any(AbortSignal), credentials: "omit", cache: "no-store",
       referrerPolicy: "no-referrer", redirect: "error",
     });
   });

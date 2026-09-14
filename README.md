@@ -24,9 +24,12 @@ component behind the Django application layer. The public API contract is docume
 
 ## Current service research
 
-The [passport and National ID suite](docs/evidence-packs/passport-national-id-suite/README.md)
-catalogs transaction families, source-backed claims, unresolved guidance, and bounded production
-implementation tasks. It is a research draft, not approval to publish new services.
+The [passport suite](docs/evidence-packs/passport-suite/README.md) and
+[National ID suite](docs/evidence-packs/national-id-suite/README.md) are separate research packs.
+Each owns its transaction catalog, sources, claims, gaps, Questions, scenarios, and bounded
+implementation handoff. Both are research drafts, not approval to publish new services.
+See the [evidence-pack index and renewal-baseline retention decision](docs/evidence-packs/README.md)
+for the distinction between current research, importer baselines, and immutable database history.
 
 ## Research history
 

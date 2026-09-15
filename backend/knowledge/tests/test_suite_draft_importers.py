@@ -199,7 +199,9 @@ class SuiteDraftImportTests(TestCase):
             tuple(planning_behavior_signature(v) for v in (old_passport, old_id)), signatures
         )
         self.assertEqual(list(ServiceQuestion.objects.order_by("pk").values()), questions)
-        self.assertEqual(list(ServiceProcedureCandidate.objects.order_by("pk").values()), candidates)
+        self.assertEqual(
+            list(ServiceProcedureCandidate.objects.order_by("pk").values()), candidates
+        )
         self.assertEqual(list(FactDefinition.objects.order_by("pk").values()), facts)
 
     def test_preview_and_report_do_not_claim_missing_identities_were_imported(self) -> None:

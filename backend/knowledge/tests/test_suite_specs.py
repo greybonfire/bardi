@@ -115,7 +115,9 @@ class SuiteManifestTests(TestCase):
         first = suite.families[0]
         bad = replace(first.scopes[0], claims=("C-P-99",))
         with self.assertRaises(ValueError):
-            replace(suite, families=(replace(first, scopes=(bad,)),) + suite.families[1:]).validate()
+            replace(
+                suite, families=(replace(first, scopes=(bad,)),) + suite.families[1:]
+            ).validate()
 
     def test_missing_catalog_row_is_rejected(self) -> None:
         suite = load_suite("national_id")

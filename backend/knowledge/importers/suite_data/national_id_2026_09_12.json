@@ -1,0 +1,676 @@
+{
+  "research_date": "2026-09-12",
+  "key": "national_id",
+  "service_id": "get_egyptian_national_id",
+  "service_ar": "الحصول على بطاقة رقم قومي مصرية",
+  "service_en": "Get an Egyptian National ID",
+  "sources": [
+    {
+      "alias": "S07",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "First National ID",
+      "locator": "https://www.khadamatmisr.gov.eg/node/63",
+      "context": "Inspected 2026-09-12; undated. Sparse student birth-certificate and third-degree guarantor wording. Not a complete general first-issuance checklist."
+    },
+    {
+      "alias": "S08",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "National ID renewal",
+      "locator": "https://www.khadamatmisr.gov.eg/node/61",
+      "context": "Inspected 2026-09-12; undated. Old-card requirement; marriage-document condition unresolved for unchanged-data renewals."
+    },
+    {
+      "alias": "S09",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "Lost National ID",
+      "locator": "https://www.khadamatmisr.gov.eg/node/62",
+      "context": "Inspected 2026-09-12; undated. Lists the old card despite loss. Ambiguous: never infer a mandatory original or silently substitute a copy."
+    },
+    {
+      "alias": "S10",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "Damaged National ID",
+      "locator": "https://www.khadamatmisr.gov.eg/node/64",
+      "context": "Inspected 2026-09-12; undated. Damaged card and marital evidence listed; marriage condition unresolved."
+    },
+    {
+      "alias": "S11",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "National ID data changes",
+      "locator": "https://www.khadamatmisr.gov.eg/node/65",
+      "context": "Inspected 2026-09-12; undated. Old card and proof of change listed. Accepted address/profession/civil-status alternatives not specified."
+    },
+    {
+      "alias": "S12",
+      "authority": "gazette",
+      "authority_ar": "الجريدة الرسمية المصرية",
+      "authority_en": "Egyptian Official Gazette",
+      "title": "Civil Status Law 143/1994 — original enacted text",
+      "locator": "https://manshurat.org/file/41801/download?token=z74noS-l",
+      "context": "Original Gazette scan hosted by Manshurat Legal. Research visually inspected PDF pages 15–17 (printed 17–19), Articles 48, 52–54 and 62. Not a certified current consolidation. Later-amendment review is open.",
+      "published_on": "1994-06-09",
+      "effective_from": "1994-06-10"
+    },
+    {
+      "alias": "S13",
+      "authority": "gazette",
+      "authority_ar": "الجريدة الرسمية المصرية",
+      "authority_en": "Egyptian Official Gazette",
+      "title": "Law 165/2022 — Article 48 age amendment",
+      "locator": "https://gate.ahram.org.eg/media/News/2022/11/6/2022-638033397276961233-696.pdf",
+      "context": "Original Gazette scan hosted by Al-Ahram. PDF page 1, printed page 9; Gazette 44 supplement (A), 2022-11-03. Next-day commencement; later-amendment review remains open.",
+      "published_on": "2022-11-03",
+      "effective_from": "2022-11-04"
+    },
+    {
+      "alias": "S15",
+      "authority": "mfa",
+      "authority_ar": "وزارة الخارجية المصرية",
+      "authority_en": "Egyptian Ministry of Foreign Affairs",
+      "title": "Consular National ID renewal",
+      "locator": "https://www.mfa.gov.eg/ar/ConsularServicesAndTransactions/Details/94",
+      "context": "Inspected 2026-09-12; undated. Five document/procedure bullets. Does not establish every mission fee, time or first-issuance availability."
+    },
+    {
+      "alias": "S20",
+      "authority": "sydney",
+      "authority_ar": "القنصلية العامة المصرية في سيدني",
+      "authority_en": "Egyptian Consulate General in Sydney",
+      "title": "Sydney first National ID",
+      "locator": "https://egyptconsulatesydney.com/en/national-id-card-first-issuance/",
+      "context": "Inspected 2026-09-12; undated. Visiting-committee model; no live date verified. Age-16 wording is stale against S13; do not import as current legal threshold."
+    },
+    {
+      "alias": "S21",
+      "authority": "dubai",
+      "authority_ar": "القنصلية العامة المصرية في دبي",
+      "authority_en": "Egyptian Consulate General in Dubai",
+      "title": "Dubai National ID renewal",
+      "locator": "https://dubai.egyptconsulates.org/id-card.html",
+      "context": "Inspected 2026-09-12; undated, Dubai only. Requirements, two-copy wording, 200 AED and approximate two-month time need current operational verification."
+    },
+    {
+      "alias": "S22",
+      "authority": "moi",
+      "authority_ar": "وزارة الداخلية المصرية",
+      "authority_en": "Egyptian Ministry of Interior",
+      "title": "Ministry public services directory — National ID online entry",
+      "locator": "https://moi.gov.eg/home/directoryservices",
+      "context": "Inspected 2026-09-12. Links to cso.moi.gov.eg/NetServices?ServiceId=9. Target exposed a shell/access rejection; transaction eligibility, fees and online completion were not verified."
+    },
+    {
+      "alias": "S24",
+      "authority": "london",
+      "authority_ar": "القنصلية العامة المصرية في لندن",
+      "authority_en": "Egyptian Consulate General in London",
+      "title": "London National ID renewal",
+      "locator": "https://egyptconsulate.co.uk/consular-services/renewing-national-id/",
+      "context": "Inspected 2026-09-12; undated, London only. Lists 75 GBP; homepage fee-change notice from 2026-03-01 does not establish a revised ID tariff. BRP and appointment wording also require review."
+    },
+    {
+      "alias": "S25",
+      "authority": "psm",
+      "authority_ar": "دليل الخدمات العامة المصري",
+      "authority_en": "Egyptian Public Services Guide",
+      "title": "Public Services Guide — National ID discovery only",
+      "locator": "https://psm.gov.eg/providers/1/services",
+      "context": "National-ID subset of shared research alias S25, inspected as discovery-only on 2026-09-12. Full details unavailable. Residence, profession and marital-status titles are not current checklist evidence. Related locators: https://psm.gov.eg/services/17 ; https://psm.gov.eg/services/122 ; https://psm.gov.eg/Services/11 . The source registry is maintained separately from passport data."
+    }
+  ],
+  "claims": [
+    {
+      "id": "C-N-01",
+      "kind": "note",
+      "text_ar": "يعدل القانون 165 لسنة 2022 سن المادة 48 من 16 إلى 15 سنة، اعتباراً من 4 نوفمبر 2022. وتقرر المادة الأصلية تقديم الطلب خلال ستة أشهر من بلوغ هذا السن. لا تزال مراجعة القانون الحالي مفتوحة.",
+      "text_en": "Law 165/2022 changes Article 48’s age from 16 to 15, effective 2022-11-04. The base Article requires application within six months of reaching that age. Current-law review remains open.",
+      "sources": [
+        "S12",
+        "S13"
+      ],
+      "context": "Law 165/2022 changes Article 48’s age from 16 to 15, effective 2022-11-04. The base Article requires application within six months of reaching that age. Current-law review remains open."
+    },
+    {
+      "id": "C-N-02",
+      "kind": "note",
+      "text_ar": "المادة 52 تقرر التقدم للتجديد خلال ثلاثة أشهر من الانتهاء؛ وليست دليلاً على استمرار صلاحية البطاقة.",
+      "text_en": "Article 52 requires applying for renewal within three months of expiry; not proof that the expired card remains valid.",
+      "sources": [
+        "S12"
+      ],
+      "context": "Article 52 requires applying for renewal within three months of expiry; not proof that the expired card remains valid."
+    },
+    {
+      "id": "C-N-03",
+      "kind": "note",
+      "text_ar": "المادة 53 تتناول تحديث البيانات خلال ثلاثة أشهر لدى سجل محل الإقامة؛ ويلزم استكمال المراجعة القانونية والتشغيلية.",
+      "text_en": "Article 53 requires updating changed card/civil-status data within three months at the residence registry; current-law/routing review remains required.",
+      "sources": [
+        "S12"
+      ],
+      "context": "Article 53 requires updating changed card/civil-status data within three months at the residence registry; current-law/routing review remains required."
+    },
+    {
+      "id": "C-N-04",
+      "kind": "note",
+      "text_ar": "المادة 54 تتناول طلب بدل الفقد أو التلف خلال 15 يوماً ومنع الاحتفاظ بالبطاقة أو استعمالها بعد إصدار بدلها؛ مع بقاء مراجعة القانون الحالي.",
+      "text_en": "Article 54 requires a loss/damage replacement request within 15 days and prohibits retaining/using a card after its replacement has been issued. Current-law review remains required.",
+      "sources": [
+        "S12"
+      ],
+      "context": "Article 54 requires a loss/damage replacement request within 15 days and prohibits retaining/using a card after its replacement has been issued. Current-law review remains required."
+    },
+    {
+      "id": "C-N-05",
+      "kind": "note",
+      "text_ar": "توفر المادة 62 إطاراً للطلبات القنصلية أو السجل المدني بالخارج لإصدار البطاقة وبدلها وتغيير بياناتها وتجديدها. لا يثبت ذلك وجود شباك أو لجنة متاحة حالياً.",
+      "text_en": "Article 62 provides an overseas consular/civil-registry framework for ID issuance, replacement, changes and renewal. It does not prove live counter or committee availability.",
+      "sources": [
+        "S12"
+      ],
+      "context": "Article 62 provides an overseas consular/civil-registry framework for ID issuance, replacement, changes and renewal. It does not prove live counter or committee availability."
+    },
+    {
+      "id": "C-N-06",
+      "kind": "checklist",
+      "text_ar": "في قناة خدمات مصر للطالب: شهادة ميلاد مختومة من جهة الدراسة وضامن قريب حتى الدرجة الثالثة؛ البدائل العامة غير مكتملة.",
+      "text_en": "Khadamat Misr first-issuance guidance lists a student’s birth certificate stamped by the educational institution and a guarantor related within the third degree. Non-student/proof alternatives remain unknown.",
+      "sources": [
+        "S07"
+      ],
+      "context": "Khadamat Misr first-issuance guidance lists a student’s birth certificate stamped by the educational institution and a guarantor related within the third degree. Non-student/proof alternatives remain unknown."
+    },
+    {
+      "id": "C-N-07",
+      "kind": "checklist",
+      "text_ar": "تذكر خدمات مصر البطاقة القديمة ومستند الزواج في حالة الزواج؛ نطاق شرط الزواج غير محسوم.",
+      "text_en": "Khadamat Misr renewal lists the old ID and marriage documentation in the marriage case; applicability of the marriage condition remains unresolved.",
+      "sources": [
+        "S08"
+      ],
+      "context": "Khadamat Misr renewal lists the old ID and marriage documentation in the marriage case; applicability of the marriage condition remains unresolved."
+    },
+    {
+      "id": "C-N-08",
+      "kind": "checklist",
+      "text_ar": "تذكر خدمات مصر البطاقة التالفة وإثبات الزواج للزوج أو الزوجة؛ نطاق شرط الزواج يحتاج مراجعة.",
+      "text_en": "Khadamat Misr damaged replacement lists the damaged card and marriage proof for a husband/wife; marriage applicability needs review.",
+      "sources": [
+        "S10"
+      ],
+      "context": "Khadamat Misr damaged replacement lists the damaged card and marriage proof for a husband/wife; marriage applicability needs review."
+    },
+    {
+      "id": "C-N-09",
+      "kind": "checklist",
+      "text_ar": "تذكر خدمات مصر البطاقة القديمة وما يفيد تغيير البيانات؛ قائمة الأدلة المقبولة لم تُحسم.",
+      "text_en": "Khadamat Misr data change lists the old ID and evidence of the changed data. Accepted evidence alternatives remain unresolved.",
+      "sources": [
+        "S11"
+      ],
+      "context": "Khadamat Misr data change lists the old ID and evidence of the changed data. Accepted evidence alternatives remain unresolved."
+    },
+    {
+      "id": "C-N-10",
+      "kind": "note",
+      "text_ar": "صفحة بدل الفقد تطلب البطاقة القديمة بصورة ملتبسة؛ يُحجب هذا كمتطلب إلى أن توضح الجهة المقصود.",
+      "text_en": "The Khadamat Misr lost-ID page nevertheless lists the old card. This discrepancy is NOT imported as a document requirement or an invented copy alternative.",
+      "sources": [
+        "S09"
+      ],
+      "context": "The Khadamat Misr lost-ID page nevertheless lists the old card. This discrepancy is NOT imported as a document requirement or an invented copy alternative."
+    },
+    {
+      "id": "C-O-07",
+      "kind": "note",
+      "text_ar": "تدرج إرشادات وزارة الخارجية لتجديد البطاقة البطاقة المنتهية والجواز، وأدلة الزواج أو الطلاق المصرية أو إثبات المهنة أو المؤهل المصدق بشروطها. يلزم تحديد نطاق البعثة.",
+      "text_en": "MFA ID renewal lists the expired ID, passport, and conditional Egyptian marriage/divorce or authenticated profession/qualification evidence. Mission scope is required.",
+      "sources": [
+        "S15"
+      ],
+      "context": "MFA ID renewal lists the expired ID, passport, and conditional Egyptian marriage/divorce or authenticated profession/qualification evidence. Mission scope is required."
+    },
+    {
+      "id": "C-O-08",
+      "kind": "note",
+      "text_ar": "تدرج تعليمات دبي البطاقة القديمة والجواز أو رخصة القيادة المصرية، وأدلة التجنيد والحالة المدنية والإقامة والمهنة، والهوية الإماراتية، وصورتين من المستندات. وتذكر 200 درهم ونحو شهرين؛ ويلزم مراجعة النطاق والتشغيل الحالي.",
+      "text_en": "Dubai ID renewal lists the old ID, passport OR Egyptian driving license, military/civil-status/residence/profession evidence, UAE ID and two copies. It quotes 200 AED and about two months; scope and current operation require review.",
+      "sources": [
+        "S21"
+      ],
+      "context": "Dubai ID renewal lists the old ID, passport OR Egyptian driving license, military/civil-status/residence/profession evidence, UAE ID and two copies. It quotes 200 AED and about two months; scope and current operation require review."
+    },
+    {
+      "id": "C-O-09",
+      "kind": "note",
+      "text_ar": "يعتمد أول إصدار للبطاقة في سيدني على لجنة أحوال مدنية زائرة أو زيارة مصر؛ ويخص التعامل القنصلي المعتاد التجديد. عبارة سن 16 سنة قديمة مقارنة بالمصدر S13. لم يُتحقق من موعد لجنة قائم.",
+      "text_en": "Sydney first ID applications depend on a visiting Civil Status committee or a visit to Egypt; normal consular handling is renewal. The age-16 sentence is stale against S13. No live committee date is verified.",
+      "sources": [
+        "S20"
+      ],
+      "context": "Sydney first ID applications depend on a visiting Civil Status committee or a visit to Egypt; normal consular handling is renewal. The age-16 sentence is stale against S13. No live committee date is verified."
+    },
+    {
+      "id": "C-O-13",
+      "kind": "note",
+      "text_ar": "تميز تعليمات لندن أدلة العنوان والمهنة والدراسة والحالة الاجتماعية، وتذكر 75 جنيهاً إسترلينياً نقداً مع حجز موعد. يحتاج إشعار تغيير الرسوم اللاحق بالصفحة الرئيسية وصياغة مستند الإقامة إلى التحقق.",
+      "text_en": "London ID guidance separates address/profession/study/marital evidence and lists 75 GBP cash with appointment booking. Later homepage fee-change notice and residence-document wording require verification.",
+      "sources": [
+        "S24"
+      ],
+      "context": "London ID guidance separates address/profession/study/marital evidence and lists 75 GBP cash with appointment booking. Later homepage fee-change notice and residence-document wording require verification."
+    },
+    {
+      "id": "C-S-01",
+      "kind": "note",
+      "text_ar": "تدرج صفحات بطاقة الرقم القومي مراكز القاهرة وأسوان والإسكندرية وشرم الشيخ. هذا دليل اكتشاف فقط؛ وليس وعداً باختصاص دقيق أو جدول تشغيل أو موعد.",
+      "text_en": "National ID pages list Cairo, Aswan, Alexandria and Sharm El Sheikh centers. Discovery only; no exact jurisdiction, timetable or appointment promise.",
+      "sources": [
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11"
+      ],
+      "context": "National ID pages list Cairo, Aswan, Alexandria and Sharm El Sheikh centers. Discovery only; no exact jurisdiction, timetable or appointment promise."
+    },
+    {
+      "id": "C-S-02",
+      "kind": "note",
+      "text_ar": "وجود رابط خدمة البطاقة الإلكتروني لا يثبت أهلية المعاملة أو إمكان إتمامها إلكترونياً.",
+      "text_en": "The Ministry directory links a National ID online service. Existence only; eligibility and end-to-end completion remain unverified.",
+      "sources": [
+        "S22"
+      ],
+      "context": "The Ministry directory links a National ID online service. Existence only; eligibility and end-to-end completion remain unverified."
+    },
+    {
+      "id": "C-S-03",
+      "kind": "note",
+      "text_ar": "يسمي دليل الخدمات العامة تغيير الإقامة والمهنة والحالة الاجتماعية منفصلة؛ ليست أدلة قوائم مكتملة.",
+      "text_en": "PSM separately names ID residence/profession/marital-status changes. Discovery lead, not complete checklist evidence.",
+      "sources": [
+        "S25"
+      ],
+      "context": "PSM separately names ID residence/profession/marital-status changes. Discovery lead, not complete checklist evidence."
+    }
+  ],
+  "families": [
+    {
+      "row": "N01",
+      "procedure_id": "ordinary_domestic_national_id_first_issue",
+      "title_ar": "إصدار بطاقة رقم قومي لأول مرة داخل مصر",
+      "title_en": "First National ID inside Egypt",
+      "boundary": "First issuance, with student-channel documentary research only; no non-student menu guessed.",
+      "blockers": [
+        "D09",
+        "G02",
+        "G03"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-01",
+            "C-N-06",
+            "C-S-01",
+            "C-S-02",
+            "C-S-03"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "N02",
+      "procedure_id": "ordinary_domestic_national_id_renewal",
+      "title_ar": "تجديد بطاقة الرقم القومي دون تغيير البيانات داخل مصر",
+      "title_en": "Renew an expired National ID without data changes inside Egypt",
+      "boundary": "Held expired ID with unchanged recorded data. Marriage-proof condition and current-law review remain open.",
+      "blockers": [
+        "D03",
+        "D09",
+        "G02"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-02",
+            "C-N-07",
+            "C-S-01",
+            "C-S-02",
+            "C-S-03"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ],
+      "identity_ar": "تجديد بطاقة الرقم القومي المنتهية داخل مصر دون تغيير البيانات",
+      "identity_en": "Renew an expired Egyptian National ID inside Egypt without changing its recorded data"
+    },
+    {
+      "row": "N03",
+      "procedure_id": "ordinary_domestic_national_id_lost",
+      "title_ar": "بدل بطاقة رقم قومي مفقودة داخل مصر",
+      "title_en": "Replace a lost National ID inside Egypt",
+      "boundary": "Lost card; old-original source discrepancy is retained as a note, NOT a checklist requirement.",
+      "blockers": [
+        "D02",
+        "D09",
+        "G02",
+        "G07"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-04",
+            "C-N-10"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N04",
+      "procedure_id": "ordinary_domestic_national_id_damaged",
+      "title_ar": "بدل بطاقة رقم قومي تالفة داخل مصر",
+      "title_en": "Replace a damaged National ID inside Egypt",
+      "boundary": "Damaged card available; exact marriage-proof scope and other documentary steps remain unknown.",
+      "blockers": [
+        "D03",
+        "D09",
+        "G02"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-04",
+            "C-N-08"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N05",
+      "procedure_id": "ordinary_domestic_national_id_residence_change",
+      "title_ar": "تغيير محل الإقامة ببطاقة الرقم القومي",
+      "title_en": "Change National ID residence data",
+      "boundary": "Held card with address change; accepted address alternatives and expiry overlap need reviewed rules.",
+      "blockers": [
+        "D09",
+        "G02",
+        "G03",
+        "G07"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-03",
+            "C-N-09"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N06",
+      "procedure_id": "ordinary_domestic_national_id_profession_change",
+      "title_ar": "تغيير المهنة ببطاقة الرقم القومي",
+      "title_en": "Change National ID profession data",
+      "boundary": "Held card with profession/study/qualification change. Do not transplant consular proof lists.",
+      "blockers": [
+        "D09",
+        "G02",
+        "G03",
+        "G07"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-03",
+            "C-N-09"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N07",
+      "procedure_id": "ordinary_domestic_national_id_marital_status_change",
+      "title_ar": "تغيير الحالة الاجتماعية ببطاقة الرقم القومي",
+      "title_en": "Change National ID marital-status data",
+      "boundary": "Marriage/divorce/widowhood need distinct proof and record-registration branches.",
+      "blockers": [
+        "D09",
+        "G02",
+        "G03",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-N-03",
+            "C-N-09"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "contested_identity"
+      ]
+    },
+    {
+      "row": "N08",
+      "procedure_id": null,
+      "title_ar": "تصحيح بيانات البطاقة أو القيد المدني",
+      "title_en": "Correct card or civil-register data",
+      "boundary": "No generic other Procedure: contested identity/underlying records require separately researched services.",
+      "blockers": [
+        "G08"
+      ],
+      "scopes": [],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N09",
+      "procedure_id": null,
+      "title_ar": "تغيير عدة بيانات",
+      "title_en": "Change multiple data fields",
+      "boundary": "Combined changes/replacements are coherent inputs; no transaction identity or charge sequencing inferred.",
+      "blockers": [
+        "G07"
+      ],
+      "scopes": [],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N10",
+      "procedure_id": null,
+      "title_ar": "التجديد المبكر لبطاقة الرقم القومي",
+      "title_en": "Early National ID renewal",
+      "boundary": "No reviewed early-renewal window or new Procedure identity.",
+      "blockers": [
+        "G02"
+      ],
+      "scopes": [],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N11",
+      "procedure_id": "consular_national_id_first_issue",
+      "title_ar": "إصدار أول بطاقة رقم قومي بالخارج",
+      "title_en": "First National ID abroad",
+      "boundary": "PROVISIONAL committee-scoped identity. Sydney research only, no live committee date. Stale age-16 rule not encoded.",
+      "blockers": [
+        "D04",
+        "D09",
+        "G09"
+      ],
+      "scopes": [
+        {
+          "key": "sydney-committee",
+          "label_ar": "بحث لجنة سيدني — لا موعد متحقق",
+          "label_en": "Sydney committee research; no verified event",
+          "claims": [
+            "C-N-05",
+            "C-O-09"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "N12",
+      "procedure_id": "consular_national_id_renewal",
+      "title_ar": "تجديد بطاقة الرقم القومي بالخارج",
+      "title_en": "Renew National ID through a consulate",
+      "boundary": "Separate mission research drafts; neither scope is a nationwide or all-missions rule.",
+      "blockers": [
+        "D07",
+        "D09",
+        "G01",
+        "G06"
+      ],
+      "scopes": [
+        {
+          "key": "dubai-research",
+          "label_ar": "بحث دبي — المراجعة معلقة",
+          "label_en": "Dubai research; review pending",
+          "claims": [
+            "C-N-05",
+            "C-O-07",
+            "C-O-08"
+          ]
+        },
+        {
+          "key": "london-research",
+          "label_ar": "بحث لندن — المراجعة معلقة",
+          "label_en": "London research; review pending",
+          "claims": [
+            "C-N-05",
+            "C-O-07",
+            "C-O-13"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military"
+      ]
+    },
+    {
+      "row": "N13",
+      "procedure_id": null,
+      "title_ar": "تحديث بيانات بطاقة الرقم القومي بالخارج",
+      "title_en": "Update National ID data through a consulate",
+      "boundary": "Conditional renewal versus standalone change remains unresolved; do not create extra charges.",
+      "blockers": [
+        "G07",
+        "G08"
+      ],
+      "scopes": [],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N14",
+      "procedure_id": "consular_national_id_lost",
+      "title_ar": "بدل بطاقة رقم قومي مفقودة بالخارج",
+      "title_en": "Replace a lost National ID abroad",
+      "boundary": "PROVISIONAL identity, statutory framework only; no mission replacement checklist, no old-original requirement.",
+      "blockers": [
+        "D09",
+        "G09"
+      ],
+      "scopes": [
+        {
+          "key": "mfa-framework",
+          "label_ar": "الإطار القانوني فقط — لا بعثة محددة",
+          "label_en": "Statutory framework only; no mission selected",
+          "claims": [
+            "C-N-05"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "N15",
+      "procedure_id": "consular_national_id_damaged",
+      "title_ar": "بدل بطاقة رقم قومي تالفة بالخارج",
+      "title_en": "Replace a damaged National ID abroad",
+      "boundary": "PROVISIONAL identity, statutory framework only; ordinary consular renewal is not replacement evidence.",
+      "blockers": [
+        "D09",
+        "G09"
+      ],
+      "scopes": [
+        {
+          "key": "mfa-framework",
+          "label_ar": "الإطار القانوني فقط — لا بعثة محددة",
+          "label_en": "Statutory framework only; no mission selected",
+          "claims": [
+            "C-N-05"
+          ]
+        }
+      ],
+      "risks": [
+        "legal"
+      ]
+    }
+  ]
+}

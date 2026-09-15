@@ -1,0 +1,950 @@
+{
+  "research_date": "2026-09-12",
+  "key": "passport",
+  "service_id": "get_egyptian_passport",
+  "service_ar": "الحصول على جواز سفر مصري",
+  "service_en": "Get an Egyptian passport",
+  "sources": [
+    {
+      "alias": "S01",
+      "authority": "moi_passports",
+      "authority_ar": "وزارة الداخلية — الإدارة العامة للجوازات والهجرة والجنسية",
+      "authority_en": "Ministry of Interior — Passports, Immigration and Nationality",
+      "title": "Passport issuance, Form 29, fees and service channels",
+      "locator": "https://moi.gov.eg/passports/home/GetPassport/1",
+      "context": "Inspected 2026-09-12: introductory text, Form 29 and fee/service headings. Undated; footer year is not an effective date. No all-in fee or nationwide office directory established."
+    },
+    {
+      "alias": "S02",
+      "authority": "moi_passports",
+      "authority_ar": "وزارة الداخلية — الإدارة العامة للجوازات والهجرة والجنسية",
+      "authority_en": "Ministry of Interior — Passports, Immigration and Nationality",
+      "title": "Documents required for a passport",
+      "locator": "https://moi.gov.eg/Passports/home/PassportRequiredPapers",
+      "context": "Inspected 2026-09-12: document bullets and instructions. Domestic scope; military exceptions require S03. No later review or new verification is implied."
+    },
+    {
+      "alias": "S03",
+      "authority": "moi_passports",
+      "authority_ar": "وزارة الداخلية — الإدارة العامة للجوازات والهجرة والجنسية",
+      "authority_en": "Ministry of Interior — Passports, Immigration and Nationality",
+      "title": "Acceptance of passport applications",
+      "locator": "https://moi.gov.eg/Passports/home/PasswordAcceptRequests",
+      "context": "Inspected 2026-09-12: acceptance list, military section and final notes. Representation, emigrant and maternal-nationality branches require specialist review."
+    },
+    {
+      "alias": "S04",
+      "authority": "moi_passports",
+      "authority_ar": "وزارة الداخلية — الإدارة العامة للجوازات والهجرة والجنسية",
+      "authority_en": "Ministry of Interior — Passports, Immigration and Nationality",
+      "title": "Passport loss",
+      "locator": "https://moi.gov.eg/Passports/home/PasswordLost",
+      "context": "Inspected 2026-09-12: loss inside Egypt and the domestic Consulates Department after loss abroad. Do not reuse the domestic police-report exception in an overseas application."
+    },
+    {
+      "alias": "S05",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "New or renewed passport",
+      "locator": "https://www.khadamatmisr.gov.eg/node/54",
+      "context": "Inspected 2026-09-12; undated. Previous passport if available; traveler-care insurance and conditional marital evidence. Khadamat Misr only."
+    },
+    {
+      "alias": "S06",
+      "authority": "khadamat",
+      "authority_ar": "مراكز خدمات مصر الحكومية",
+      "authority_en": "Government of Egypt — Khadamat Misr service centers",
+      "title": "Lost or damaged passport",
+      "locator": "https://www.khadamatmisr.gov.eg/node/53",
+      "context": "Inspected 2026-09-12; undated. Combined heading does not erase loss-specific steps. Insurance and conditional marital evidence are channel-scoped."
+    },
+    {
+      "alias": "S14",
+      "authority": "mfa",
+      "authority_ar": "وزارة الخارجية المصرية",
+      "authority_en": "Egyptian Ministry of Foreign Affairs",
+      "title": "Consular passport issuance and renewal",
+      "locator": "https://www.mfa.gov.eg/ar/ConsularServicesAndTransactions/Details/73",
+      "context": "Inspected 2026-09-12; undated. First-issuance section concerns children; exact age equality and lost/damaged distinction require review. Mission conditions are not universal."
+    },
+    {
+      "alias": "S16",
+      "authority": "mfa",
+      "authority_ar": "وزارة الخارجية المصرية",
+      "authority_en": "Egyptian Ministry of Foreign Affairs",
+      "title": "Temporary travel document",
+      "locator": "https://www.mfa.gov.eg/ar/ConsularServicesAndTransactions/Details/88",
+      "context": "Inspected 2026-09-12; undated. General identity/photo instructions and separate passport-loss branch. Mission validity and acceptance unresolved."
+    },
+    {
+      "alias": "S17",
+      "authority": "mfa",
+      "authority_ar": "وزارة الخارجية المصرية",
+      "authority_en": "Egyptian Ministry of Foreign Affairs",
+      "title": "Newborn temporary travel document",
+      "locator": "https://www.mfa.gov.eg/ar/ConsularServicesAndTransactions/Details/2",
+      "context": "Inspected 2026-09-12; undated. Ten child/parent document bullets. Not an ordinary passport. Custody/nationality exceptions require review."
+    },
+    {
+      "alias": "S18",
+      "authority": "london",
+      "authority_ar": "القنصلية العامة المصرية في لندن",
+      "authority_en": "Egyptian Consulate General in London",
+      "title": "London passport instructions",
+      "locator": "https://egyptconsulate.co.uk/consular-services/egyptian-passport/",
+      "context": "Inspected 2026-09-12; page says updated 2024-09-12. London only. Validity, age and photo scope differ from MFA guidance. Tariff and operational details require fresh review."
+    },
+    {
+      "alias": "S19",
+      "authority": "london",
+      "authority_ar": "القنصلية العامة المصرية في لندن",
+      "authority_en": "Egyptian Consulate General in London",
+      "title": "London temporary return document",
+      "locator": "https://egyptconsulate.co.uk/consular-services/travel-document/",
+      "context": "Inspected 2026-09-12; undated, London only. Return-to-Egypt-only output; transit acceptance conditional. Photo count differs from MFA guidance."
+    },
+    {
+      "alias": "S23",
+      "authority": "moi",
+      "authority_ar": "وزارة الداخلية المصرية",
+      "authority_en": "Egyptian Ministry of Interior",
+      "title": "Privacy policy — invalid current passport-evidence locator",
+      "locator": "https://moi.gov.eg/content/PPAr.htm",
+      "context": "Inspection on 2026-09-12 returned a privacy policy, not passport requirements. Kept only as provenance-discrepancy context. NEVER attach as support for a passport requirement; does not prove what the URL served in August."
+    },
+    {
+      "alias": "S25",
+      "authority": "psm",
+      "authority_ar": "دليل الخدمات العامة المصري",
+      "authority_en": "Egyptian Public Services Guide",
+      "title": "Public Services Guide — discovery only",
+      "locator": "https://psm.gov.eg/providers/65/services",
+      "context": "Discovery-only research, 2026-09-12; full details unavailable. Passport renewal/loss/damage and ID residence/profession/marital-change titles are not current checklist evidence. ID locators: https://psm.gov.eg/providers/1/services ; https://psm.gov.eg/services/17 ; https://psm.gov.eg/services/122 ; https://psm.gov.eg/Services/11 ; damaged passport https://psm.gov.eg/services/360 ."
+    }
+  ],
+  "claims": [
+    {
+      "id": "C-P-01",
+      "kind": "checklist",
+      "text_ar": "في الفرع المنطبق على من أتم 15 سنة: بطاقة رقم قومي سارية ببيانات محدثة.",
+      "text_en": "At age 15 or above, present a valid National ID with updated data.",
+      "sources": [
+        "S02"
+      ],
+      "context": "At age 15 or above, present a valid National ID with updated data."
+    },
+    {
+      "id": "C-P-02",
+      "kind": "checklist",
+      "text_ar": "لمن هو دون 15 سنة: شهادة ميلاد مميكنة تحمل الرقم القومي.",
+      "text_en": "Under 15, use a machine-readable birth certificate carrying the national number.",
+      "sources": [
+        "S02"
+      ],
+      "context": "Under 15, use a machine-readable birth certificate carrying the national number."
+    },
+    {
+      "id": "C-P-03",
+      "kind": "checklist",
+      "text_ar": "للطالب: دليل قيد للعام الدراسي الحالي.",
+      "text_en": "Students provide current-academic-year enrollment evidence.",
+      "sources": [
+        "S02"
+      ],
+      "context": "Students provide current-academic-year enrollment evidence."
+    },
+    {
+      "id": "C-P-04",
+      "kind": "note",
+      "text_ar": "فرع مستند التجنيد يتعلق بالذكور المولودين في 18 مارس 1941 أو بعده ممن أتموا 19 سنة؛ وتلزم مراجعة الاستثناءات.",
+      "text_en": "The military-document branch concerns males born on or after 1941-03-18 who have reached 19. Read with C-P-11; specialist review remains required.",
+      "sources": [
+        "S02"
+      ],
+      "context": "The military-document branch concerns males born on or after 1941-03-18 who have reached 19. Read with C-P-11; specialist review remains required."
+    },
+    {
+      "id": "C-P-05",
+      "kind": "checklist",
+      "text_ar": "ثلاث صور حديثة ملونة بخلفية بيضاء بمقاس 4×6.",
+      "text_en": "Three recent color photographs, white background, 4×6.",
+      "sources": [
+        "S02"
+      ],
+      "context": "Three recent color photographs, white background, 4×6."
+    },
+    {
+      "id": "C-P-06",
+      "kind": "checklist",
+      "text_ar": "تقديم الأصول وصورة واحدة للمقارنة، وفق نطاق المستندات المنطبق.",
+      "text_en": "Present originals and one copy for comparison, within the applicable document scope.",
+      "sources": [
+        "S02"
+      ],
+      "context": "Present originals and one copy for comparison, within the applicable document scope."
+    },
+    {
+      "id": "C-P-07",
+      "kind": "checklist",
+      "text_ar": "تذكر خدمات مصر جواز السفر السابق إن وجد لطلبات الإصدار أو التجديد؛ وليس ذلك اشتراطاً عاماً غير مشروط لتقديم الأصل.",
+      "text_en": "Khadamat Misr lists the previous passport if available for new/renewed applications; not an unconditional old-original rule.",
+      "sources": [
+        "S05"
+      ],
+      "context": "Khadamat Misr lists the previous passport if available for new/renewed applications; not an unconditional old-original rule."
+    },
+    {
+      "id": "C-P-08",
+      "kind": "checklist",
+      "text_ar": "تذكر خدمات مصر تأمين رعاية المسافر الذي يغطي مدة سريان الجواز. لم يُحسم تطبيقه خارج هذه القناة أو مقدم التأمين أو تكلفته.",
+      "text_en": "Khadamat Misr lists traveler-care insurance covering passport validity. Other-channel applicability, provider and cost are unresolved.",
+      "sources": [
+        "S05",
+        "S06"
+      ],
+      "context": "Khadamat Misr lists traveler-care insurance covering passport validity. Other-channel applicability, provider and cost are unresolved."
+    },
+    {
+      "id": "C-P-09",
+      "kind": "checklist",
+      "text_ar": "تذكر خدمات مصر إثبات الحالة الاجتماعية للإناث عندما لا تكون مثبتة في البطاقة.",
+      "text_en": "Khadamat Misr lists marital-status evidence for females when it is absent from the ID.",
+      "sources": [
+        "S05",
+        "S06"
+      ],
+      "context": "Khadamat Misr lists marital-status evidence for females when it is absent from the ID."
+    },
+    {
+      "id": "C-P-10",
+      "kind": "note",
+      "text_ar": "تشمل فئات مقدمي الطلب المذكورة صاحب الطلب، والزوجين نيابةً عن بعضهما، والوالدين أو الأشقاء البالغين للقُصّر، والأبناء البالغين لوالديهم، والجد أو العم عند وجود الوالدين معاً بالخارج، والوكلاء ذوي صلاحيات الجوازات الصريحة. لا تزال الإثباتات الدقيقة وحالات التمثيل المتنازع عليها غير محسومة.",
+      "text_en": "Accepted submitters include self, spouses, parents/adult siblings for minors, adult children for parents, a grandfather/paternal uncle when both parents are abroad, and agents with explicit passport powers. Exact proof and disputed representation remain unresolved.",
+      "sources": [
+        "S03"
+      ],
+      "context": "Accepted submitters include self, spouses, parents/adult siblings for minors, adult children for parents, a grandfather/paternal uncle when both parents are abroad, and agents with explicit passport powers. Exact proof and disputed representation remain unresolved."
+    },
+    {
+      "id": "C-P-11",
+      "kind": "note",
+      "text_ar": "يعفي تسجيل عبارة «غير مطلوب للتجنيد» في الجواز السابق من إعادة تقديم مستند الحالة التجنيدية. ويجب أن تثبت شهادة قيد الطالب الذكر تأجيل التجنيد. لا يُعمم هذا الاستثناء على أي بيان تجنيدي آخر.",
+      "text_en": "A previous passport recording “not required for military service” removes duplicate military-status documentation. Male students’ enrollment evidence must record postponement. Do not generalize to any military notation.",
+      "sources": [
+        "S03"
+      ],
+      "context": "A previous passport recording “not required for military service” removes duplicate military-status documentation. Male students’ enrollment evidence must record postponement. Do not generalize to any military notation."
+    },
+    {
+      "id": "C-P-12",
+      "kind": "step",
+      "text_ar": "للفقد داخل مصر: إخطار مكتب الجوازات المختص واستكمال نموذج الفقد لديه؛ لا تُطلب مذكرة إبلاغ من قسم الشرطة. لا ينطبق هذا على الفقد بالخارج.",
+      "text_en": "For loss inside Egypt, notify the competent passport office and complete its loss form; a police-station loss-report memorandum is not required. This does not apply to loss abroad.",
+      "sources": [
+        "S04"
+      ],
+      "context": "For loss inside Egypt, notify the competent passport office and complete its loss form; a police-station loss-report memorandum is not required. This does not apply to loss abroad."
+    },
+    {
+      "id": "C-P-13",
+      "kind": "note",
+      "text_ar": "بعد فقد الجواز بالخارج، تتولى إدارة القنصليات داخل مصر مسار البدل المذكور، وتدرج صور البطاقة وبطاقة الوصول والجواز المفقود. ولطلب الطفل الذي يقدمه أحد والديه قائمة مستندات منفصلة. لم تُحسم بدائل الصور أو إثبات الوصول عند عدم توافرها.",
+      "text_en": "After loss abroad, the domestic Consulates Department handles replacement and lists copies of ID, arrival card and lost passport. A parent’s child application has a separate document list. Unavailable-copy/arrival-proof alternatives remain unresolved.",
+      "sources": [
+        "S04"
+      ],
+      "context": "After loss abroad, the domestic Consulates Department handles replacement and lists copies of ID, arrival card and lost passport. A parent’s child application has a separate document list. Unavailable-copy/arrival-proof alternatives remain unresolved."
+    },
+    {
+      "id": "C-P-14",
+      "kind": "note",
+      "text_ar": "الجواز المميكن شخصي، ومدته العادية سبع سنوات، ولا تضاف أو تعدل بياناته بعد إصداره؛ لا تُستنتج صلاحيات استثنائية.",
+      "text_en": "A machine-readable passport is personal, ordinarily valid seven years, and cannot have data added or amended on it. Exceptional validity is not inferred.",
+      "sources": [
+        "S01"
+      ],
+      "context": "A machine-readable passport is personal, ordinarily valid seven years, and cannot have data added or amended on it. Exceptional validity is not inferred."
+    },
+    {
+      "id": "C-P-15",
+      "kind": "step",
+      "text_ar": "استمارة 29 مجانية؛ يستكمل مقدم الطلب بيانات صفحتها الأولى.",
+      "text_en": "Form 29 is free; the applicant completes its first-page information.",
+      "sources": [
+        "S01"
+      ],
+      "context": "Form 29 is free; the applicant completes its first-page information."
+    },
+    {
+      "id": "C-P-16",
+      "kind": "fee",
+      "text_ar": "رسم إصدار الجواز المميكن — قيمة بحثية غير متحقق منها حالياً",
+      "text_en": "Machine-readable passport issuance fee — not currently verified",
+      "sources": [
+        "S01"
+      ],
+      "context": "Research ledger records 705 EGP on 2026-09-12; undated tariff, not an all-in total. Use C-P-16 OR C-P-17 and at most one optional acceleration component; approvals can affect timing.",
+      "amount": 705
+    },
+    {
+      "id": "C-P-17",
+      "kind": "fee",
+      "text_ar": "رسم بدل جواز مفقود أو تالف — قيمة بحثية غير متحقق منها حالياً",
+      "text_en": "Lost/damaged passport replacement fee — not currently verified",
+      "sources": [
+        "S01"
+      ],
+      "context": "Research ledger records 1155 EGP on 2026-09-12; undated tariff, not an all-in total. Use C-P-16 OR C-P-17 and at most one optional acceleration component; approvals can affect timing.",
+      "amount": 1155
+    },
+    {
+      "id": "C-P-18",
+      "kind": "fee",
+      "text_ar": "مكون الخدمة المميزة الاختياري — غير متحقق منه حالياً",
+      "text_en": "Optional premium-service component — not currently verified",
+      "sources": [
+        "S01"
+      ],
+      "context": "Research ledger records 500 EGP on 2026-09-12; undated tariff, not an all-in total. Use C-P-16 OR C-P-17 and at most one optional acceleration component; approvals can affect timing.",
+      "amount": 500
+    },
+    {
+      "id": "C-P-19",
+      "kind": "fee",
+      "text_ar": "مكون الخدمة العاجلة الاختياري — غير متحقق منه حالياً",
+      "text_en": "Optional urgent-service component — not currently verified",
+      "sources": [
+        "S01"
+      ],
+      "context": "Research ledger records 100 EGP on 2026-09-12; undated tariff, not an all-in total. Use C-P-16 OR C-P-17 and at most one optional acceleration component; approvals can affect timing.",
+      "amount": 100
+    },
+    {
+      "id": "C-P-20",
+      "kind": "note",
+      "text_ar": "تتبع الفروع داخل مصر الاختصاص الإقليمي عادةً. وتوجد استثناءات منشورة للخدمة المميزة بالمقر الرئيسي ومندوبيات المراكز التجارية والوحدات المتنقلة، وللمكاتب العاجلة قواعدها الخاصة. لا يشكل هذا دليلاً وطنياً متحققاً منه لكل المنافذ.",
+      "text_en": "Domestic branches normally follow territorial jurisdiction. Premium headquarters/mall/mobile services have published exceptions; urgent offices have their own rules. This is not a verified nationwide office directory.",
+      "sources": [
+        "S01"
+      ],
+      "context": "Domestic branches normally follow territorial jurisdiction. Premium headquarters/mall/mobile services have published exceptions; urgent offices have their own rules. This is not a verified nationwide office directory."
+    },
+    {
+      "id": "C-P-21",
+      "kind": "note",
+      "text_ar": "يذكر المصدر حداً لنص المهنة قدره 32 حرفاً بالعربية و35 بالإنجليزية مع احتساب المسافات. لا يلزم جمع بيانات شخصية إضافية لتنفيذ هذا البيان.",
+      "text_en": "Profession text limits are 32 Arabic and 35 English characters, including spaces. No extra personal-data collection is needed.",
+      "sources": [
+        "S02"
+      ],
+      "context": "Profession text limits are 32 Arabic and 35 English characters, including spaces. No extra personal-data collection is needed."
+    },
+    {
+      "id": "C-P-22",
+      "kind": "step",
+      "text_ar": "تصرح الزوجة في الطلب برغبتها في إدراج اسم الزوج بالإنجليزية. لا يمنح هذا الإجراء صلاحية تغيير سجلات الهوية.",
+      "text_en": "A wife wanting the husband’s name in English declares this on the application. This does not authorize changing identity records.",
+      "sources": [
+        "S02"
+      ],
+      "context": "A wife wanting the husband’s name in English declares this on the application. This does not authorize changing identity records."
+    },
+    {
+      "id": "C-P-23",
+      "kind": "note",
+      "text_ar": "تصف صفحة قبول الطلبات معاملة الأطفال المولودين منذ 15 يوليو 2004 لأم مصرية وأب غير مصري بموجب القانون 154 لسنة 2004. هذا مسار بحث للمراجعة القانونية فقط؛ ولا تُستنتج الجنسية من إجابات الوالدين.",
+      "text_en": "The acceptance page describes children born from 2004-07-15 to an Egyptian mother and a non-Egyptian father under Law 154/2004. Legal-review lead only; never derive citizenship from parent answers.",
+      "sources": [
+        "S03"
+      ],
+      "context": "The acceptance page describes children born from 2004-07-15 to an Egyptian mother and a non-Egyptian father under Law 154/2004. Legal-review lead only; never derive citizenship from parent answers."
+    },
+    {
+      "id": "C-P-24",
+      "kind": "note",
+      "text_ar": "المصدر يصف تقديم قريب لبعض المهاجرين رسمياً؛ لا يُعمم ذلك على كل المقيمين بالخارج.",
+      "text_en": "The acceptance page describes domestic submission by a relative for certain formally emigrated citizens abroad. Do not infer every overseas applicant qualifies.",
+      "sources": [
+        "S03"
+      ],
+      "context": "The acceptance page describes domestic submission by a relative for certain formally emigrated citizens abroad. Do not infer every overseas applicant qualifies."
+    },
+    {
+      "id": "C-O-01",
+      "kind": "note",
+      "text_ar": "تصف إرشادات وزارة الخارجية لأول جواز سياق الطفل: قيد ميلاده المصري، وجوازا الوالدين، ووثيقة زواجهما، وحضورهما. لا تزال تفاصيل أول إصدار لشخص بالغ غير مبحوثة.",
+      "text_en": "MFA first-passport guidance describes a child’s Egyptian birth record, parents’ passports and marriage record, and parental attendance. Adult-first-issue details remain unresearched.",
+      "sources": [
+        "S14"
+      ],
+      "context": "MFA first-passport guidance describes a child’s Egyptian birth record, parents’ passports and marriage record, and parental attendance. Adult-first-issue details remain unresearched."
+    },
+    {
+      "id": "C-O-02",
+      "kind": "note",
+      "text_ar": "تذكر إرشادات وزارة الخارجية للتجديد الجواز القائم وفرع إثبات الهوية وأدلة الدراسة أو المؤهل والحالة الاجتماعية بشروطها وأربع صور. يلزم التوفيق مع تعليمات البعثة المحددة.",
+      "text_en": "MFA renewal lists the existing passport, identity branch, conditional study/qualification and marital evidence, and four photographs. Reconcile with the named mission.",
+      "sources": [
+        "S14"
+      ],
+      "context": "MFA renewal lists the existing passport, identity branch, conditional study/qualification and marital evidence, and four photographs. Reconcile with the named mission."
+    },
+    {
+      "id": "C-O-03",
+      "kind": "note",
+      "text_ar": "تشترط وزارة الخارجية موافقة القاهرة المسبقة لبدل الفقد أو التلف عبر القنصلية. ويتضمن فرع الفقد محضر جهة البلد المضيف وصورة الجواز المفقود؛ ولا تُفرض مستندات الفقد وحده على التلف.",
+      "text_en": "MFA requires prior Cairo approval for consular loss/damage replacement. Its loss branch includes a host-authority report and lost-passport copy; do not require loss-only documents for damage.",
+      "sources": [
+        "S14"
+      ],
+      "context": "MFA requires prior Cairo approval for consular loss/damage replacement. Its loss branch includes a host-authority report and lost-passport copy; do not require loss-only documents for damage."
+    },
+    {
+      "id": "C-O-04",
+      "kind": "note",
+      "text_ar": "تصف وزارة الخارجية إصداراً لثلاث سنوات ثم سنة عند عدم وجود بطاقة سارية، بينما تصف لندن سنة مع استثناء لمن هم دون 16 سنة. لا يزال اختلاف مدة الصلاحية ونطاق السن غير محسوم.",
+      "text_en": "MFA describes three-year then one-year issuance without a current ID; London describes one year with an under-16 exception. Validity and age scope conflict remains open.",
+      "sources": [
+        "S14",
+        "S18"
+      ],
+      "context": "MFA describes three-year then one-year issuance without a current ID; London describes one year with an under-16 exception. Validity and age scope conflict remains open."
+    },
+    {
+      "id": "C-O-05",
+      "kind": "note",
+      "text_ar": "تذكر لندن الحضور الشخصي وثلاث صور وإثبات الإقامة أو الموافقة المسبقة عند عدم توافره، وشروط المستند التجنيدي، والموافقة المسبقة للفقد وأول إصدار. تعود التعليمات إلى 2024 وتحتاج مراجعة حالية للبعثة.",
+      "text_en": "London lists personal attendance, three photos, residence proof/prior approval when absent, military conditions, and prior approval for loss/first issuance. Dated 2024 instructions require current mission review.",
+      "sources": [
+        "S18"
+      ],
+      "context": "London lists personal attendance, three photos, residence proof/prior approval when absent, military conditions, and prior approval for loss/first issuance. Dated 2024 instructions require current mission review."
+    },
+    {
+      "id": "C-O-06",
+      "kind": "note",
+      "text_ar": "تذكر صفحة جوازات لندن 255 جنيهاً إسترلينياً للجواز الجديد و375 للفقد أو السرقة، والدفع بالبطاقة أو الحوالة البريدية، ونحو ثمانية أسابيع. هذه مبالغ لمعاملات مختلفة، وليست نطاق رسم واحد أو تعريفة حالية مضمونة.",
+      "text_en": "London’s passport page lists 255 GBP new passports and 375 GBP lost/stolen, card/postal-order payment and approximately eight weeks. These distinct transaction amounts are not a fee range or a current guaranteed tariff.",
+      "sources": [
+        "S18"
+      ],
+      "context": "London’s passport page lists 255 GBP new passports and 375 GBP lost/stolen, card/postal-order payment and approximately eight weeks. These distinct transaction amounts are not a fee range or a current guaranteed tariff."
+    },
+    {
+      "id": "C-O-10",
+      "kind": "note",
+      "text_ar": "الخارجية تذكر إثبات الهوية المصرية وصورتين لوثيقة السفر المؤقتة، ومحضر جهة البلد عند فقد الجواز؛ يلزم نطاق البعثة.",
+      "text_en": "MFA temporary-document guidance lists Egyptian identity evidence and two photos; passport loss adds a host-authority report. Mission reconciliation remains required.",
+      "sources": [
+        "S16"
+      ],
+      "context": "MFA temporary-document guidance lists Egyptian identity evidence and two photos; passport loss adds a host-authority report. Mission reconciliation remains required."
+    },
+    {
+      "id": "C-O-11",
+      "kind": "note",
+      "text_ar": "تصف لندن وثيقة للعودة إلى مصر فقط، صالحة لمدة 30 يوماً، مع صورة واحدة وموافقة تتوقف على إثبات الهوية وتذكرة عودة وتأكيد شركة الطيران للعبور. لا تُضمن صلاحية عالمية أو قبول العبور.",
+      "text_en": "London describes a return-to-Egypt-only document valid 30 days, one photo, identity-dependent approval, a return ticket and airline confirmation for transit. No worldwide validity or transit guarantee.",
+      "sources": [
+        "S19"
+      ],
+      "context": "London describes a return-to-Egypt-only document valid 30 days, one photo, identity-dependent approval, a return ticket and airline confirmation for transit. No worldwide validity or transit guarantee."
+    },
+    {
+      "id": "C-O-12",
+      "kind": "note",
+      "text_ar": "تدرج إرشادات وزارة الخارجية لوثيقة عودة المولود جوازَي الوالدين الساريين وإثبات الزواج وإثبات الميلاد المصدق أو المترجم حيث ينطبق وصورتين وطلباً للطفل. لا تزال استثناءات الحضانة والجنسية غير محسومة.",
+      "text_en": "MFA newborn return-document guidance lists parents’ valid passports, marriage evidence, authenticated birth evidence/translation where applicable, two photos and a child application. Custody/nationality exceptions remain unresolved.",
+      "sources": [
+        "S17"
+      ],
+      "context": "MFA newborn return-document guidance lists parents’ valid passports, marriage evidence, authenticated birth evidence/translation where applicable, two photos and a child application. Custody/nationality exceptions remain unresolved."
+    },
+    {
+      "id": "C-S-01",
+      "kind": "note",
+      "text_ar": "تدرج صفحات جوازات خدمات مصر مراكز القاهرة وأسوان والإسكندرية وشرم الشيخ. هذا دليل اكتشاف فقط؛ وليس وعداً باختصاص دقيق أو جدول تشغيل أو موعد.",
+      "text_en": "Passport pages list Cairo, Aswan, Alexandria and Sharm El Sheikh centers. Discovery only; no exact jurisdiction, timetable or appointment promise.",
+      "sources": [
+        "S05",
+        "S06"
+      ],
+      "context": "Passport pages list Cairo, Aswan, Alexandria and Sharm El Sheikh centers. Discovery only; no exact jurisdiction, timetable or appointment promise."
+    },
+    {
+      "id": "C-S-03",
+      "kind": "note",
+      "text_ar": "يسمي دليل الخدمات العامة تجديد الجواز وبدل الفقد والتلف بصورة منفصلة؛ ليست قوائم مكتملة.",
+      "text_en": "PSM separately names passport renewal/loss/damage. Discovery lead, not complete checklist evidence.",
+      "sources": [
+        "S25"
+      ],
+      "context": "PSM separately names passport renewal/loss/damage. Discovery lead, not complete checklist evidence."
+    }
+  ],
+  "families": [
+    {
+      "row": "P01",
+      "procedure_id": "ordinary_domestic_passport_first_issue",
+      "title_ar": "إصدار جواز سفر عادي لأول مرة داخل مصر",
+      "title_en": "First ordinary passport inside Egypt",
+      "boundary": "Egyptian; domestic; ordinary class; never issued a passport. Do not infer nationality or first issuance from missing documents.",
+      "blockers": [
+        "G01",
+        "G06",
+        "G08",
+        "D08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-P-01",
+            "C-P-02",
+            "C-P-03",
+            "C-P-04",
+            "C-P-05",
+            "C-P-06",
+            "C-P-08",
+            "C-P-09",
+            "C-P-10",
+            "C-P-14",
+            "C-P-15",
+            "C-P-16",
+            "C-P-18",
+            "C-P-19",
+            "C-P-20",
+            "C-P-21",
+            "C-P-22",
+            "C-P-23",
+            "C-S-01",
+            "C-S-03"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P02",
+      "procedure_id": "ordinary_domestic_passport_renewal",
+      "title_ar": "تجديد جواز سفر منتهٍ أو ممتلئ الصفحات داخل مصر",
+      "title_en": "Replace an expired or page-full ordinary passport inside Egypt",
+      "boundary": "Existing expired/page-full ordinary passport. Preserve existing renewal behavior until a reviewed successor rollout.",
+      "blockers": [
+        "D01",
+        "D08",
+        "G01",
+        "G06",
+        "G07",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-P-01",
+            "C-P-02",
+            "C-P-03",
+            "C-P-04",
+            "C-P-05",
+            "C-P-06",
+            "C-P-07",
+            "C-P-08",
+            "C-P-09",
+            "C-P-10",
+            "C-P-11",
+            "C-P-14",
+            "C-P-15",
+            "C-P-16",
+            "C-P-18",
+            "C-P-19",
+            "C-P-20",
+            "C-P-21",
+            "C-P-22",
+            "C-P-24",
+            "C-S-01",
+            "C-S-03"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ],
+      "identity_ar": "استخراج جواز سفر عادي بدل جواز سفر منتهي أو ممتلئ الصفحات داخل مصر",
+      "identity_en": "Obtain an ordinary passport in place of an expired or page-full passport inside Egypt"
+    },
+    {
+      "row": "P03",
+      "procedure_id": "ordinary_domestic_passport_lost_in_egypt",
+      "title_ar": "بدل جواز سفر فُقد داخل مصر",
+      "title_en": "Replace an ordinary passport lost inside Egypt",
+      "boundary": "Application and loss both inside Egypt. Separate the loss location from submission location.",
+      "blockers": [
+        "G01",
+        "G05",
+        "G06",
+        "G07",
+        "G08",
+        "D08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-P-01",
+            "C-P-02",
+            "C-P-03",
+            "C-P-04",
+            "C-P-05",
+            "C-P-06",
+            "C-P-08",
+            "C-P-09",
+            "C-P-10",
+            "C-P-11",
+            "C-P-12",
+            "C-P-14",
+            "C-P-15",
+            "C-P-17",
+            "C-P-18",
+            "C-P-19",
+            "C-P-20"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P04",
+      "procedure_id": "ordinary_domestic_passport_lost_abroad",
+      "title_ar": "بدل جواز سفر فُقد بالخارج بعد العودة لمصر",
+      "title_en": "Replace a passport lost abroad after returning to Egypt",
+      "boundary": "Domestic Consulates Department after loss abroad and return. Missing arrival/identity-proof alternatives remain unresolved.",
+      "blockers": [
+        "G01",
+        "G05",
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-P-01",
+            "C-P-02",
+            "C-P-03",
+            "C-P-04",
+            "C-P-05",
+            "C-P-06",
+            "C-P-13",
+            "C-P-14",
+            "C-P-15",
+            "C-P-17"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P05",
+      "procedure_id": "ordinary_domestic_passport_damaged",
+      "title_ar": "بدل جواز سفر تالف داخل مصر",
+      "title_en": "Replace a damaged ordinary passport inside Egypt",
+      "boundary": "Damaged passport available; no fictitious loss report. Damage-specific surrender/inspection steps are unresearched.",
+      "blockers": [
+        "G04",
+        "G07",
+        "G08",
+        "D08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-P-01",
+            "C-P-02",
+            "C-P-03",
+            "C-P-04",
+            "C-P-05",
+            "C-P-06",
+            "C-P-08",
+            "C-P-09",
+            "C-P-10",
+            "C-P-14",
+            "C-P-15",
+            "C-P-17",
+            "C-P-18",
+            "C-P-19",
+            "C-P-20"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P06",
+      "procedure_id": "ordinary_domestic_passport_data_reissue",
+      "title_ar": "إصدار جواز سفر ببيانات محدثة داخل مصر",
+      "title_en": "Reissue a passport with updated data inside Egypt",
+      "boundary": "PROVISIONAL identity. New booklet versus underlying-record correction; P02 overlap unresolved.",
+      "blockers": [
+        "G04",
+        "G07",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "domestic-research",
+          "label_ar": "بحث داخلي — شروط القناة لم تُبرمج",
+          "label_en": "Domestic research; channel predicates not compiled",
+          "claims": [
+            "C-P-01",
+            "C-P-14",
+            "C-P-21",
+            "C-P-22"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "contested_identity"
+      ]
+    },
+    {
+      "row": "P07",
+      "procedure_id": null,
+      "title_ar": "التجديد المبكر لجواز السفر",
+      "title_en": "Early passport renewal",
+      "boundary": "No reviewed early-renewal window and no agreed new Procedure identity.",
+      "blockers": [
+        "G04"
+      ],
+      "scopes": [],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "P08",
+      "procedure_id": "ordinary_consular_passport_first_issue",
+      "title_ar": "إصدار جواز سفر لأول مرة بالخارج",
+      "title_en": "First ordinary passport through a consulate",
+      "boundary": "London research only. MFA child context is not an adult-first-issue checklist.",
+      "blockers": [
+        "D04",
+        "D05",
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "london-research",
+          "label_ar": "بحث لندن — الاختصاص والمراجعة معلقان",
+          "label_en": "London research; jurisdiction and review pending",
+          "claims": [
+            "C-O-01",
+            "C-O-05",
+            "C-O-06"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P09",
+      "procedure_id": "ordinary_consular_passport_renewal",
+      "title_ar": "تجديد جواز السفر بالخارج",
+      "title_en": "Renew an ordinary passport through a consulate",
+      "boundary": "London research only. MFA and mission validity/photo/age conflicts remain open.",
+      "blockers": [
+        "D04",
+        "D05",
+        "G01",
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "london-research",
+          "label_ar": "بحث لندن — الاختصاص والمراجعة معلقان",
+          "label_en": "London research; jurisdiction and review pending",
+          "claims": [
+            "C-O-02",
+            "C-O-04",
+            "C-O-05",
+            "C-O-06"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P10",
+      "procedure_id": "ordinary_consular_passport_lost",
+      "title_ar": "بدل جواز سفر مفقود بالخارج",
+      "title_en": "Replace a lost passport through a consulate",
+      "boundary": "London research only. Prior approval and loss-only documents; no domestic police-report exception.",
+      "blockers": [
+        "D04",
+        "D05",
+        "G05",
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "london-research",
+          "label_ar": "بحث لندن — الاختصاص والمراجعة معلقان",
+          "label_en": "London research; jurisdiction and review pending",
+          "claims": [
+            "C-O-03",
+            "C-O-04",
+            "C-O-05",
+            "C-O-06"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P11",
+      "procedure_id": "ordinary_consular_passport_damaged",
+      "title_ar": "بدل جواز سفر تالف بالخارج",
+      "title_en": "Replace a damaged passport through a consulate",
+      "boundary": "London research only; separate damage from loss-only documentation before authoring executable rules.",
+      "blockers": [
+        "D04",
+        "D05",
+        "G04",
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "london-research",
+          "label_ar": "بحث لندن — الاختصاص والمراجعة معلقان",
+          "label_en": "London research; jurisdiction and review pending",
+          "claims": [
+            "C-O-03",
+            "C-O-04",
+            "C-O-05",
+            "C-O-06"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "military",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P12",
+      "procedure_id": null,
+      "title_ar": "تحديث بيانات جواز السفر بالخارج",
+      "title_en": "Update passport data through consular reissuance",
+      "boundary": "May be conditional renewal rather than a separate fee-bearing transaction; identity unresolved.",
+      "blockers": [
+        "G07",
+        "G08"
+      ],
+      "scopes": [],
+      "risks": [
+        "legal"
+      ]
+    },
+    {
+      "row": "P13",
+      "procedure_id": "consular_temporary_return_document",
+      "title_ar": "وثيقة سفر مؤقتة للعودة إلى مصر",
+      "title_en": "Temporary document to return to Egypt",
+      "boundary": "London return-only research, not general travel; photo differences and transit acceptance unresolved.",
+      "blockers": [
+        "D06",
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "london-research",
+          "label_ar": "بحث لندن — الاختصاص والمراجعة معلقان",
+          "label_en": "London research; jurisdiction and review pending",
+          "claims": [
+            "C-O-10",
+            "C-O-11"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "custody_guardianship"
+      ]
+    },
+    {
+      "row": "P14",
+      "procedure_id": "consular_newborn_return_document",
+      "title_ar": "وثيقة سفر مؤقتة لحديث الولادة",
+      "title_en": "Temporary return document for a newborn",
+      "boundary": "MFA baseline only. No mission, appointment, custody exception or ordinary-passport output inferred.",
+      "blockers": [
+        "G06",
+        "G08"
+      ],
+      "scopes": [
+        {
+          "key": "mfa-baseline",
+          "label_ar": "بحث الخارجية — البعثة غير محددة",
+          "label_en": "MFA baseline; mission not selected",
+          "claims": [
+            "C-O-12"
+          ]
+        }
+      ],
+      "risks": [
+        "legal",
+        "custody_guardianship",
+        "contested_identity"
+      ]
+    }
+  ]
+}

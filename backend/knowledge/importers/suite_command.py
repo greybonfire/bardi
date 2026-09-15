@@ -26,12 +26,8 @@ class SuiteDraftCommand(BaseCommand):
         parser.add_argument("--author", help="Existing active staff username; no users created.")
         mode = parser.add_mutually_exclusive_group()
         mode.add_argument("--check", action="store_true", help="Verify only; do not create rows.")
-        mode.add_argument(
-            "--dry-run", action="store_true", help="Validate an import and roll back."
-        )
-        mode.add_argument(
-            "--list", action="store_true", help="Print catalog disposition; no writes."
-        )
+        mode.add_argument("--dry-run", action="store_true", help="Validate an import and roll back.")
+        mode.add_argument("--list", action="store_true", help="Print catalog disposition; no writes.")
 
     def handle(self, *args: Any, **options: Any) -> str | None:
         spec = load_suite(self.suite_key)

@@ -189,8 +189,7 @@ def load_suite(key: str) -> SuiteSpec:
     families = []
     for raw in data.pop("families"):
         scopes = tuple(
-            DraftScope(**{**scope, "claims": tuple(scope["claims"])})
-            for scope in raw.pop("scopes")
+            DraftScope(**{**scope, "claims": tuple(scope["claims"])}) for scope in raw.pop("scopes")
         )
         raw["blockers"] = tuple(raw["blockers"])
         raw["risks"] = tuple(raw["risks"])

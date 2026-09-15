@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.test import TestCase, override_settings
+
 from knowledge.fees import Fee
 from knowledge.importers.national_id_suite import import_national_id_suite
 from knowledge.importers.passport_suite import import_passport_suite
@@ -198,9 +199,7 @@ class SuiteDraftImportTests(TestCase):
             tuple(planning_behavior_signature(v) for v in (old_passport, old_id)), signatures
         )
         self.assertEqual(list(ServiceQuestion.objects.order_by("pk").values()), questions)
-        self.assertEqual(
-            list(ServiceProcedureCandidate.objects.order_by("pk").values()), candidates
-        )
+        self.assertEqual(list(ServiceProcedureCandidate.objects.order_by("pk").values()), candidates)
         self.assertEqual(list(FactDefinition.objects.order_by("pk").values()), facts)
 
     def test_preview_and_report_do_not_claim_missing_identities_were_imported(self) -> None:

@@ -12,6 +12,7 @@ from typing import Any, cast
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import connection, models, transaction
+
 from knowledge.fees import Fee
 from knowledge.models import (
     Authority,
@@ -345,16 +346,16 @@ def _verify_version(
         Warning: [_marker(version, suite, family, scope)],
     }
     for position, claim_id in enumerate(scope.claims, start=1):
-        expected = _claim_instance(version, claims[claim_id], position)
-        expected_rows[type(expected)].append(expected)
-    for model, expected in expected_rows.items():
+        expected_claim = _claim_instance(version, claims[claim_id], position)
+        expected_rows[type(expected_claim)].append(expected_claim)
+    for model, expected_claims in expected_rows.items():
         actual = {
             row.semantic_id: row
             for row in cast(Any, model).objects.filter(procedure_version=version)
         }
-        if set(actual) != {row.semantic_id for row in expected}:
+        if set(actual) != {row.semantic_id for row in expected_claims}:
             raise ValidationError(f"{version.semantic_id}: unexpected {model.__name__} set.")
-        for row in expected:
+        for row in expected_claims:
             stored = actual[row.semantic_id]
             _expect(stored, row)
             _reject_extra_relations(stored, {"evidence_links"})

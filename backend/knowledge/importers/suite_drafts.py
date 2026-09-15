@@ -159,13 +159,16 @@ def _service(suite: SuiteSpec, *, check_only: bool) -> Service:
 
 
 def _procedure(service: Service, family: FamilySpec, *, check_only: bool) -> Procedure:
+    procedure_id = family.procedure_id
+    if procedure_id is None:
+        raise ValidationError(f"Unresolved suite Procedure identity: {family.row}.")
     expected = Procedure(
-        semantic_id=family.procedure_id,
+        semantic_id=procedure_id,
         text_ar=family.identity_ar or family.title_ar,
         text_en=family.identity_en or family.title_en,
         primary_service=service,
     )
-    procedure = Procedure.objects.filter(semantic_id=family.procedure_id).first()
+    procedure = Procedure.objects.filter(semantic_id=procedure_id).first()
     if procedure is None:
         if check_only:
             raise ValidationError(f"Missing suite Procedure: {family.row}.")
@@ -215,12 +218,15 @@ def _evidence_instance(
     family: FamilySpec,
     scope: DraftScope,
 ) -> EvidenceLink:
+    model_name = owner._meta.model_name
+    if model_name is None:
+        raise ValidationError("Suite evidence requires a concrete claim owner.")
     owner_field = {
         "checklistitem": "checklist_item",
         "step": "step",
         "fee": "fee",
         "warning": "warning",
-    }[owner._meta.model_name]
+    }[model_name]
     return EvidenceLink(
         **{owner_field: owner},
         semantic_id=f"{claim.id}.research-context",
@@ -267,7 +273,7 @@ def _policy(
 ) -> ProcedureVersionReviewPolicy:
     return ProcedureVersionReviewPolicy(
         procedure_version=version,
-        author=author,
+        author_id=author.pk,
         legal_risk="legal" in family.risks,
         military_risk="military" in family.risks,
         custody_guardianship_risk="custody_guardianship" in family.risks,

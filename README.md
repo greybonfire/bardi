@@ -50,15 +50,6 @@ application interface and a separate Next.js web application. The planning engin
 component behind the Django application layer. The public API contract is documented in
 [`docs/api/v1.md`](docs/api/v1.md).
 
-## Current service research
-
-The [passport suite](docs/evidence-packs/passport-suite/README.md) and
-[National ID suite](docs/evidence-packs/national-id-suite/README.md) are separate research packs.
-Each owns its transaction catalog, sources, claims, gaps, Questions, scenarios, and bounded
-implementation handoff. Both are research drafts, not approval to publish new services.
-See the [evidence-pack index and renewal-baseline retention decision](docs/evidence-packs/README.md)
-for the distinction between current research, importer baselines, and immutable database history.
-
 ## Research history
 
 The framework-independent research prototype completed its pressure-test role and was retired

@@ -15,7 +15,7 @@ configured gates fail closed. Ordinary model and Admin writes cannot perform lif
 transitions or alter published semantics; successful transitions record the actor and an
 immutable audit event in the same transaction.
 
-Production now registers the evidence/discrepancy, scenario, independent review, and
+Production registers the evidence/discrepancy, scenario, mode-aware review, and
 specialist-review gates through this canonical publication path. Procedure-selection Question
 coverage is checked before scenario and review gates. Publication locks the selected candidate,
 Service Questions and their resolved-Fact links so gate results and review signatures cannot
@@ -171,7 +171,8 @@ The service must:
 4. verify required review/approval records;
 5. validate effective-date non-overlap with other published versions;
 6. persist the immutable published state atomically; and
-7. record an audit event identifying the published version and approving actors.
+7. record an audit event identifying the published version, applied review mode, and only the
+   actual eligible approvals consumed by that mode (see review requirements below).
 
 A failed validation leaves the draft unpublished.
 
@@ -232,7 +233,28 @@ Version 1 should record distinct review dimensions rather than one undifferentia
 - Arabic/English semantic review;
 - discrepancy review when applicable.
 
-A second person must approve meaning-changing publication. Specialist review is required for consequential legal eligibility, military status, custody/guardianship, contested identity, and similarly high-risk material.
+[ADR 0019](../adr/0019-use-explicit-solo-and-independent-publication-review-modes.md) replaces the
+blanket second-person requirement with deployment-wide `PROCEDURE_VERSION_REVIEW_MODE`: exactly
+`solo` or `independent`, default `independent`, invalid values fail closed. The old
+`PROCEDURE_VERSION_REVIEWS_REQUIRED` toggle is no longer supported.
+
+Both modes require a Review Policy with an accountable author and truthful configured high-risk
+flags. In `solo`, general dimension approvals are not mandatory or consumed: one person may author
+and publish with existing permissions, without self-approval or account switching. Optional
+independent general approvals may remain history. In `independent`, all dimensions above require
+fresh, permission-eligible, signature-bound approvals distinct from both author and publisher;
+the author may be the publisher.
+
+In **both modes**, every configured `legal`, `military`, `custody_guardianship`, or
+`contested_identity` flag requires a fresh, eligible specialist approval distinct from author and
+publisher. High-risk material stays unpublished without a real specialist. Never clear or omit
+risk flags to evade policy. All other publication gates and immutable snapshots remain unchanged;
+there are no new lifecycle states.
+
+New publish events record the applied `review_mode` and only actual fresh eligible independent
+approvals consumed by that mode. Legacy events and withdrawal rows retain null/unrecorded mode,
+not inferred review claims. Mode changes affect future publication attempts only, never history.
+See [review role rules](procedure-version-review-roles.md) for signatures and permissions.
 
 The production schema may implement these as compact review/audit records; it does not require a generalized workflow engine.
 
@@ -296,8 +318,10 @@ A custom CMS may be introduced later only if Django Admin becomes a demonstrated
 ## Production import lifecycle
 
 Supported importers create or verify drafts only. Staff run the importer with an existing
-accountable author, complete independent dimension and applicable specialist approvals in
-Admin, and publish only with the canonical Procedure Version Admin action. Rerunning an importer
+accountable author, complete general dimension approvals in `independent` and applicable specialist
+approvals in both modes in Admin, and publish only with the canonical Procedure Version Admin action.
+Manual Admin authoring and the existing deterministic importers remain the supported routes; PR1
+adds no generic importer, LLM ingestion, or Admin upload tooling. Rerunning an importer
 returns an identical draft (or verifies an already finalized identity) and rejects semantic
 conflicts; it never manufactures users, approvals, publisher identity, or publication dates.
 
@@ -306,7 +330,7 @@ pre-Fee-Question scenario seals. After all other integrity checks pass, rerunnin
 eligible draft atomically through normal scenario saves: legacy routing corrections are retained,
 the student Question correction is retained where needed, and the missing Fee applicability
 scenario is created for every prior seal. Changed scenario content invalidates prior review
-signatures; publication still requires fresh approvals. Exact legacy published or withdrawn
+signatures; publication still requires fresh approvals for the applied mode. Exact legacy published or withdrawn
 imports remain verifiable without rewriting their scenarios. Any other scenario drift is rejected,
 including missing or partial upgrades. Fresh imports use the current expectations. This
 compatibility path does not change claims, evidence, lifecycle state, or publication history.

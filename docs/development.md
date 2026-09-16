@@ -73,6 +73,42 @@ For the complete editor-facing workflow—including manual Admin authoring, evid
 publication, successor drafts, re-verification, and deterministic programmatic imports—see
 [`editorial-process.md`](editorial-process.md).
 
+## Solo now; independent when the team joins
+
+`PROCEDURE_VERSION_REVIEW_MODE` is a deployment-wide environment variable/Django setting with
+exactly `solo` and `independent` values. Unset defaults to `independent`; invalid values fail
+closed. The local `.env.example` explicitly opts into `solo`. For an existing local `.env`, set:
+
+```dotenv
+PROCEDURE_VERSION_REVIEW_MODE=solo
+```
+
+Export the updated file for host commands and restart Django; for Compose, recreate the backend
+container so it receives the new environment (`docker compose up -d --force-recreate backend`).
+In solo, name yourself as accountable author in the Review Policy and publish ordinary drafts
+with your existing permissions. No general approvals, self-approval forms, or account switching
+are needed. Optional independent general reviews remain history but are not consumed.
+
+Always configure high-risk flags truthfully. Every legal, military, custody/guardianship, or
+contested-identity flag still requires a fresh, permission-eligible specialist distinct from both
+author and publisher. Without a real specialist, leave that content unpublished; never clear a
+risk to bypass policy. Evidence/trust/scenario/domain/bilingual/effective-date gates remain active.
+
+When the team joins, set `PROCEDURE_VERSION_REVIEW_MODE=independent` across the deployment and
+restart/recreate all backend processes. Future attempts then require fresh, eligible general
+dimension approvals (including discrepancy as applicable), independent of author and publisher,
+as well as applicable specialists. The author may still publish. Existing snapshots and audit
+history are not rewritten: new publish events record applied mode and only actual approvals
+consumed; legacy events and withdrawal rows retain null/unrecorded mode.
+
+Remove `PROCEDURE_VERSION_REVIEWS_REQUIRED` from old configuration; it is no longer supported and
+there is no production off mode. Test-only settings isolate unrelated tests by explicitly omitting
+the review gate, not by disabling production review policy.
+
+This is PR1's policy/audit scope only. Use manual Admin authoring or the deterministic imports
+below, not a generic importer, LLM ingestion, or Admin upload feature. See
+[ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md).
+
 ## Frontend setup
 
 Keep Django running in its own terminal at `http://localhost:8000`. In another terminal,
@@ -98,7 +134,7 @@ complete frontend scope, security boundaries and test coverage.
 
 The Service directory is loaded from the backend, not bundled fake data. Only explicitly
 active Services are listed; publication alone does not activate one. Use the imports below
-and the normal independent Admin review/publish workflow to author usable guidance. Imports
+and the mode-aware Admin review/publish workflow to author usable guidance. Imports
 do not publish or approve knowledge. Empty navigation and API unavailability are explicit
 states, not a switch to a demo catalog or sample plan.
 
@@ -112,10 +148,11 @@ uv run python backend/manage.py import_passport_renewal --author <username> \
   --settings=bardi.settings.development
 ```
 
-A rerun returns the identical draft and rejects semantic conflicts. In Admin, independent staff
+A rerun returns the identical draft and rejects semantic conflicts. In `independent`, eligible staff
 approve evidence/source, rule/logic, scenario/behavior, bilingual-semantic, and applicable
-discrepancy dimensions. An independent military specialist approves the military risk. A
-separate publisher finally uses the Procedure Version **publish selected** action. Import,
+discrepancy dimensions. Solo skips those general approvals. In both modes, an independent military
+specialist must approve the military risk. The publisher (who may be the author, but cannot supply
+consumed approvals) finally uses the Procedure Version **publish selected** action. Import,
 review, specialist approval, and canonical publish are intentionally separate operations.
 
 ## National-ID-renewal knowledge import and review
@@ -130,9 +167,10 @@ uv run python backend/manage.py import_national_id_renewal --author <username> \
 
 The command does not create users, approvals, or publication metadata. A rerun returns the
 identical draft and rejects planning, scenario, provenance, trust, source, and review-policy
-semantic drift. Independent staff review the normal evidence/source, rule/logic,
-scenario/behavior, and bilingual-semantic dimensions; a separate publisher then uses the
-canonical Procedure Version **publish selected** action. The imported ordinary fee remains an
+semantic drift. In `independent`, eligible independent staff review the normal evidence/source,
+rule/logic, scenario/behavior, and bilingual-semantic dimensions (and discrepancy as applicable).
+In `solo`, those general approvals are skipped. A permitted publisher, who may be the author,
+then uses the canonical Procedure Version **publish selected** action. The imported ordinary fee remains an
 explicit unknown value, the previous-card research lead remains needs-reverification, and exact
 office routing remains unresolved until stronger current evidence is authored.
 
@@ -158,10 +196,12 @@ The import deliberately preserves the research limits: it does not invent the un
 incapable-brother semantics, exact Basis-specific document lists, a fee amount, nationwide or
 nearest-region routing, a direct prerequisite, or compatibility aliases. The only imported
 jurisdiction mappings are the researched Giza, Mansoura, and Zagazig recruitment regions.
-Independent staff review evidence/source, rule/logic, scenario/behavior, and bilingual-semantic
-dimensions. Because the review policy flags both legal and military risk, independent legal and
-military specialist approvals are also required before a separate publisher uses the canonical
-Procedure Version **publish selected** action.
+In `independent`, independent staff review evidence/source, rule/logic, scenario/behavior, and
+bilingual-semantic dimensions (and discrepancy as applicable); solo skips these general approvals.
+Because the review policy flags both legal and military risk, fresh eligible legal and military
+specialist approvals distinct from author and publisher are required in **both modes** before the
+canonical Procedure Version **publish selected** action. Without specialists, keep both drafts
+unpublished.
 
 The backend's trusted HTTPS ingress, proxy-header, HSTS and rate-limit requirements are
 in [`operations/private-pilot.md`](operations/private-pilot.md). The Next integration does

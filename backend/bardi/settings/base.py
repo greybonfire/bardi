@@ -142,8 +142,10 @@ INSTALLED_APPS = [
 # structural core defined by knowledge.publication.
 SELECTION_QUESTIONS_REQUIRED = True
 PLANNING_SCENARIOS_REQUIRED = True
-PROCEDURE_VERSION_REVIEWS_REQUIRED = True
-PROCEDURE_VERSION_PUBLICATION_GATES = (
+PROCEDURE_VERSION_REVIEW_MODE = os.environ.get("PROCEDURE_VERSION_REVIEW_MODE", "independent")
+if PROCEDURE_VERSION_REVIEW_MODE not in ("solo", "independent"):
+    raise ImproperlyConfigured("PROCEDURE_VERSION_REVIEW_MODE must be solo or independent")
+PROCEDURE_VERSION_PUBLICATION_GATES: tuple[str, ...] = (
     "knowledge.selection_questions.SelectionQuestionPublicationGate",
     "knowledge.fees.FeePublicationGate",
     "knowledge.eligibility_bases.EligibilityBasisPublicationGate",

@@ -48,13 +48,23 @@ The Procedure Version Admin review action presents the supported review dimensio
 risk approvals. Submitting it calls the #48 approval services. Those services remain responsible
 for draft-state hashing, author independence and reviewer/specialist eligibility.
 
-Approval rows stay immutable and are inspectable in their history Admins.
+Approval rows stay immutable and are inspectable in their history Admins. Under
+[ADR 0019](../adr/0019-use-explicit-solo-and-independent-publication-review-modes.md), `solo` needs
+no general review action or self-approval paperwork: an accountable author may publish with the
+existing publish permission. Optional independent general approvals are history only in solo.
+`independent` requires the applicable general dimensions. Both modes require truthful risk flags
+and fresh, eligible specialist approvals distinct from author and publisher for every configured
+risk; never clear flags to bypass review.
 
 ## Publication and withdrawal
 
 The existing Procedure Version Admin publish/withdraw actions remain permission-controlled calls
 to `publish_procedure_version()` and `withdraw_procedure_version()`. Admin never assigns lifecycle
-fields directly.
+fields directly. The deployment-wide `PROCEDURE_VERSION_REVIEW_MODE` selects `solo` or
+`independent` (default); invalid values fail closed. All non-review gates remain mandatory.
+New publish audits record the applied mode and only actual eligible independent approvals consumed
+by it. Legacy events and withdrawal rows have null/unrecorded mode. Changing mode affects future
+attempts, not published snapshots or history.
 
 Published semantic material is read-only. Withdrawn material remains read-only and auditable.
 Ordinary planning resolution considers only `published` versions; a withdrawn version can be

@@ -37,7 +37,7 @@ Bardi separates stable catalog identities from versioned guidance.
 The most important lifecycle rule is:
 
 ```text
-research -> draft -> independent review -> publish -> immutable
+research -> draft -> mode-required review -> publish -> immutable
                                       |
                                       +-> publication rejected -> edit draft -> review again
 ```
@@ -68,6 +68,36 @@ where publication safety requires it.
 The accountable author cannot satisfy an independent review or specialist approval for their own
 draft. The eventual publisher also cannot satisfy the independent approvals used to publish that
 draft. One eligible reviewer may approve several ordinary dimensions.
+
+### Solo now; independent when the team joins
+
+[ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md) replaces blanket
+second-person publication with deployment-wide `PROCEDURE_VERSION_REVIEW_MODE`: exactly `solo` or
+`independent`, default `independent`, invalid values fail closed. Local `.env.example` explicitly
+opts into `solo`; the old `PROCEDURE_VERSION_REVIEWS_REQUIRED` flag is unsupported.
+
+In **solo**, name the accountable author and configure risk flags truthfully, complete the editor
+self-check, then publish with existing permissions. The author may publish; skip general approval
+paperwork entirely. Do not switch accounts or manufacture self-approvals. Optional genuinely
+independent general approvals remain history but are not consumed by solo publication.
+
+In **both modes**, every configured legal, military, custody/guardianship, or contested-identity
+risk requires a fresh, permission-eligible specialist distinct from both author and publisher.
+Without a real specialist, keep high-risk content unpublished. Never omit or clear flags to evade
+policy. Evidence, trust, scenarios, domain validation, bilingual completeness, effective dates and
+immutable snapshots are unchanged; there are no new publication states.
+
+When reviewers join, an operator sets `PROCEDURE_VERSION_REVIEW_MODE=independent` across the
+deployment and restarts backend processes (see [development configuration](development.md#solo-now-independent-when-the-team-joins)).
+Future publication attempts require all applicable general dimensions, current signatures and
+permissions, and reviewer independence from author and publisher. The author may still publish.
+Mode changes never rewrite past publications. New publish audits record applied `review_mode` and
+only actual fresh eligible independent approvals consumed by it; legacy events and withdrawal rows
+retain null/unrecorded mode, not retrospective review claims.
+
+PR1 covers this policy and honest audit history only. Manual Admin authoring and existing
+deterministic draft importers remain the routes; generic importers, LLM ingestion and Admin upload
+tooling are not implemented here.
 
 ## 3. Before entering data
 
@@ -366,8 +396,8 @@ Set:
   - contested identity.
 
 Do not enable specialist flags merely as a generic "extra safety" checkbox; they define required
-independent approvals. Conversely, do not omit a real high-risk category to make publication
-easier.
+independent approvals in both modes. Conversely, do not omit or clear a real high-risk category
+to make publication easier.
 
 Changing the author or risk policy changes the reviewed-state signature and invalidates prior
 approvals.
@@ -396,6 +426,9 @@ whole-version validation boundary and may still find cross-record problems.
 
 ### 4.19 Record independent review
 
+Required in `independent`; skip this step in `solo` unless recording a genuinely independent
+optional review for history only.
+
 From the **Procedure Versions** changelist:
 
 1. select the draft;
@@ -415,26 +448,28 @@ The reviewer must have `knowledge.review_procedureversion`.
 
 Approval records bind to a SHA-256 signature of the coherent reviewed draft state. If an editor
 changes consequential content afterward, the old approval remains in history but becomes stale.
-Request a fresh approval for the new state.
+Request a fresh approval for the new state when required by the applied mode.
 
 ### 4.20 Record specialist approval
 
 Use the same Procedure Version action and choose the required specialist approval.
 
-The reviewer must hold the matching specialist permission. Specialist approval is separate from
+Required for every configured risk in both modes. The reviewer must be distinct from author and
+publisher and hold the matching specialist permission when approving and publishing. Specialist
+approval is separate from
 ordinary review: a military specialist approval does not automatically approve evidence,
 rule/logic, scenarios, or bilingual meaning.
 
 ### 4.21 Publish
 
-When review is complete, a publisher with `knowledge.publish_procedureversion` selects the draft
+When all review required by the deployment mode is complete, a publisher with `knowledge.publish_procedureversion` selects the draft
 on the Procedure Versions changelist and chooses **Publish selected drafts**.
 
 Publication is not a simple state-field edit. The canonical publication service:
 
 - locks the relevant state;
 - runs the complete publication gates;
-- checks review independence/freshness;
+- checks mode-required review independence, permissions and freshness;
 - validates temporal overlap;
 - changes lifecycle state atomically; and
 - records immutable audit history.
@@ -446,7 +481,7 @@ gate: code (detail)
 ```
 
 Fix the draft based on the diagnostic, then obtain fresh approvals whenever the fix changed the
-reviewed state.
+reviewed state and the applied mode requires those approvals.
 
 After a successful publish, semantic material becomes read-only.
 
@@ -461,7 +496,7 @@ For a meaning-changing correction:
 3. open the newly created draft;
 4. make the correction;
 5. update evidence/scenarios/review policy as needed;
-6. obtain fresh independent review;
+6. obtain fresh general approvals in `independent` and applicable specialist approvals in both modes;
 7. publish the successor.
 
 The clone copies the coherent editable aggregate but deliberately does not copy historical review
@@ -624,7 +659,8 @@ explicit authorization boundary around who is allowed to invoke it. Django Admin
 that permission boundary and is the preferred staff interface.
 
 Do not build an ad-hoc script that calls lifecycle services under a generic superuser simply to
-skip the normal separation of author, reviewer, specialist, and publisher responsibilities.
+bypass the applied review mode, specialist independence, or permissions. Solo author/publication
+uses the normal permission-controlled path, not a generic superuser workaround.
 
 If a future bulk-editor tool is added, it should call these same canonical services rather than
 reimplementing state transitions.
@@ -648,7 +684,7 @@ Use a **programmatic importer** when:
 - a reviewed code/data change is safer than repetitive manual entry.
 
 Both paths meet at the same draft/review/publication lifecycle. Programmatic import is not a
-shortcut around editorial review.
+shortcut around the applied review policy or other publication gates.
 
 ## 10. Common mistakes
 
@@ -668,13 +704,15 @@ itself has changed.
 **Meaning:** A required approval was never recorded, the reviewer is ineligible, or the reviewed
 state changed after approval.
 
-**Action:** Finish editing first, then request fresh independent approvals.
+**Action:** Finish editing first, then request fresh independent approvals required by the mode.
+Solo still requires applicable specialists, but not general dimension approvals.
 
 ### A specialist approval does not satisfy ordinary review
 
 **Meaning:** Specialist and general review are separate capabilities.
 
-**Action:** Record the required ordinary review dimensions as well.
+**Action:** In `independent`, record the required ordinary review dimensions as well. Solo does
+not require or consume general dimension approvals.
 
 ### A rule refers to a Fact but planning cannot ask for it
 
@@ -707,7 +745,8 @@ Before editing a new real Service, practice on a disposable development database
 3. inspect its Review Policy and Planning Scenarios;
 4. create a small draft-only change on a cloned successor;
 5. observe how that change makes old approvals inapplicable;
-6. record a review using a separate reviewer account;
+6. in `independent`, have another eligible person record general review (do not switch accounts
+   to simulate independence); in either mode, obtain any required real specialist approvals;
 7. intentionally attempt publication before all requirements are met and read the diagnostics;
 8. finish the required review and publish;
 9. confirm the published material becomes read-only; and
@@ -738,9 +777,10 @@ Before handing a draft to reviewers:
 
 Before publication:
 
-- [ ] Required ordinary review dimensions are fresh.
-- [ ] Required specialist approvals are fresh.
-- [ ] Reviewers are independent of the accountable author and publisher.
+- [ ] Confirm the deployment review mode; in `independent`, all applicable general dimensions are fresh.
+- [ ] In both modes, truthful risk flags have all required fresh, permission-eligible specialist approvals.
+- [ ] Consumed reviewers are permission-eligible and independent of the accountable author and publisher.
+- [ ] In `solo`, no general approvals or self-approval paperwork are needed.
 - [ ] Publication diagnostics are clear.
 - [ ] The publisher is prepared for the version to become immutable.
 

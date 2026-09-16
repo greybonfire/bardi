@@ -1,5 +1,6 @@
 import importlib
 import os
+import runpy
 from typing import Any
 from unittest.mock import patch
 
@@ -33,6 +34,22 @@ def _production_settings() -> Any:
 
 
 class SettingsTests(SimpleTestCase):
+    def test_review_mode_startup_contract(self) -> None:
+        settings_path = importlib.import_module("bardi.settings.base").__file__
+        assert settings_path is not None
+        for value in (None, "solo", "independent", "off", "", "Solo", " solo "):
+            with self.subTest(value=value), patch.dict(os.environ, {}, clear=True):
+                if value is not None:
+                    os.environ["PROCEDURE_VERSION_REVIEW_MODE"] = value
+                if value in (None, "solo", "independent"):
+                    namespace = runpy.run_path(settings_path)
+                    self.assertEqual(
+                        namespace["PROCEDURE_VERSION_REVIEW_MODE"], value or "independent"
+                    )
+                else:
+                    with self.assertRaises(ImproperlyConfigured):
+                        runpy.run_path(settings_path)
+
     def test_database_is_postgresql_only(self) -> None:
         engine = settings.DATABASES["default"]["ENGINE"]
 

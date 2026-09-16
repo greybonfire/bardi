@@ -13,7 +13,6 @@ from planning import PlanningInput, PlanResult, plan_stateless
 @override_settings(
     SELECTION_QUESTIONS_REQUIRED=True,
     PLANNING_SCENARIOS_REQUIRED=False,
-    PROCEDURE_VERSION_REVIEWS_REQUIRED=False,
 )
 class PassportRenewalProductionPlanningTests(TestCase):
     def test_detached_bilingual_plan_preserves_ids_fees_and_giza_only(self) -> None:

@@ -43,6 +43,17 @@ Owns persisted domain knowledge: Services, Procedures, Procedure Versions, Fact 
 
 Owns draft lifecycle, validation, review/approval records, atomic publication, withdrawal, re-verification workflow, and creation of immutable published snapshots. Publishing is a service operation, not a casual model-field edit.
 
+[ADR 0019](../adr/0019-use-explicit-solo-and-independent-publication-review-modes.md) defines the
+deployment-wide environment variable/Django setting `PROCEDURE_VERSION_REVIEW_MODE`: exactly
+`solo` or `independent` (default), invalid values fail closed. It replaces the unsupported
+`PROCEDURE_VERSION_REVIEWS_REQUIRED` toggle. Solo skips mandatory general approvals, permitting
+one accountable author/publisher with existing permissions. Independent requires the applicable
+fresh general approvals independent of author and publisher. Both require truthful Review Policy
+risk flags and fresh, eligible specialist approvals distinct from author and publisher for each
+configured risk; all other publication gates remain mandatory. Publish audits record applied mode
+and only actual eligible approvals consumed by it. Legacy events and withdrawal rows retain
+null/unrecorded mode; future mode changes never rewrite history or snapshots.
+
 ### Planning
 
 Owns typed Facts, derivations, rules-contract implementations, three-valued evaluation, consequential-unknown selection, Procedure and Procedure-Version resolution, Basis evaluation, plan assembly, trust application, and public planning result DTOs. Its core evaluation code remains independent of Django models and request objects.
@@ -98,8 +109,9 @@ does not implement administrative rules, infer eligibility, rank Bases/offices, 
 plan dependencies or replace unknown guidance with a closest match.
 
 Navigation is loaded from the active-Service API, never a bundled fake catalog. Authored
-knowledge enters through the normal import, independent Admin review and canonical publish
-workflow; these are separate operations. Service activation remains explicit and independent
+knowledge enters through manual Admin authoring or existing deterministic draft imports, review
+required by the deployment mode, and canonical publish; these are separate operations. PR1 adds no
+generic importer, LLM ingestion, or Admin upload tooling. Service activation remains explicit and independent
 of publication. Empty navigation and unavailable services remain honest states, not demo
 fallbacks.
 
@@ -240,6 +252,10 @@ navigation data. Full scope and commands are in
 [`../../frontend/README.md`](../../frontend/README.md).
 
 A production implementation is not considered semantically complete merely because its ORM and endpoints work; it must reproduce the intended planning behavior captured by the authoritative rules contract and acceptance scenarios.
+
+Test settings may explicitly omit the review gate to isolate unrelated validation tests; this is
+not a production off mode. Review integration tests must exercise both modes and specialist and
+audit invariants with the gate present.
 
 ## Explicit exclusions for the first backend milestone
 

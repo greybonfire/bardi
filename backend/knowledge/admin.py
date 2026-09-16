@@ -670,12 +670,21 @@ class EvidenceLinkAdmin(EvidenceLinkLifecycleAdmin):
 
 @admin.register(ProcedureVersionAuditEvent)
 class ProcedureVersionAuditEventAdmin(admin.ModelAdmin):  # type: ignore[type-arg]
-    list_display = ("version", "event_type", "actor", "occurred_at", "from_state", "to_state")
+    list_display = (
+        "version",
+        "event_type",
+        "review_mode",
+        "actor",
+        "occurred_at",
+        "from_state",
+        "to_state",
+    )
     list_filter = ("event_type", "actor", "occurred_at", "version")
     search_fields = ("version__semantic_id", "actor__username")
     readonly_fields = (
         "version",
         "event_type",
+        "review_mode",
         "actor",
         "occurred_at",
         "from_state",

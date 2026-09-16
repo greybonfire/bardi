@@ -227,6 +227,16 @@ class ProcedureVersion(models.Model):
         return self.semantic_id
 
 
+class DraftPackImportReceipt(models.Model):
+    """Last successful request only; never a substitute for the live-state revision."""
+
+    version = models.OneToOneField(
+        ProcedureVersion, on_delete=models.CASCADE, related_name="draft_pack_receipt"
+    )
+    request_digest = models.CharField(max_length=64)
+    post_revision = models.CharField(max_length=64)
+
+
 class ProcedureVersionAuditEvent(models.Model):
     class EventType(models.TextChoices):
         PUBLISHED = "published", "Published"

@@ -39,6 +39,33 @@ The exact Python package layout may evolve, but these ownership boundaries are a
 
 Owns persisted domain knowledge: Services, Procedures, Procedure Versions, Fact definitions, authored Questions, claims, Eligibility Bases, Sources/Evidence Links, Service Points, dependencies, and related stable identities.
 
+### Draft authoring transport
+
+`knowledge.draft_packs` owns the strict versioned JSON parser, relational mapping, atomic
+import/dry-run, coherent pack export and distinct non-importable vocabulary context; Django
+management commands are thin adapters. See
+[ADR 0020](../adr/0020-use-versioned-draft-pack-authoring-contract.md) and the
+[operator contract](../draft-packs/README.md). This is staff-only knowledge authoring, not a new
+public HTTP/API boundary or an opaque JSON persistence model. External-LLM preparation is
+untrusted research assistance, not runtime inference, automatic ingestion or verification.
+
+The service reloads a persisted active staff actor and checks version add/change or export view
+permissions, plus add permissions for new shared catalog/setup rows. Updates require an explicit
+draft target and complete-live-state fingerprint; shared definitions are compare-only. Initial
+Questions/selection/contradictions may only accompany a Service created in that transaction,
+never modify an existing Service even inactive. New Services/Facts remain inactive/unpublished.
+
+Ordinary writers do not uniformly lock the owning version, so a fixed allowlist of knowledge
+tables is locked in `SHARE ROW EXCLUSIVE NOWAIT` mode for imports and coherent exports. Ordinary
+reads continue; writers may wait while authoring transactions hold locks. A local 750 ms
+implicit-lock timeout covers outermost commit but does not bound total operation duration.
+Nonblocking knowledge-row key-share locks and a fresh actor lock protect deferred foreign-key
+checks; nested calls retain locks until the caller's transaction ends, so callers must keep it
+short. Conflicts return retryable `concurrent_edit`. Conservative fingerprints include shared/global state, relevant dependency
+aggregates, trust, seals and workflow/review/audit history. A per-version internal hash receipt
+proves exact unchanged last-request retries; no raw uploaded packs are stored. This intentionally
+trades concurrency for MVP correctness against existing model/Admin writes.
+
 ### Publication
 
 Owns draft lifecycle, validation, review/approval records, atomic publication, withdrawal, re-verification workflow, and creation of immutable published snapshots. Publishing is a service operation, not a casual model-field edit.
@@ -109,10 +136,10 @@ does not implement administrative rules, infer eligibility, rank Bases/offices, 
 plan dependencies or replace unknown guidance with a closest match.
 
 Navigation is loaded from the active-Service API, never a bundled fake catalog. Authored
-knowledge enters through manual Admin authoring or existing deterministic draft imports, review
-required by the deployment mode, and canonical publish; these are separate operations. PR1 adds no
-generic importer, LLM ingestion, or Admin upload tooling. Service activation remains explicit and independent
-of publication. Empty navigation and unavailable services remain honest states, not demo
+knowledge enters through manual Admin authoring, existing deterministic draft imports or the
+generic draft-pack CLI, followed by deployment-mode review and canonical publish as separate
+operations. PR2 adds no Admin pack-upload/preview screen; that remains PR3 work. Service
+activation remains explicit and independent of publication. Empty navigation and unavailable services remain honest states, not demo
 fallbacks.
 
 ### Same-origin transport
@@ -265,7 +292,8 @@ audit invariants with the gate present.
 - recursive automatic planning of Procedure dependencies;
 - user profiles or saved administrative cases;
 - document upload/verification;
-- AI-authored rules or automatic legal determinations;
+- trusted/autonomously applied AI-authored rules or automatic legal determinations (external-LLM
+  draft preparation is untrusted input to the separate human-reviewed authoring contract);
 - a generalized evidence knowledge graph;
 - mandatory Redis/Celery/search infrastructure before a demonstrated need.
 

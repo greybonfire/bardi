@@ -95,9 +95,10 @@ Mode changes never rewrite past publications. New publish audits record applied 
 only actual fresh eligible independent approvals consumed by it; legacy events and withdrawal rows
 retain null/unrecorded mode, not retrospective review claims.
 
-PR1 covers this policy and honest audit history only. Manual Admin authoring and existing
-deterministic draft importers remain the routes; generic importers, LLM ingestion and Admin upload
-tooling are not implemented here.
+PR1 established this policy and honest audit history. PR2 adds the
+[generic draft-pack import/export CLI](draft-packs/README.md) alongside manual Admin authoring
+and existing deterministic importers. External-LLM research preparation is supported as untrusted
+input, not automatic ingestion or verification. PR3 Admin upload/preview is not implemented.
 
 ## 3. Before entering data
 
@@ -538,10 +539,30 @@ or deleting history.
 
 ### 8.1 What "programmatic" means today
 
-Bardi does not currently expose a generic editorial CSV/JSON upload API or bulk CMS interface.
+Bardi supports the [versioned draft-pack CLI](draft-packs/README.md) for generic JSON authoring,
+export and read-only vocabulary context. There is no generic editorial upload API or Admin
+pack-upload/preview screen in PR2. Start with the supported schema/example and
+[external-LLM prompt](draft-packs/llm-prompt.md), inspect sources and Fact vocabulary, then dry-run
+with a real active staff `--actor`. For updates, export first, retain `base_revision`, explicitly
+select `--target-version`, and review every owned deletion before `--allow-deletions`.
 
-The supported pattern for repeatable programmatic data entry is a **deterministic production
-importer**, normally paired with a Django management command. This is appropriate when:
+New Services stay inactive and source Facts unpublished. Initial Questions/selection setup can
+only accompany a Service created by that same import; any existing Service, even inactive, is
+protected from setup changes. Shared catalog definitions are create-or-exact-compare. Import
+never assigns approvals or verification, replaces an existing author, clears risks, or publishes.
+Complete evidence, Fact publication, Service setup/activation, scenarios and reviews manually.
+
+Changed claims/evidence reset affected trust. Owners with evidence discrepancy/re-verification
+history cannot be edited or deleted by import because historical overlays cannot safely follow
+changed meaning; use a successor/manual workflow. Approval history is retained, but signatures
+may become stale. Unchanged scenarios keep their seals: explicitly review and resave stale ones
+in Planning Scenario Admin, rather than reimporting identical JSON to simulate review. The
+[pack guide](draft-packs/README.md) details exact retry receipts, stale revisions, concurrency,
+permissions and legacy blank Evidence Link IDs.
+
+A separate supported pattern is a **deterministic production importer**, normally paired with a
+Django management command. Sections 8.2–8.5 describe that existing code-backed pattern (including
+its `--author` flag), not the generic pack CLI's `--actor` interface. It is appropriate when:
 
 - a researched Procedure contains many related rows;
 - the source pack is maintained in code/reviewed data;
@@ -683,7 +704,11 @@ Use a **programmatic importer** when:
 - the same data must be loaded into multiple environments; or
 - a reviewed code/data change is safer than repetitive manual entry.
 
-Both paths meet at the same draft/review/publication lifecycle. Programmatic import is not a
+Use the **generic draft-pack CLI** when reviewed research JSON or an exported draft needs a
+bounded, explicit snapshot import without writing a custom importer. Always dry-run first;
+use Admin for protected existing Service configuration and all lifecycle followups.
+
+All paths meet at the same draft/review/publication lifecycle. Programmatic import is not a
 shortcut around the applied review policy or other publication gates.
 
 ## 10. Common mistakes

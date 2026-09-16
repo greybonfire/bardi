@@ -27,6 +27,7 @@ Older ADRs predate the structured Status/Context/Decision/Consequences template;
 | [0017](0017-ask-source-questions-for-fee-applicability.md) | Ask source Questions for trusted Fee applicability without weakening monetary evidence fallback. |
 | [0018](0018-retire-research-prototype.md) | Retire the executable research prototype after production parity becomes authoritative. |
 | [0019](0019-use-explicit-solo-and-independent-publication-review-modes.md) | Extend ADR 0003 with explicit solo/independent publication review modes and honest mode-specific audit history; replace the blanket second-person requirement. |
+| [0020](0020-use-versioned-draft-pack-authoring-contract.md) | Use a versioned staff draft-pack authoring contract, protected history and coherent revision checks with conservative short knowledge-table locking. |
 
 ## Adding or superseding an ADR
 

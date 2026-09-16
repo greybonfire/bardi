@@ -358,7 +358,7 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
         published = publish_procedure_version(self.version.pk, actor=self.publisher)
         event_id = published.audit_events.get().pk
         old = [("knowledge", "0016_evidence_semantic_id_nonblank")]
-        new = [("knowledge", "0017_procedureversionauditevent_review_mode")]
+        latest = MigrationExecutor(connection).loader.graph.leaf_nodes("knowledge")
         try:
             MigrationExecutor(connection).migrate(old)
             with connection.cursor() as cursor:
@@ -368,7 +368,7 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
                 )
                 self.assertEqual(cursor.fetchone()[0], 1)
         finally:
-            MigrationExecutor(connection).migrate(new)
+            MigrationExecutor(connection).migrate(latest)
         event = published.audit_events.get(pk=event_id)
         self.assertIsNone(event.review_mode)
         self.assertEqual(event.approvals.count(), len(CORE_DIMENSIONS))

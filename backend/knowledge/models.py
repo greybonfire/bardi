@@ -236,6 +236,12 @@ class ProcedureVersionAuditEvent(models.Model):
         ProcedureVersion, on_delete=models.PROTECT, related_name="audit_events"
     )
     event_type = models.CharField(max_length=16, choices=EventType.choices)
+    review_mode = models.CharField(
+        max_length=16,
+        choices=(("solo", "Solo"), ("independent", "Independent")),
+        null=True,
+        blank=True,
+    )
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,

@@ -4,6 +4,7 @@ from datetime import date
 from io import StringIO
 from typing import Any, cast
 
+from bardi.settings.base import PROCEDURE_VERSION_PUBLICATION_GATES
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.core.exceptions import ValidationError
@@ -149,7 +150,8 @@ class TemporaryFamilyExemptionImportTests(TestCase):
     @override_settings(
         SELECTION_QUESTIONS_REQUIRED=True,
         PLANNING_SCENARIOS_REQUIRED=True,
-        PROCEDURE_VERSION_REVIEWS_REQUIRED=True,
+        PROCEDURE_VERSION_REVIEW_MODE="independent",
+        PROCEDURE_VERSION_PUBLICATION_GATES=PROCEDURE_VERSION_PUBLICATION_GATES,
     )
     def test_both_versions_pass_normal_review_and_specialist_publication_gates(self) -> None:
         author = get_user_model().objects.create_user(username="mil-publish-author", is_staff=True)

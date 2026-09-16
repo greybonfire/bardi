@@ -15,4 +15,8 @@ DATABASES = {"default": postgres_database()}
 # Production remains fail-closed.
 SELECTION_QUESTIONS_REQUIRED = False
 PLANNING_SCENARIOS_REQUIRED = False
-PROCEDURE_VERSION_REVIEWS_REQUIRED = False
+PROCEDURE_VERSION_PUBLICATION_GATES = tuple(
+    gate
+    for gate in PROCEDURE_VERSION_PUBLICATION_GATES
+    if gate != "knowledge.review_workflow.ProcedureVersionReviewPublicationGate"
+)

@@ -7,6 +7,21 @@ This document defines the version-1 independence and specialist-eligibility rule
 Procedure Version publication gate. It extends `knowledge-publication.md`; it does not introduce
 a second publication path or a generalized workflow engine.
 
+## Deployment review mode
+
+[ADR 0019](../adr/0019-use-explicit-solo-and-independent-publication-review-modes.md) replaces the
+blanket second-person publication requirement. `PROCEDURE_VERSION_REVIEW_MODE` is a deployment-wide
+environment variable/Django setting accepting exactly `solo` or `independent`, defaulting to
+`independent`; invalid values fail closed. The old `PROCEDURE_VERSION_REVIEWS_REQUIRED` flag is
+unsupported, not a fallback. There is no production off mode.
+
+In `solo`, mandatory general dimension approvals are skipped entirely. One person may author and
+publish with existing permissions; no account switching or self-approval paperwork is required.
+Optional genuinely independent general approvals remain history but are not consumed. In
+`independent`, all applicable general dimensions below are required. Both modes require the
+accountable author, truthful risk flags, and all applicable specialist approvals. All evidence,
+trust, scenario, domain, bilingual, effective-date and immutable-snapshot gates remain in force.
+
 ## Meaning-changing publication
 
 A new Procedure Version is the semantic publication boundary. In version 1, publishing a draft
@@ -37,7 +52,7 @@ recorded separately for these dimensions:
 - `bilingual_semantic` — Arabic/English semantic parity;
 - `discrepancy` — discrepancy disposition when the draft has affected evidence.
 
-One eligible reviewer may approve more than one dimension. Each required dimension must have at
+In `independent`, one eligible reviewer may approve more than one dimension. Each required dimension must have at
 least one fresh approval independent of both the accountable author and the eventual publisher.
 An approval by the eventual publisher is preserved as review history but does not satisfy the
 publication gate.
@@ -51,7 +66,9 @@ High-risk review is configured on the draft review policy with independent flags
 - `custody_guardianship`;
 - `contested_identity`.
 
-Each configured risk requires a fresh independent specialist approval. The reviewer must hold the
+In **both modes**, each configured risk requires a fresh specialist approval independent of both
+accountable author and publisher. High-risk content remains unpublished without a real specialist;
+flags must not be omitted or cleared to evade policy. The reviewer must hold the
 matching Django permission both when recording the approval and when the approval is used for
 publication:
 
@@ -62,7 +79,7 @@ publication:
 
 A specialist may also act as a general reviewer only when they separately hold the general review
 permission and record the corresponding dimension approval. Specialist approval does not replace
-ordinary evidence, logic, scenario, bilingual, or discrepancy review.
+ordinary evidence, logic, scenario, bilingual, or discrepancy approvals required in `independent`.
 
 ## Reviewed draft state
 
@@ -79,9 +96,14 @@ satisfy publication.
 ## Publication and audit
 
 The publication gate reports missing, stale, ineligible, or non-independent approvals by review
-dimension or specialist risk. When all requirements pass, it places the accepted reviewed-state
-signature in a transaction-local PostgreSQL setting. The existing atomic publisher remains the only
-lifecycle service. Its immutable publication audit insert triggers an atomic snapshot of the fresh,
-independent approval rows and their approving actors into `ProcedureVersionAuditApproval`.
+dimension or specialist risk. When all requirements pass, it returns an in-memory decision binding
+the mode, coherent draft-state signature, accepted approval IDs, version, and publisher. The
+canonical publisher validates that decision before the lifecycle transition. Each new publish
+audit event records the applied `review_mode` and atomically
+captures only fresh, permission-eligible approvals independent of author and publisher actually
+consumed by that mode into `ProcedureVersionAuditApproval`. Solo captures applicable specialist
+approvals only, never optional general approvals or fake self-approvals.
 
-Failed publication rolls back both lifecycle changes and approval-audit capture.
+Legacy audit events and withdrawal rows have null/unrecorded mode: no retrospective inference or
+backfill of review claims. Changing mode affects future publication attempts only, never existing
+publications or audit history. Failed publication rolls back lifecycle changes and audit capture.

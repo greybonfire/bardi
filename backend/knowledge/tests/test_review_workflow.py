@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission, User
 from django.core.exceptions import ValidationError
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, connection, transaction
 from django.test import TransactionTestCase, override_settings
+from django.utils import timezone
 
 from knowledge.evidence_workflow import open_evidence_discrepancy
 from knowledge.models import (
@@ -38,7 +41,7 @@ CORE_DIMENSIONS = {
 
 
 @override_settings(
-    PROCEDURE_VERSION_REVIEWS_REQUIRED=True,
+    PROCEDURE_VERSION_REVIEW_MODE="independent",
     PROCEDURE_VERSION_PUBLICATION_GATES=REVIEW_GATE,
 )
 class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
@@ -316,3 +319,260 @@ class ProcedureVersionReviewWorkflowTests(TransactionTestCase):
             ProcedureVersionAuditApproval.objects.filter(audit_event__version=published).update(
                 dimension="rule_logic"
             )
+
+    @override_settings(PROCEDURE_VERSION_REVIEW_MODE="solo")
+    def test_solo_requires_policy_and_preserves_optional_history(self) -> None:
+        with self.assertRaises(PublicationRejected):
+            publish_procedure_version(self.version.pk, actor=self.author)
+        self.policy()
+        approvals = self.approve_core()
+        published = publish_procedure_version(self.version.pk, actor=self.author)
+        event = published.audit_events.get()
+        self.assertEqual(event.review_mode, "solo")
+        self.assertFalse(event.approvals.exists())
+        self.assertEqual(ProcedureVersionReviewApproval.objects.count(), len(approvals))
+
+    @override_settings(PROCEDURE_VERSION_REVIEW_MODE="solo")
+    def test_solo_admin_author_with_real_publish_permission(self) -> None:
+        from django.contrib.admin import AdminSite
+        from django.test import RequestFactory
+
+        from knowledge.admin import ProcedureVersionAdmin
+
+        self.policy()
+        self._grant(self.author, "publish_procedureversion")
+        request = RequestFactory().get("/admin/")
+        request.user = self.author
+        model_admin = ProcedureVersionAdmin(ProcedureVersion, AdminSite())
+        self.assertTrue(model_admin.has_publish_procedureversion_permission(request))
+        model_admin.publish_selected(request, ProcedureVersion.objects.filter(pk=self.version.pk))
+        self.version.refresh_from_db()
+        self.assertEqual(self.version.state, "published")
+        self.assertFalse(ProcedureVersionReviewApproval.objects.exists())
+
+    def test_migration_preserves_legacy_events_and_reverses_capture_trigger(self) -> None:
+        from django.db.migrations.executor import MigrationExecutor
+
+        self.policy()
+        self.approve_core()
+        published = publish_procedure_version(self.version.pk, actor=self.publisher)
+        event_id = published.audit_events.get().pk
+        old = [("knowledge", "0016_evidence_semantic_id_nonblank")]
+        new = [("knowledge", "0017_procedureversionauditevent_review_mode")]
+        try:
+            MigrationExecutor(connection).migrate(old)
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT count(*) FROM pg_trigger WHERE tgname = "
+                    "'knowledge_capture_procedure_version_review_approvals_insert'"
+                )
+                self.assertEqual(cursor.fetchone()[0], 1)
+        finally:
+            MigrationExecutor(connection).migrate(new)
+        event = published.audit_events.get(pk=event_id)
+        self.assertIsNone(event.review_mode)
+        self.assertEqual(event.approvals.count(), len(CORE_DIMENSIONS))
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT count(*) FROM pg_trigger WHERE tgname = "
+                "'knowledge_capture_procedure_version_review_approvals_insert'"
+            )
+            self.assertEqual(cursor.fetchone()[0], 0)
+
+    def test_invalid_runtime_mode_fails_closed(self) -> None:
+        self.policy()
+        self.approve_core()
+        for mode in ("", "off", "SOLO", None):
+            with self.subTest(mode=mode), override_settings(PROCEDURE_VERSION_REVIEW_MODE=mode):
+                with self.assertRaises(PublicationRejected) as caught:
+                    publish_procedure_version(self.version.pk, actor=self.publisher)
+                self.assertIn("invalid_review_mode", {d.code for d in caught.exception.diagnostics})
+
+    def test_specialists_remain_fresh_eligible_and_independent_in_both_modes(self) -> None:
+        risks = ("legal", "military", "custody_guardianship", "contested_identity")
+        self.policy(**{f"{risk}_risk": True for risk in risks})
+        self.approve_core()
+        for mode in ("solo", "independent"):
+            with override_settings(PROCEDURE_VERSION_REVIEW_MODE=mode):
+                with self.assertRaises(PublicationRejected) as caught:
+                    publish_procedure_version(self.version.pk, actor=self.author)
+                self.assertEqual(
+                    {
+                        d.detail
+                        for d in caught.exception.diagnostics
+                        if d.code == "missing_specialist_approval"
+                    },
+                    set(risks),
+                )
+        for risk in risks:
+            self._grant(self.specialist, f"specialist_approve_{risk}")
+            approve_specialist_risk(self.version.pk, risk_kind=risk, actor=self.specialist)
+        for mode in ("solo", "independent"):
+            with override_settings(PROCEDURE_VERSION_REVIEW_MODE=mode):
+                with self.assertRaises(PublicationRejected):
+                    publish_procedure_version(self.version.pk, actor=self.specialist)
+                self._revoke(self.specialist, "specialist_approve_legal")
+                with self.assertRaises(PublicationRejected):
+                    publish_procedure_version(self.version.pk, actor=self.author)
+                self._grant(self.specialist, "specialist_approve_legal")
+        self.version.text_en = "Changed specialist meaning"
+        self.version.save()
+        for mode in ("solo", "independent"):
+            with override_settings(PROCEDURE_VERSION_REVIEW_MODE=mode):
+                with self.assertRaises(PublicationRejected) as caught:
+                    publish_procedure_version(self.version.pk, actor=self.author)
+                self.assertEqual(
+                    {
+                        d.detail
+                        for d in caught.exception.diagnostics
+                        if d.code == "stale_specialist_approval"
+                    },
+                    set(risks),
+                )
+
+    @override_settings(PROCEDURE_VERSION_REVIEW_MODE="solo")
+    def test_solo_captures_only_required_specialists_not_optional_general_reviews(self) -> None:
+        risks = ("legal", "military", "custody_guardianship", "contested_identity")
+        self.policy(**{f"{risk}_risk": True for risk in risks})
+        self.approve_core()
+        accepted = []
+        for risk in risks:
+            self._grant(self.specialist, f"specialist_approve_{risk}")
+            accepted.append(
+                approve_specialist_risk(self.version.pk, risk_kind=risk, actor=self.specialist)
+            )
+        publish_procedure_version(self.version.pk, actor=self.author)
+        event = self.version.audit_events.get()
+        self.assertEqual(event.review_mode, "solo")
+        self.assertEqual(
+            set(event.approvals.values_list("approval_id", flat=True)), {row.pk for row in accepted}
+        )
+
+    def test_author_specialist_rows_cannot_satisfy_either_mode(self) -> None:
+        self.policy(legal_risk=True)
+        self.approve_core()
+        self._grant(self.author, "specialist_approve_legal")
+        with self.assertRaises(ValidationError):
+            approve_specialist_risk(self.version.pk, risk_kind="legal", actor=self.author)
+        # Simulate an externally inserted row: the gate must independently reject it.
+        ProcedureVersionReviewApproval.objects.bulk_create(
+            [
+                ProcedureVersionReviewApproval(
+                    procedure_version=self.version,
+                    reviewer=self.author,
+                    approval_kind="specialist",
+                    specialist_risk="legal",
+                    dimension="",
+                    reviewed_signature=review_state_signature(self.version),
+                    approved_at=timezone.now(),
+                )
+            ]
+        )
+        for mode in ("solo", "independent"):
+            with override_settings(PROCEDURE_VERSION_REVIEW_MODE=mode):
+                with self.assertRaises(PublicationRejected) as caught:
+                    publish_procedure_version(self.version.pk, actor=self.publisher)
+                self.assertIn(
+                    "specialist_review_not_independent",
+                    {d.code for d in caught.exception.diagnostics},
+                )
+
+    def test_switching_modes_and_gate_isolation_in_one_transaction(self) -> None:
+        from knowledge.publication import withdraw_procedure_version
+
+        self.policy()
+        with transaction.atomic():
+            with override_settings(PROCEDURE_VERSION_REVIEW_MODE="solo"):
+                publish_procedure_version(self.version.pk, actor=self.author)
+            withdraw_procedure_version(self.version.pk, actor=self.author)
+            first = self.version
+            self.version = ProcedureVersion.objects.create(
+                semantic_id="review.procedure.v2",
+                procedure=self.procedure,
+                text_ar=first.text_ar,
+                text_en=first.text_en,
+                applicability=first.applicability,
+            )
+            self.policy()
+            with self.assertRaises(PublicationRejected):
+                publish_procedure_version(self.version.pk, actor=self.author)
+            self.approve_core()
+            publish_procedure_version(self.version.pk, actor=self.author)
+            self.assertEqual(self.version.audit_events.get().review_mode, "independent")
+            self.assertEqual(first.audit_events.get(event_type="published").review_mode, "solo")
+            withdraw_procedure_version(self.version.pk, actor=self.author)
+            isolated = ProcedureVersion.objects.create(
+                semantic_id="review.procedure.v3",
+                procedure=self.procedure,
+                text_ar=first.text_ar,
+                text_en=first.text_en,
+                applicability=first.applicability,
+            )
+            with override_settings(PROCEDURE_VERSION_PUBLICATION_GATES=()):
+                publish_procedure_version(isolated.pk, actor=self.author)
+            self.assertIsNone(isolated.audit_events.get().review_mode)
+            self.assertFalse(isolated.audit_events.get().approvals.exists())
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT current_setting('bardi.procedure_version_lifecycle', true), "
+                    "current_setting('bardi.procedure_version_review_signature', true)"
+                )
+                lifecycle, signature = cursor.fetchone()
+            self.assertIn(lifecycle, (None, ""))
+            self.assertIn(signature, (None, ""))
+
+    def test_audit_failure_rolls_back_publication(self) -> None:
+        self.policy()
+        self.approve_core()
+        for target in (
+            "knowledge.publication._create_audit_event",
+            "knowledge.review_workflow.ProcedureVersionAuditApproval.objects.bulk_create",
+        ):
+            with self.subTest(target=target), transaction.atomic():
+                with patch(target, side_effect=RuntimeError):
+                    with self.assertRaises(RuntimeError):
+                        publish_procedure_version(self.version.pk, actor=self.publisher)
+                self.version.refresh_from_db()
+                self.assertEqual(self.version.state, "draft")
+                self.assertFalse(self.version.audit_events.exists())
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SELECT current_setting('bardi.procedure_version_lifecycle', true)"
+                    )
+                    self.assertIn(cursor.fetchone()[0], (None, ""))
+
+    def test_only_eligible_approvals_are_captured_and_withdrawal_has_no_mode(self) -> None:
+        from knowledge.publication import withdraw_procedure_version
+
+        self.policy()
+        self._grant(self.specialist, "review_procedureversion")
+        self.approve_core(self.specialist)
+        self._revoke(self.specialist, "review_procedureversion")
+        # A genuine independent specialist row for a scope not required by this policy
+        # remains history, but is not part of the publication decision.
+        self._grant(self.specialist, "specialist_approve_legal")
+        ProcedureVersionReviewApproval.objects.bulk_create(
+            [
+                ProcedureVersionReviewApproval(
+                    procedure_version=self.version,
+                    reviewer=self.specialist,
+                    approval_kind="specialist",
+                    specialist_risk="legal",
+                    dimension="",
+                    reviewed_signature=review_state_signature(self.version),
+                    approved_at=timezone.now(),
+                )
+            ]
+        )
+        accepted = self.approve_core()
+        with transaction.atomic():
+            published = publish_procedure_version(self.version.pk, actor=self.publisher)
+            event = published.audit_events.get()
+            self.assertEqual(event.review_mode, "independent")
+            self.assertEqual(
+                set(event.approvals.values_list("approval_id", flat=True)), {a.pk for a in accepted}
+            )
+            withdraw_procedure_version(self.version.pk, actor=self.publisher)
+            self.assertIsNone(published.audit_events.get(event_type="withdrawn").review_mode)
+            with self.assertRaises(DatabaseError), transaction.atomic():
+                published.audit_events.filter(pk=event.pk).update(review_mode="solo")

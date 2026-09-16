@@ -26,6 +26,7 @@ Older ADRs predate the structured Status/Context/Decision/Consequences template;
 | [0016](0016-ask-source-questions-for-checklists-and-steps.md) | Ask source Questions for usable official checklist and step applicability; preserve blocked research uncertainty. |
 | [0017](0017-ask-source-questions-for-fee-applicability.md) | Ask source Questions for trusted Fee applicability without weakening monetary evidence fallback. |
 | [0018](0018-retire-research-prototype.md) | Retire the executable research prototype after production parity becomes authoritative. |
+| [0019](0019-use-explicit-solo-and-independent-publication-review-modes.md) | Extend ADR 0003 with explicit solo/independent publication review modes and honest mode-specific audit history; replace the blanket second-person requirement. |
 
 ## Adding or superseding an ADR
 

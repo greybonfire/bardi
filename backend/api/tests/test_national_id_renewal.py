@@ -19,7 +19,6 @@ from planning import (
 @override_settings(
     SELECTION_QUESTIONS_REQUIRED=True,
     PLANNING_SCENARIOS_REQUIRED=False,
-    PROCEDURE_VERSION_REVIEWS_REQUIRED=False,
 )
 class NationalIdRenewalProductionPlanningTests(TestCase):
     def publish_snapshot(self):  # type: ignore[no-untyped-def]

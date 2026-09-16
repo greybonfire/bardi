@@ -86,7 +86,6 @@ MILITARY_ONLY_SON_FACTS: dict[str, object] = {
 @override_settings(
     SELECTION_QUESTIONS_REQUIRED=True,
     PLANNING_SCENARIOS_REQUIRED=False,
-    PROCEDURE_VERSION_REVIEWS_REQUIRED=False,
 )
 class CrossFamilyProductionParityAcceptanceTests(TransactionTestCase):
     serialized_rollback = True

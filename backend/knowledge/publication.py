@@ -57,10 +57,20 @@ class PublicationRejected(Exception):
 
 
 @dataclass(frozen=True, slots=True)
+class ReviewPublicationDecision:
+    mode: str
+    version_id: int
+    publisher_id: int
+    signature: str
+    approval_ids: tuple[int, ...]
+
+
+@dataclass(slots=True)
 class PublicationContext:
     version: ProcedureVersion
     actor: models.Model
     fact_definitions: Mapping[str, DomainFactDefinition]
+    review_decision: ReviewPublicationDecision | None = None
 
 
 class PublicationGate(Protocol):
@@ -558,14 +568,43 @@ def _create_audit_event(
     occurred_at: datetime,
     from_state: str,
     to_state: str,
+    review_decision: ReviewPublicationDecision | None = None,
 ) -> None:
     table = ProcedureVersionAuditEvent._meta.db_table
     with connection.cursor() as cursor:
         cursor.execute(
             f'INSERT INTO "{table}" '
-            "(version_id, event_type, actor_id, occurred_at, from_state, to_state) "
-            "VALUES (%s, %s, %s, %s, %s, %s)",
-            [version.pk, event_type, actor.pk, occurred_at, from_state, to_state],
+            "(version_id, event_type, actor_id, occurred_at, from_state, to_state, review_mode) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id",
+            [
+                version.pk,
+                event_type,
+                actor.pk,
+                occurred_at,
+                from_state,
+                to_state,
+                review_decision.mode if review_decision else None,
+            ],
+        )
+
+        event_id = cursor.fetchone()[0]
+    if review_decision is not None:
+        from .review_workflow import ProcedureVersionAuditApproval, ProcedureVersionReviewApproval
+
+        rows = ProcedureVersionReviewApproval.objects.filter(pk__in=review_decision.approval_ids)
+        ProcedureVersionAuditApproval.objects.bulk_create(
+            [
+                ProcedureVersionAuditApproval(
+                    audit_event_id=event_id,
+                    approval=row,
+                    actor_id=row.reviewer_id,
+                    approval_kind=row.approval_kind,
+                    dimension=row.dimension,
+                    specialist_risk=row.specialist_risk,
+                    approved_at=row.approved_at,
+                )
+                for row in rows
+            ]
         )
 
 
@@ -707,6 +746,19 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
             diagnostics = _run_policy(context)
             if diagnostics:
                 raise PublicationRejected(diagnostics)
+            if context.review_decision is not None:
+                from .review_workflow import review_state_signature
+
+                decision = context.review_decision
+                if (
+                    decision.version_id != version.pk
+                    or decision.publisher_id != actor.pk
+                    or decision.mode != settings.PROCEDURE_VERSION_REVIEW_MODE
+                    or decision.signature != review_state_signature(version)
+                ):
+                    raise PublicationRejected(
+                        _diagnostic("core.procedure_version_reviews", "invalid_review_decision")
+                    )
             published_at = timezone.now()
             _enable_transition("publish")
             updated = ProcedureVersion.objects.filter(
@@ -725,6 +777,7 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 occurred_at=published_at,
                 from_state=ProcedureVersion.State.DRAFT,
                 to_state=ProcedureVersion.State.PUBLISHED,
+                review_decision=context.review_decision,
             )
             _enable_transition("")
             version.refresh_from_db()

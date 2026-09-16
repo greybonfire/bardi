@@ -16,7 +16,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db import connection, models, transaction
+from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
 
@@ -35,7 +35,7 @@ from .models import (
     Warning,
 )
 from .planning_scenarios import PlanningScenario, planning_behavior_signature
-from .publication import PublicationContext, PublicationDiagnostic
+from .publication import PublicationContext, PublicationDiagnostic, ReviewPublicationDecision
 
 _REVIEW_DIMENSIONS = (
     "evidence_source",
@@ -58,7 +58,6 @@ _SPECIALIST_PERMISSIONS: Mapping[str, str] = {
     "contested_identity": "knowledge.specialist_approve_contested_identity",
 }
 _REVIEW_PERMISSION = "knowledge.review_procedureversion"
-_SIGNATURE_SETTING = "bardi.procedure_version_review_signature"
 
 
 def _validate_actor(actor: User) -> None:
@@ -547,17 +546,14 @@ def _approval_diagnostic(
     return None
 
 
-def _set_review_signature(signature: str) -> None:
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT set_config(%s, %s, true)", [_SIGNATURE_SETTING, signature])
-
-
 class ProcedureVersionReviewPublicationGate:
     name = "core.procedure_version_reviews"
 
     def validate(self, context: PublicationContext) -> Iterable[PublicationDiagnostic]:
-        if not getattr(settings, "PROCEDURE_VERSION_REVIEWS_REQUIRED", True):
-            return ()
+        context.review_decision = None
+        mode = settings.PROCEDURE_VERSION_REVIEW_MODE
+        if mode not in ("solo", "independent"):
+            return (PublicationDiagnostic(self.name, "invalid_review_mode"),)
         try:
             policy = ProcedureVersionReviewPolicy.objects.select_for_update().get(
                 procedure_version=context.version
@@ -574,7 +570,10 @@ class ProcedureVersionReviewPublicationGate:
         )
         publisher_id = context.actor.pk
         failures: list[PublicationDiagnostic] = []
-        for dimension in sorted(required_review_dimensions(context.version)):
+        dimensions = (
+            required_review_dimensions(context.version) if mode == "independent" else frozenset()
+        )
+        for dimension in sorted(dimensions):
             rows = tuple(
                 row
                 for row in approvals
@@ -620,7 +619,27 @@ class ProcedureVersionReviewPublicationGate:
 
         if failures:
             return tuple(failures)
-        _set_review_signature(current_signature)
+        accepted = tuple(
+            row.pk
+            for row in approvals
+            if row.reviewed_signature == current_signature
+            and row.reviewer_id not in (policy.author_id, publisher_id)
+            and (
+                (
+                    row.approval_kind == ProcedureVersionReviewApproval.ApprovalKind.DIMENSION
+                    and row.dimension in dimensions
+                    and row.reviewer.has_perm(_REVIEW_PERMISSION)
+                )
+                or (
+                    row.approval_kind == ProcedureVersionReviewApproval.ApprovalKind.SPECIALIST
+                    and row.specialist_risk in policy.risk_kinds
+                    and row.reviewer.has_perm(_SPECIALIST_PERMISSIONS[row.specialist_risk])
+                )
+            )
+        )
+        context.review_decision = ReviewPublicationDecision(
+            mode, context.version.pk, publisher_id, current_signature, accepted
+        )
         return ()
 
 

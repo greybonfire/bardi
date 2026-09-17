@@ -6,35 +6,14 @@ The web app presents authored guidance, not government decisions or an applicati
 
 ## Local development
 
-Use a current **Node 22** release (`frontend/.nvmrc`) and npm. Run commands from the
-repository root unless a command explicitly changes directory. For a one-command
-containerized development environment, use the full-stack workflow in
-[`docs/development.md`](../docs/development.md); it starts PostgreSQL, Django, and Next.js
-together. The host-run workflow below remains available when you prefer local Python and
-Node processes.
+Use **Node 22** (`frontend/.nvmrc`) and npm. The development guide owns runnable
+[full-stack Compose setup](../docs/development.md#full-stack-docker-compose-setup),
+[host-run frontend setup](../docs/development.md#frontend-setup) (including dependency
+upgrades), and [shutdown](../docs/development.md#teardown).
+Open **http://localhost:3000/ar**; the host-run dev server binds to `127.0.0.1`.
 
-1. Set up PostgreSQL and Django using [`docs/development.md`](../docs/development.md).
-   Keep Django running separately at `http://localhost:8000`; Admin is at `/admin/`.
-2. On first frontend setup:
-
-   ```bash
-   cp frontend/.env.example frontend/.env.local
-   npm --prefix frontend ci
-   npm --prefix frontend run dev
-   ```
-
-3. Open **http://localhost:3000/ar**. Visiting `/` redirects to `/ar`; use **English**
-   in the header to switch languages. The dev server binds to `127.0.0.1`.
-
-Next reads `frontend/.env.local`; it does not use the backend's root `.env` as its
-configuration contract. Do not copy Django/database secrets into the frontend environment.
-
-Use `npm ci` for reproducible installs from `frontend/package-lock.json`. An npm 10
-Arborist dependency-update bug was encountered while updating this lock; npm 11 installed
-the current lock. Use npm 11 for dependency upgrades if updating the lock, for example
-`(cd frontend && npx --yes npm@11 install <package>@<version>)`. No global npm installation
-or upgrade is required for this workflow; routine setup uses the committed lock, not
-`npm update`.
+Next reads `frontend/.env.local`, not the backend's root `.env`.
+Do not copy Django/database secrets into the frontend environment.
 
 ### Real knowledge, not a demo catalog
 
@@ -42,8 +21,10 @@ Navigation comes only from `GET /v1/services`, whose sole activation criterion i
 editorial `Service.is_active` flag. Publication dates or a published Procedure Version
 do not implicitly activate a Service.
 
-Use the researched imports and normal independent Admin review/publish workflow described
-in [`docs/development.md`](../docs/development.md) to prepare usable guidance. Imports
+Use the researched imports and mode-aware Admin review/publish workflow described
+in [`docs/development.md`](../docs/development.md#solo-now-independent-when-the-team-joins)
+to prepare usable guidance. `solo` skips general approvals; `independent` requires them.
+Both modes still require independent specialists for flagged high-risk content. Imports
 create drafts, not approvals or publication. Keep Service activation and Procedure-Version
 publication explicit. Empty navigation and unavailable services have honest recovery states;
 production navigation never substitutes bundled fake data, a demo plan, or a closest match.
@@ -51,21 +32,15 @@ Synthetic fixtures and the browser-test API stand-in are test-only.
 
 ## Current application scope
 
-- Server-rendered bilingual Service directory, Service introduction and privacy pages;
-  canonical/alternate-language metadata, sitemap and robots metadata. Questionnaire pages
-  are marked `noindex`, `nofollow`, and `noarchive`; those directives are not access control.
-- A backend-driven questionnaire for all public answer kinds: boolean, enum, integer,
-  Gregorian date and string, including multi-Fact Questions. Unanswered Facts stay omitted;
-  nothing is implicitly answered No. The server owns administrative rules and progression.
-- All four planning outcomes: `next_question`, `plan`, `inconclusive`, and `invalid`.
-  Review/correction discards the affected and subsequent answers. Locale/date changes and
-  case clearing cancel obsolete requests; failures retain answers for manual retry, including
-  bounded `Retry-After` handling without automatic POST retries.
-- Plans show identity/evaluation date, warnings, direct prerequisites, Official Requirements
-  separately from Practical Preparation, quantities, ordered steps, fee value states,
-  non-ranked Eligibility Bases, local routing uncertainty, and compact sources/freshness.
-  Unknown fees are not invented or totaled; routing is not a nearest-office recommendation.
-  Browser printing includes sources and the reminder to regenerate immediately before acting.
+The server owns questionnaire rules and progression. Unanswered Facts stay omitted, never
+implicitly No. Correction discards the affected and subsequent answers; failures retain
+answers for manual retry, without automatic POST retries. Locale/date changes and clearing
+cancel obsolete requests.
+
+Plans distinguish Official Requirements from Practical Preparation. Unknown fees are not
+invented or totaled; Eligibility Bases are non-ranked, and routing is not a nearest-office
+recommendation. Regenerate guidance immediately before acting, including printed guidance.
+Questionnaire `noindex`, `nofollow` and `noarchive` directives are not access control.
 
 ## Configuration and the public API boundary
 
@@ -166,108 +141,30 @@ The complete unit suite also invokes the real Python schema exporter, so **Pytho
 and uv are required even for `npm test`**. PostgreSQL is not required for the frontend
 checks or schema export.
 
-```bash
-uv sync --locked
-uv run python tools/export_web_api.py --check
-npm --prefix frontend run api:generate
-# Generated files must already be tracked and current when checking drift.
-git diff --exit-code -- frontend/api-schema.json frontend/src/api/generated.d.ts
-npm --prefix frontend run lint
-npm --prefix frontend run typecheck
-npm --prefix frontend run test
-npm --prefix frontend run build
-```
-
-`tools/export_web_api.py` builds OpenAPI from Django Ninja's declarations in memory without
-a database connection, migrations or production secrets. `--check` fails on a missing or
-stale `frontend/api-schema.json`. When intentionally changing the backend public contract,
-regenerate from the **repository root**:
-
-```bash
-uv run python tools/export_web_api.py
-npm --prefix frontend run api:generate
-```
-
-Review and include both `frontend/api-schema.json` and `frontend/src/api/generated.d.ts`
-with the contract change; do not hand-edit generated types. CI checks the snapshot, then
-regenerates types and checks those exact paths for drift. Type checking also checks runtime
-Zod schemas against the generated public types in both directions.
+Run the [frontend checks and API schema commands](../docs/development.md#frontend-checks-and-api-schema)
+for lint, types, unit tests, build and generated-contract drift. That section also owns
+intentional schema regeneration; include both generated files with contract changes and
+never hand-edit generated types. Type checking checks runtime Zod schemas against the
+generated public types in both directions.
 
 ### Production-build browser checks
 
-Install Playwright's managed Chromium locally, then test the production build:
-
-```bash
-(cd frontend && npx playwright install chromium)
-BARDI_API_ORIGIN=http://127.0.0.1:8451 BARDI_SITE_ORIGIN=http://localhost:3010 \
-  npm --prefix frontend run build
-npm --prefix frontend run test:e2e
-```
-
-On Linux runners needing browser system packages, CI uses
-`(cd frontend && npx playwright install --with-deps chromium)`. Alternatively, use an
-existing local Chromium-compatible executable without downloading a managed browser:
-
-```bash
-PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/absolute/path/to/chromium \
-  npm --prefix frontend run test:e2e
-```
-
-`playwright.config.ts` starts the existing Next production build at `http://localhost:3010`
-(bound to `127.0.0.1`) and the **test-only** `e2e/api-stand-in.mjs` API on
-`127.0.0.1:8451`; keep both ports free. Build with the same site origin, as above, so
-build-time robots/SEO metadata matches the browser origin. It does not need Django
-or PostgreSQL and must never point at real cases. The stand-in is not a production fallback
-or a replacement for backend acceptance tests. Servers are not reused; if the default API
-port is occupied, the configuration permits `BARDI_E2E_API_PORT=8471` as a local test-only
-alternative. CI uses the default 8451. Trace, screenshot and video recording are disabled,
-and CI uploads no browser artifacts. Do not upload reports or captures containing real cases.
-
-For visual inspection using **synthetic data only**, after the browser-test build above,
-start these in two terminals from `frontend/`:
-
-```bash
-node --experimental-strip-types e2e/api-stand-in.mjs
-```
-
-```bash
-BARDI_API_ORIGIN=http://127.0.0.1:8451 BARDI_SITE_ORIGIN=http://localhost:3010 \
-  npm run start -- --port 3010
-```
-
-Open `http://localhost:3010/ar` or `/en`. Follow the synthetic fixture instructions in
-`e2e/fixtures.mjs`; use `TEST-ONLY-NOTE`, never personal information. Stop these processes
-before running Playwright, which needs to own the same ports.
+Use the [browser setup and visual inspection commands](../docs/development.md#frontend-checks-and-api-schema)
+with synthetic data only. Playwright owns both loopback ports and never reuses servers.
+Its stand-in is not a production fallback or a replacement for backend acceptance tests.
+Trace, screenshot and video recording are disabled, and CI uploads no browser artifacts.
+Do not upload reports or captures containing real cases.
 
 ### Regression scope
 
-- `src/api/*.test.ts`: every public result and nested allow-list, exact generated contract,
-  transport/date/Unicode limits, status/error normalization, header and origin isolation,
-  request stream size/deadline/disconnect cases, retry/cancellation, no sensitive logging,
-  mandatory Next privacy settings, and deterministic database-free export/missing/stale checks.
-- `src/planning/state.test.ts` and `storage.test.ts`: typed values and omissions, recurring
-  multi-Fact Questions, correction history, current bilingual labels, one-case isolation,
-  corrupt/incompatible storage, quota/access failures and explicit storage allow-lists.
-- `src/planning/questionnaire.test.tsx`: SSR/hydration, Arabic/English fields, every result,
-  review/diagnostic correction, refresh, locale/date changes, cancellation/stale results,
-  confirmed clearing, manual retry/cooldown, storage fallback, privacy and browser printing.
-- `src/components/plan-view.test.tsx`: complete/partial plans in both languages, all guidance
-  sections and states, exact dates/quantities, unknown money, non-ranked Bases, direct
-  dependencies, local routing limits, safe source links and complete printable evidence.
-- `e2e/*.spec.ts` (Playwright): production Next navigation and language switching, no-JavaScript
-  Service pages, canonical/alternate/noindex metadata, sitemap and HTTP 404s; complete
-  bilingual questionnaire-to-plan journeys and print media; review/refresh, tab/Service
-  isolation, confirmed clearing; invalid/inconclusive outcomes, 429 cooldown, unavailable,
-  malformed or wrong-Service responses, manual recovery and delayed-response cancellation;
-  privacy checks for URLs/storage/metadata/credentials/analytics, safe external links and
-  inert hostile locators/authored text; 390px Arabic RTL overflow, keyboard/focus and disclosure
-  checks. Projects are desktop Chromium and mobile Chromium emulation, not a full
-  cross-browser or accessibility audit. These use synthetic responses through the real
-  same-origin boundary (with browser interception for selected failure cases), not
-  Django/PostgreSQL or researched-family parity.
+Unit/component tests cover the public contract, transport/privacy boundaries, case state,
+recovery and bilingual rendering. Browser tests exercise the production Next same-origin
+boundary with synthetic responses, not Django/PostgreSQL or researched-family parity.
+Desktop Chromium and mobile Chromium emulation are not a full cross-browser or
+accessibility audit.
 
 See [`docs/ci-cd.md`](../docs/ci-cd.md) for the independent Frontend CI job and the required
-two-track aggregate. The architectural boundaries remain governed by
+three-track aggregate (Production backend, Frontend and Development Compose). The architectural boundaries remain governed by
 [ADR 0004](../docs/adr/0004-do-not-persist-case-facts.md),
 [ADR 0005](../docs/adr/0005-use-nextjs-with-django-ninja.md),
 [ADR 0006](../docs/adr/0006-expose-one-stateless-planning-operation.md),

@@ -11,33 +11,21 @@ administrative services.
   switch, a backend-driven questionnaire and printable, sourced guidance. Use Node 22 and
   npm with the committed lockfile.
 
-The Django/PostgreSQL backend provides environment-specific settings, Django Admin/authentication,
-deterministic planning, publication/review workflows, Django Ninja APIs, reproducible uv tooling,
-and PostgreSQL-backed checks. See [`docs/development.md`](docs/development.md) for local setup
-and validation. Editors should use [`docs/editorial-process.md`](docs/editorial-process.md) for the
-end-to-end authoring, review, publication, and programmatic-import workflow.
+- **Run and check locally:** [development guide](docs/development.md), starting with
+  [full-stack Compose](docs/development.md#full-stack-docker-compose-setup) or host-run setup.
+  It includes prerequisites, Admin creation, complete checks and safe shutdown.
+- **Author and publish:** [editorial workflow](docs/editorial-process.md). Publication is
+  mode-aware: `solo` skips general approvals; `independent` requires them. Flagged high-risk
+  content requires independent specialists in both modes.
+- **Configure the web app safely:** [frontend guide](frontend/README.md) for API origins,
+  case privacy, shared-device handling and deployment-security caveats.
+- **Understand delivery gates:** [CI/CD](docs/ci-cd.md) for the three required tracks.
+  There is no production deployment automation for Django or Next.js.
+- **Operate or recover a private pilot:** [operations guide](docs/operations/private-pilot.md)
+  for ingress hardening, backups and restore procedures.
 
-For the quickest local full-stack setup, from the repository root run:
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-This starts PostgreSQL, Django at `http://localhost:8000`, and Next.js at
-**http://localhost:3000/ar**. The Compose setup is development-only; source files are
-mounted for reloads, the backend applies migrations when it starts, and the frontend
-reconciles its mounted `node_modules` with the committed lockfile before starting. Stop it
-with `docker compose down` (the database volume is preserved). To use the host-run workflow
-instead, or to create an Admin user, see [`docs/development.md`](docs/development.md).
-
-**English** switches to `/en`. Services come from the backend, never a bundled demo
-fallback. Import authored knowledge, complete independent Admin review and publish it
-through the normal workflow; empty or unavailable services are shown honestly. See
-[`frontend/README.md`](frontend/README.md) for configuration, case privacy, schema
-generation, unit/browser tests and deployment-security caveats. [`docs/ci-cd.md`](docs/ci-cd.md)
-describes the three required CI tracks. There is no production deployment automation
-for Django or Next.js.
+Services come from authored backend knowledge, never a bundled demo fallback. Empty or
+unavailable services are shown honestly; Service activation and publication are explicit.
 
 ## Production design
 

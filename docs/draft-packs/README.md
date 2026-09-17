@@ -1,11 +1,13 @@
 # Draft packs v1
 
-A draft pack is a versioned **staff authoring transport**, not a publication, verification,
-backup, public API response, or saved Anonymous Case. Generic import/export services have both
-Django management commands and a focused native Django Admin adapter: upload, inspect, then
-confirm draft import, with publication-readiness checks and stored-scenario previews. There is no
-new dashboard or free-form case simulator. Manual Admin editing and the existing deterministic
-research importers remain supported.
+A draft pack is a versioned **staff authoring transport**, not publication, verification, backup,
+a public API response or a saved Anonymous Case. Import/export through CLI or Django Admin;
+Admin also offers advisory readiness and stored-scenario previews, not a free-form simulator.
+Manual editing and deterministic research importers remain supported.
+
+**One pack imports one draft Procedure Version, not a whole Service.** Other procedures in that
+Service are untouched. Use this guide for pack preparation, inspection, confirmation and recovery;
+use the [editorial workflow](../editorial-process.md) for field meaning and human completion.
 
 ## Contract and supported inputs
 
@@ -81,20 +83,12 @@ parser, database-backed rule/reference checks, and production structural validat
 
 ## Staff permissions and accountability
 
-Use an existing, persisted, currently active staff account. The service reloads the actor from
-the database; caller-supplied or cached staff flags are not authority.
-
-| Operation | Required permissions |
-| --- | --- |
-| New draft | `knowledge.add_procedureversion` and `knowledge.change_procedureversion` |
-| Update draft | `knowledge.change_procedureversion` |
-| Create shared catalog rows | Corresponding `knowledge.add_<model>` for every new shared type |
-| Initial new-Service setup | `knowledge.add_servicequestion`, `knowledge.add_serviceprocedurecandidate`, `knowledge.add_servicecontradiction`, as applicable |
-| Either export | `knowledge.view_procedureversion` |
-
-Version permissions authorize the owned aggregate import; separate child change/delete permissions
-are not required by this service. This does not grant publication, review, verification, or general
-Admin access to those child models. `--actor` names the real operator; there is no second
+Use your own existing, persisted, currently active staff account. The service reloads permissions
+from the database, including on confirmation. Ask an operator for version add/change access for a
+new draft, change access for an update, view access for exports, and add access for any new shared
+catalog/setup types. The exact permission names and aggregate-versus-child authorization boundary
+are defined in the [Admin capability contract](../architecture/django-admin-lifecycle.md#generic-draft-pack-service-permissions).
+Import access does not grant publication, review, verification or ordinary child-model Admin access. `--actor` names the real operator; there is no second
 `--author` impersonation flag. The actor becomes accountable author for a new Review Policy;
 an existing author is retained. No users, approvals, publication actors/dates, trust metadata,
 scenario seals, or lifecycle state may be supplied in JSON.
@@ -127,24 +121,21 @@ be exported, not updated or previewed as drafts. Clone a successor through the e
 Downloads and standalone checks require version view permission; imports retain the aggregate
 permissions above, freshly checked again on confirmation.
 
-Choose one JSON file (at most 8 MiB), then **Inspect proposed changes**. Inspection runs the real
-import path and publication gates on the proposed state, detaches the result, and rolls back.
+Choose one JSON file (at most 8 MiB), then **Inspect proposed changes**. Inspection runs the import path and publication gates, then rolls back; sequences may advance.
 Review before/after values, deletions, shared/setup creations, trust/date resets, risk increases
-and stale scenarios. Nothing is saved; sequences may advance. Publication blockers do **not**
-prevent importing structurally valid incomplete research. Structural, authorization, history,
-identity and revision errors still prevent import. Consent explicitly to any displayed deletions,
+and stale scenarios. Publication blockers allow structurally valid incomplete research;
+structural, authorization, history, identity and revision errors prevent import. Consent explicitly to any displayed deletions,
 then use **Confirm draft import**. Success redirects to the draft; it never publishes or approves.
 
 With JavaScript, inspection retains the original File input and replaces only the rendered result;
 changing files clears the old inspection and discards obsolete responses. Without JavaScript,
 reselect the **same file** after inspection before confirming. Confirmation resends the file with a
 signed, 15-minute token bound to its exact bytes, current editor, route-selected target, deletion
-requirement and inspected live-state precondition. Even whitespace changes require reinspection.
-Tokens are stateless, **not one-use**: an unchanged receipt-proven exact retry within expiry may
-return `noop`. Confirmation rechecks permissions, draft identity, exported revision and live state.
-The conservative global precondition includes knowledge rows and readiness settings; unrelated
-edits can require reinspection (`stale_inspection`). A stale exported revision still requires a
-fresh export and human reconciliation, not merely a new inspection.
+requirement and inspected live-state precondition. Even whitespace changes invalidate inspection.
+Tokens are stateless, **not one-use**; exact retries within expiry follow the receipt rules below.
+Confirmation rechecks permissions, draft identity, exported revision and live state. Its global
+precondition includes knowledge rows and readiness settings, so unrelated edits can cause
+`stale_inspection`. See the [recovery table](#recovery-quick-reference) for next actions.
 
 The upload handler is installed before multipart/CSRF parsing; during parsing it bounds actual
 received file bytes and rejects extra files. Actual operations remain CSRF-protected. This is an application limit,
@@ -155,11 +146,10 @@ Only the small signed token crosses requests alongside the explicitly resubmitte
 
 ### Advisory readiness and stored-scenario previews
 
-Readiness identifies the current editor as **prospective publisher**, not a selectable actor.
-It evaluates the canonical core and configured publication gates, including dates, evidence,
-scenarios and mode-specific independent/specialist requirements. Lacking publish permission adds
-`missing_publish_permission` without suppressing other diagnostics. No blockers means advisory
-readiness for that editor at that moment, not approval; actual publication reruns all gates.
+Readiness checks the current editor as **prospective publisher** against all canonical gates,
+including dates, evidence, scenarios and mode-required reviews/specialists. Missing publish
+permission adds `missing_publish_permission` without suppressing other diagnostics. Readiness
+is advisory, not approval; publication reruns all gates.
 
 Readiness and scenario evaluation run only on explicit tool requests (and proposed-state readiness
 on inspection), not ordinary draft page loads or saves. **Preview stored scenarios** lists existing
@@ -237,17 +227,13 @@ but that does not make them editable; use Admin successor cloning, then export t
 `base_revision` is an opaque fingerprint of the complete relevant live state, not merely authored
 text or the review signature. It includes trust, seals, policy, approvals, evidence workflow and
 audit history, shared registries and dependency state. Conservative shared/global inputs mean an
-apparently unrelated catalog change can stale a pack. `stale_revision` requires a fresh export and
-human reconciliation, even if your text already matches. Do not replace the hash blindly.
+apparently unrelated catalog change can cause `stale_revision`, even if your text already matches.
 
-The sole stale/new-collision retry exception is the **exact normalized last successful request**
-(including its original base revision and explicit target choice), with an internal receipt whose
-post-import revision still matches the complete live state. It may return `noop` without replaying
-writes. Authorization and draft state are checked again. Different content/target, an older request,
-or any intervening fingerprinted change is not a proven retry. Dry-run never records a successful
-receipt. The small one-per-version receipt stores request/post-state hashes, not the raw pack;
-there is no stored upload archive or replacement audit history. Re-export after a successful write
-before preparing a different update.
+The sole stale/new-collision retry exception is the **exact normalized last successful request**,
+including original revision and target, whose receipt's post-import revision still matches live
+state. It may return `noop`; authorization and draft state are rechecked. Older requests or changed
+content, targets or fingerprinted state do not qualify. The one-per-version receipt stores hashes,
+not raw packs or replacement audit history; dry-run creates none. Re-export before a different update.
 
 ### Output and recovery
 
@@ -258,24 +244,31 @@ short stderr error. Argument-parser usage failures use Django's normal CLI handl
 
 Exports without `--output` emit the pack/context directly. With `--output`, they atomically create
 a new file and emit `{"status":"written","output":"..."}`; this means a file was written, not
-knowledge was changed. Existing files and symlinks are refused, with **no overwrite flag**. Use a
-new output path. In `export_draft_pack`, `--version ID` deliberately overrides Django's normally
+knowledge was changed. Existing files and symlinks are refused, with **no overwrite flag**. In `export_draft_pack`, `--version ID` deliberately overrides Django's normally
 reserved version-banner option and selects the knowledge version.
 
-Import and both exports acquire a fixed knowledge-table lock set using PostgreSQL
-`SHARE ROW EXCLUSIVE NOWAIT`. Acquisition is nonblocking; ordinary reads continue, but ordinary
-writers can wait while the authoring transaction holds the locks. A 750 ms local lock timeout
-bounds implicit lock waits, not total import duration, and remains active through an outermost
-commit. Existing knowledge rows receive nonblocking key-share locks, and the fresh actor row is
-locked, to protect deferred foreign-key checks. When called inside a larger transaction, these
-locks last until that outer transaction ends, although the caller's timeout is restored; keep
-outer transactions short. Exports are coherent multi-query snapshots under the same protection. `concurrent_edit` is retryable: let the competing transaction
-finish, reload/re-export as needed, and retry. This is a conservative low-volume MVP, not a promise
-of parallel bulk editing or a measured latency guarantee.
+During import/export, ordinary reads continue but writers may wait. If calling these tools inside
+an outer transaction, keep it short: locks persist until it ends. There is no total latency
+guarantee. For lock and timeout implementation, see
+[draft authoring transport](../architecture/production-backend.md#draft-authoring-transport);
+for retryable `concurrent_edit` and other failures, use the table below.
 
-`legacy_evidence_identity` means an Evidence Link has a blank legacy semantic ID. Assign a stable
-owner-scoped ID manually in Admin before export where lifecycle guards permit; for immutable
-material use the supported successor/manual path. Export never silently repairs the database.
+### Recovery quick reference
+
+| Situation | Safe next action |
+| --- | --- |
+| File changed, confirmation expired, or `stale_inspection` | Inspect the exact intended file again; recheck the new diff before confirming. Without JavaScript, reselect that same file. |
+| `stale_revision` | Export to a new file and reconcile your edits against current state. Do not paste in a replacement hash blindly. |
+| `concurrent_edit` | Let the competing transaction finish, then reload/re-export as needed and retry. |
+| Write response lost | Retry only the exact last request; `noop` requires a matching receipt and unchanged live state. Otherwise inspect/export current state before deciding what remains to do. |
+| `protected_history` | Use a successor or supported manual workflow; do not delete discrepancy/re-verification history. |
+| `risk_reduction` | Restore true risk flags; do not remove a risk to avoid specialist review. |
+| `legacy_evidence_identity` (blank Evidence Link ID) | Assign a stable owner-scoped ID in Admin where lifecycle guards permit; immutable material needs the supported successor/manual path. Export never repairs it silently. |
+| Export destination exists | Choose a new output filename; files and symlinks are never overwritten. |
+| Permission or structural diagnostic | Ask an operator for required access or correct the indicated field/reference. A new confirmation token cannot bypass validation. |
+
+Keep your reviewed local baseline and edited file for reconciliation; the server does not archive
+uploaded packs. Successful import still needs human completion below.
 
 ## Trust, history, and manual followups
 
@@ -294,8 +287,8 @@ contract. Shared Service Point material is never reset or rewritten.
 
 Edits **and deletions** affecting owners with discrepancy or re-verification workflow history
 are refused (`protected_history`). Historical overlays could otherwise apply old trust to changed
-meaning; imports cannot safely rewrite those overlays. Use a fresh successor or the supported
-manual workflow, never delete history to force an import. Approval/audit rows remain immutable
+meaning; imports cannot safely rewrite those overlays. Follow the recovery table above.
+Approval/audit rows remain immutable
 history, not silently regenerated approval for the new content. Signature-changing edits make
 prior approvals stale. Existing true risk flags cannot be cleared (`risk_reduction`).
 

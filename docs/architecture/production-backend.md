@@ -7,7 +7,7 @@
 
 Build a maintainable production backend for sourced, bilingual Egyptian administrative guidance without losing the determinism, evidence discipline, local uncertainty, and privacy boundaries established during the research-prototype phase.
 
-The first production system is a **Django/PostgreSQL modular monolith**. Django Admin is the initial research/editorial interface. Django Ninja exposes a small application interface to a separate Next.js web client.
+The production system is a **Django/PostgreSQL modular monolith**. Django Admin is the initial research/editorial interface. Django Ninja exposes a small application interface to a separate Next.js web client.
 
 ## System boundary
 
@@ -49,11 +49,9 @@ management commands are thin adapters. See
 public HTTP/API boundary or an opaque JSON persistence model. External-LLM preparation is
 untrusted research assistance, not runtime inference, automatic ingestion or verification.
 
-The service reloads a persisted active staff actor and checks version add/change or export view
-permissions, plus add permissions for new shared catalog/setup rows. Updates require an explicit
-draft target and complete-live-state fingerprint; shared definitions are compare-only. Initial
-Questions/selection/contradictions may only accompany a Service created in that transaction,
-never modify an existing Service even inactive. New Services/Facts remain inactive/unpublished.
+The [Admin lifecycle contract](django-admin-lifecycle.md) owns staff authorization and adapter
+behavior; [publication](knowledge-publication.md#production-import-lifecycle) owns the import/history
+boundary. Transport cannot publish, verify, activate or rewrite protected shared setup.
 
 Ordinary writers do not uniformly lock the owning version, so a fixed allowlist of knowledge
 tables is locked in `SHARE ROW EXCLUSIVE NOWAIT` mode for imports and coherent exports. Ordinary
@@ -70,16 +68,9 @@ trades concurrency for MVP correctness against existing model/Admin writes.
 
 Owns draft lifecycle, validation, review/approval records, atomic publication, withdrawal, re-verification workflow, and creation of immutable published snapshots. Publishing is a service operation, not a casual model-field edit.
 
-[ADR 0019](../adr/0019-use-explicit-solo-and-independent-publication-review-modes.md) defines the
-deployment-wide environment variable/Django setting `PROCEDURE_VERSION_REVIEW_MODE`: exactly
-`solo` or `independent` (default), invalid values fail closed. It replaces the unsupported
-`PROCEDURE_VERSION_REVIEWS_REQUIRED` toggle. Solo skips mandatory general approvals, permitting
-one accountable author/publisher with existing permissions. Independent requires the applicable
-fresh general approvals independent of author and publisher. Both require truthful Review Policy
-risk flags and fresh, eligible specialist approvals distinct from author and publisher for each
-configured risk; all other publication gates remain mandatory. Publish audits record applied mode
-and only actual eligible approvals consumed by it. Legacy events and withdrawal rows retain
-null/unrecorded mode; future mode changes never rewrite history or snapshots.
+[Knowledge publication](knowledge-publication.md) owns lifecycle and evidence gates;
+[review roles](procedure-version-review-roles.md) owns mode-specific approvals, independence,
+specialists and truthful audit history. These are one canonical publication path, not adapter policy.
 
 ### Planning
 
@@ -118,7 +109,7 @@ The production schema must be designed from the domain model rather than copied 
 
 ## Public application interface
 
-Version 1 exposes `GET /v1/services` and `POST /v1/planning`; the exact contract is in [`../api/v1.md`](../api/v1.md). Navigation includes only explicitly active Services (`Service.is_active` is the sole activation criterion) and bilingual titles. Planning consumes the caller's current source Facts, exact locale, and calendar evaluation date without a persisted Case. One complete read-only, repeatable-read PostgreSQL snapshot is materialized before pure planning starts.
+Version 1 exposes `GET /v1/services` and `POST /v1/planning`; the exact contract is in [`../api/v1.md`](../api/v1.md). Navigation includes only explicitly active Services (`Service.is_active` is the sole activation criterion) and bilingual titles. Planning consumes the caller's current source Facts, exact locale, and calendar evaluation date without a persisted Case. One coherent service-scoped read-only, repeatable-read PostgreSQL snapshot is materialized before pure planning starts; global integrity validation remains mandatory.
 
 The four public discriminators are `next_question`, `plan`, `inconclusive`, and `invalid`. Deterministic Fact derivation and contradiction rejection always precede Procedure selection, version resolution, version applicability, and Checklist Item assembly. A resolved applicable version returns a plan containing only factually applicable material permitted by shared trust/freshness semantics. Clients receive compact Source/freshness metadata but no rule ASTs, raw Facts, Evidence Links, internal discrepancies or rationale, publication actors, or Evaluation Traces.
 
@@ -138,30 +129,18 @@ plan dependencies or replace unknown guidance with a closest match.
 Navigation is loaded from the active-Service API, never a bundled fake catalog. Authored
 knowledge enters through manual Admin authoring, existing deterministic draft imports or the
 generic draft-pack CLI/native Admin adapter, followed by deployment-mode review and canonical
-publish as separate operations. The focused Admin flow is upload → inspect → confirm, with
-no-store JSON downloads, advisory publication readiness and stored-scenario bilingual preview;
-it is not a new dashboard or public/free-form simulation API. Service
-activation remains explicit and independent of publication. Empty navigation and unavailable services remain honest states, not demo
-fallbacks.
+publication as separate operations. Service activation remains explicit and independent of
+publication. Empty navigation and unavailable services remain honest states, not demo fallbacks.
 
 ### Private Admin authoring transport
 
-The [draft-pack adapter](../draft-packs/README.md#admin-upload-inspect-then-confirm) delegates to
-shared authoring/publication/planning services; no knowledge-domain dependency on the public API
-is introduced. The Admin adapter projects detached planning results through the existing public
-projection code without changing the public response schema. Checks run only on explicit requests
-and roll back speculative database effects. Inactive Services remain honestly inconclusive;
-preview never activates or reseals. Trusted custom gates must avoid irreversible external I/O.
-
-Uploads retain only a bounded request-local buffer, never a persistent raw-pack archive, session,
-cookie or browser-storage payload. A signed 15-minute exact-file/editor/target/precondition token
-requires explicit multipart resubmission. It is not one-use: unchanged receipt-proven retries
-may be no-ops. Conservative global state/settings changes can require reinspection. JavaScript
-retains the selected File input; the no-JavaScript path requires exact-file reselection. A custom
-handler installed before multipart/CSRF parsing enforces one file and at most 8 MiB received file
-bytes; actual operations remain CSRF-protected. This application limit does not prevent upstream
-buffering or replace ingress limits. All existing import authorization, revision/history protection
-and manual publication/activation boundaries remain intact.
+The [Admin adapter contract](django-admin-lifecycle.md#native-draft-pack-tools) defines upload,
+confirmation, explicit rollback-only checks and bounded request-local buffering; the
+[operator guide](../draft-packs/README.md#admin-upload-inspect-then-confirm) supplies the how-to.
+The adapter delegates to shared authoring/publication/planning services, without a knowledge-domain
+dependency on the public API. Detached preview results reuse public projection without changing
+the response schema. Raw packs are not a persistent archive, session, cookie or browser-storage
+payload; application limits do not replace ingress controls.
 
 ### Same-origin transport
 
@@ -241,6 +220,57 @@ applicable workflow reads in one outermost read-only, repeatable-read transactio
 nested transactions. The non-consistent loaders impose no transaction policy. No ORM objects or
 lazy relations cross into planning.
 
+Full loaders read all Fact definitions but expose only published definitions to planning snapshots.
+They materialize Services (including inactive ones), candidates, Questions, contradictions and
+published/withdrawn versions; drafts are excluded. Internal snapshot availability never authorizes
+public exposure: DTO projection is a separate whitelist boundary.
+
+Only `execute_planning` uses the service-scoped repeatable-read loader. It materializes the requested
+Service's Questions/candidates/contradictions, published/withdrawn versions, transitive blocking
+Procedure dependencies, guidance, evidence and routing graph. Dependency discovery uses batched
+Procedure frontiers and terminates cycles without changing the planner's one-level recursion policy.
+Fact acquisition remains global, with the same published-only planning boundary. The global
+integrity ledger remains scalar validation-only acquisition, not unrelated DTO construction:
+published rule decoding, evidence/Source
+presence, Basis/dependency/routing integrity, contradiction/Question Fact reachability and visible
+workflow owner resolution still fail closed globally. Graph-scoped overlays retain every historical
+event needed for as-of reconstruction and the full loader's visible-owner failure checks. Full
+loaders remain available to callers needing the complete catalog.
+
+### Shared request-time validation policy
+
+`knowledge.snapshot_policy` owns core → Basis → dependency → routing validation over captured typed
+plain rows, explicit Fact definitions and lightweight Evidence Link summaries. It returns decoded
+rules keyed by structural identity or raises `KnowledgeSnapshotLoadError` (also exported from
+`knowledge.domain`). Diagnostic owner text is not identity; owner sorting and same-owner diagnostic
+order are preserved. Failure in one stage prevents later stages from running.
+
+Full materializers validate their captured rows before constructing each stage's DTOs.
+`knowledge.snapshot_validation` acquires global scalar rows for scoped loads and calls the same
+policy. This shares decisions, not read strategies: scoped loads repeat selected checks after
+global validation; full loads do not gain a global preflight. Core/routing Evidence Link owner
+precedence stays distinct; Basis/dependency reverse relations stay independent. Workflow ownership,
+temporal overlays and publication-only gates remain outside this policy. Preserved edge cases are
+recorded in [snapshot validation follow-ups](../operations/snapshot-validation-follow-ups.md).
+
+### Date-aware evidence trust projection
+
+`knowledge.evidence_trust_projection.project_evidence_trust(snapshot, ordered_history)` performs
+pure temporal replay and detached rewriting for all eight claim/material owner types. Records carry
+structural owner identities, not ORM objects or editorial rationale. Open-discrepancy precedence and
+verification-date handling are shared; authored values, rules, text and provenance stay unchanged.
+
+`knowledge.evidence_workflow_temporal` retains PostgreSQL acquisition and public loader entry points.
+It filters by evaluation date and optional Evidence Link scope using PostgreSQL active-timezone
+calendar semantics, not a second Python date filter. It eagerly reads transitions then reviews and
+orders their combined history by timestamp, discrepancy before review, then within-kind primary key.
+After both reads, it resolves one preloaded owner and immediately replays that record before resolving
+the next: eager history consumption would change failure order. Pure replay consumes history once,
+without re-sorting or dropping owners absent from the snapshot. Workflow ownership precedence,
+global visible-owner validation and transaction policy remain intact. Generic semantic loaders have
+no workflow projection, and no alternative latest-state path exists. Compatibility observations are
+recorded in [evidence projection follow-ups](../operations/evidence-projection-follow-ups.md).
+
 ## Privacy and observability
 
 - Do not persist raw Anonymous Case Facts in version 1.
@@ -274,11 +304,13 @@ Keep the first production deployment operationally simple.
 - Do not introduce a mandatory paid SaaS dependency for core application behavior in the initial release.
 - Use Django's built-in authentication/authorization for staff/admin unless a demonstrated requirement justifies another system.
 - Background work should be introduced only for concrete needs such as scheduled re-verification or notifications; publication itself remains a synchronous transactional operation.
-- Deployment provider and production topology are intentionally not fixed by this document. They should be chosen when the deployable Django/Next.js applications exist.
+- Deployment provider and production topology are intentionally not fixed by this document; deployment procedures belong in the operations guides.
 
 ## Testing strategy
 
-Production tests replace prototype implementation tests over time, but the prototype remains a reference during parity work.
+Production acceptance tests are the living behavioral authority after completed parity work
+([ADR 0018](../adr/0018-retire-research-prototype.md)); the retired prototype is historical evidence
+in Git, not a second executable test suite.
 
 The backend requires:
 
@@ -305,7 +337,7 @@ Test settings may explicitly omit the review gate to isolate unrelated validatio
 not a production off mode. Review integration tests must exercise both modes and specialist and
 audit invariants with the gate present.
 
-## Explicit exclusions for the first backend milestone
+## Version 1 exclusions
 
 - microservices;
 - event sourcing;

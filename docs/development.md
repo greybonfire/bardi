@@ -85,31 +85,19 @@ PROCEDURE_VERSION_REVIEW_MODE=solo
 
 Export the updated file for host commands and restart Django; for Compose, recreate the backend
 container so it receives the new environment (`docker compose up -d --force-recreate backend`).
-In solo, name yourself as accountable author in the Review Policy and publish ordinary drafts
-with your existing permissions. No general approvals, self-approval forms, or account switching
-are needed. Optional independent general reviews remain history but are not consumed.
+When the team joins, set `PROCEDURE_VERSION_REVIEW_MODE=independent`
+across the deployment and restart/recreate all backend processes.
 
-Always configure high-risk flags truthfully. Every legal, military, custody/guardianship, or
-contested-identity flag still requires a fresh, permission-eligible specialist distinct from both
-author and publisher. Without a real specialist, leave that content unpublished; never clear a
-risk to bypass policy. Evidence/trust/scenario/domain/bilingual/effective-date gates remain active.
-
-When the team joins, set `PROCEDURE_VERSION_REVIEW_MODE=independent` across the deployment and
-restart/recreate all backend processes. Future attempts then require fresh, eligible general
-dimension approvals (including discrepancy as applicable), independent of author and publisher,
-as well as applicable specialists. The author may still publish. Existing snapshots and audit
-history are not rewritten: new publish events record applied mode and only actual approvals
-consumed; legacy events and withdrawal rows retain null/unrecorded mode.
+Solo does not bypass specialist safety: keep risk flags truthful and high-risk content unpublished
+without eligible specialists independent of author and publisher.
 
 Remove `PROCEDURE_VERSION_REVIEWS_REQUIRED` from old configuration; it is no longer supported and
 there is no production off mode. Test-only settings isolate unrelated tests by explicitly omitting
 the review gate, not by disabling production review policy.
 
-This policy/audit boundary was established by
-[ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md). PR2 also
-established the generic draft-pack CLI below. Native Admin upload/inspection/confirmation,
-publication-readiness checks and stored-scenario previews are now available; manual Admin
-authoring and deterministic imports remain available.
+See the [review-mode contract](architecture/procedure-version-review-roles.md#deployment-review-mode)
+and [editor workflow](editorial-process.md#solo-now-independent-when-the-team-joins)
+for policy, approvals and audit behavior.
 
 ## Frontend setup
 
@@ -128,11 +116,11 @@ link switches to the corresponding English (LTR) page. Next reads its own
 `BARDI_API_ORIGIN=http://127.0.0.1:8000` and SEO origin
 `BARDI_SITE_ORIGIN=http://localhost:3000`; do not copy backend secrets into it.
 
-Use the committed npm lock with `npm ci`. npm 10 encountered an Arborist bug during
-dependency updates; npm 11 installed the current lock. For dependency upgrades use npm 11,
-e.g. `(cd frontend && npx --yes npm@11 install <package>@<version>)`; no global npm upgrade
-is required. See [`frontend/README.md`](../frontend/README.md) for configuration and the
-complete frontend scope, security boundaries and test coverage.
+Use the committed npm lock with `npm ci`; use npm 11 for dependency upgrades,
+e.g. `(cd frontend && npx --yes npm@11 install <package>@<version>)`. No global npm upgrade
+is required. Do not assume disabling install scripts is safe without running the complete
+frontend checks. See [`frontend/README.md`](../frontend/README.md) for configuration,
+UX and privacy/security boundaries.
 
 The Service directory is loaded from the backend, not bundled fake data. Only explicitly
 active Services are listed; publication alone does not activate one. Use the imports below
@@ -142,48 +130,20 @@ states, not a switch to a demo catalog or sample plan.
 
 ## Generic draft-pack authoring
 
-See [draft packs v1](draft-packs/README.md) for the exact schema, supported synthetic example,
-[external-LLM prompt](draft-packs/llm-prompt.md), permission matrix and safe update roundtrip.
+Draft packs transport research into unpublished drafts. Start with the operator guide's
+[CLI research/dry-run/write workflow](draft-packs/README.md#cli-research-dry-run-then-write),
+[update roundtrip](draft-packs/README.md#update-roundtrip-and-deletion-consent) and
+[output/recovery guidance](draft-packs/README.md#output-and-recovery).
 Use the host-run setup above and apply pending branch migrations to your chosen local database
 before database-backed commands; adding this feature does not automatically migrate an existing
 host-run database or update its `.env`. No production migration is authorized by these examples.
 
-With a real active staff `EDITOR` holding the required permissions, run from the repository root:
-
-```bash
-uv run python backend/manage.py export_draft_context --actor EDITOR \
-  --output /tmp/bardi-context.json --settings=bardi.settings.development
-uv run python backend/manage.py import_draft_pack docs/draft-packs/examples/minimal-research.json \
-  --new --actor EDITOR --dry-run --settings=bardi.settings.development
-uv run python backend/manage.py export_draft_pack --version DRAFT_ID --actor EDITOR \
-  --output /tmp/bardi-draft.json --settings=bardi.settings.development
-```
-
-The last command requires an existing version: dry-run creates none. Remove `--dry-run` only
-after inspecting the result on a disposable development database. The example creates an inactive
-Service and unpublished source Fact, not usable government guidance. Exports refuse existing
-output paths; there is no overwrite flag. For `export_draft_pack`, `--version ID` selects knowledge
-and intentionally overrides Django's usual version-banner option.
-
-For updates preserve the exported fingerprint, use `--target-version DRAFT_ID` instead of `--new`,
-and add `--allow-deletions` only for reviewed intended deletions. Existing Service setup is
-protected even inactive; imports cannot verify, approve, publish, clear risks or rewrite evidence
-workflow history. Finish manual Admin followups. `concurrent_edit` means retry after competing
-work finishes; conservative fingerprints may require re-export/reconciliation. The short
-knowledge-table locks used by import/export permit ordinary reads but can briefly delay writers.
-
 ### Native Admin draft-pack workflow
 
-With the backend running, open `/admin/knowledge/procedureversion/`. Use **Import research draft**
-or **Download incomplete research template**. Existing draft pages provide **Draft-pack tools**
-for export/context downloads, targeted import, **Check publication readiness as current editor**
-and **Preview stored scenarios**. See [the operator guide](draft-packs/README.md#admin-upload-inspect-then-confirm)
-for exact routes, permissions, 15-minute exact-file confirmation and manual followups. No new
-migration, dashboard, public endpoint or Next.js change is required by this adapter.
-
-Inspection is rollback-only and permits incomplete research despite publication blockers. Checks
-are explicitly requested, not run on ordinary page loads/saves. Preview uses stored scenarios and
-displays Arabic/English production projections without activation, publication or resealing.
+Open `/admin/knowledge/procedureversion/` for **Import research draft** and template downloads;
+existing drafts expose **Draft-pack tools**. Follow the operator guide for
+[upload/inspection/confirmation](draft-packs/README.md#admin-upload-inspect-then-confirm) and
+[advisory readiness/scenario previews](draft-packs/README.md#advisory-readiness-and-stored-scenario-previews).
 The runtime template is `backend/knowledge/draft_pack_template.json` (the backend image does not
 copy `docs/`); its regression test requires equality with the documented synthetic example.
 
@@ -212,7 +172,7 @@ application database is not needed. With `.env` values exported and PostgreSQL r
 unique unused test database name for parallel work (do not use `--keepdb`):
 
 ```bash
-(cd backend && POSTGRES_DB=bardi_task3_docs_probe uv run python manage.py test \
+(cd backend && POSTGRES_DB=bardi_draft_pack_checks uv run python manage.py test \
   knowledge.tests.test_draft_pack_inspection knowledge.tests.test_draft_preview \
   knowledge.tests.test_draft_pack_admin --settings=bardi.settings.test --noinput)
 ```
@@ -240,12 +200,8 @@ uv run python backend/manage.py import_passport_renewal --author <username> \
   --settings=bardi.settings.development
 ```
 
-A rerun returns the identical draft and rejects semantic conflicts. In `independent`, eligible staff
-approve evidence/source, rule/logic, scenario/behavior, bilingual-semantic, and applicable
-discrepancy dimensions. Solo skips those general approvals. In both modes, an independent military
-specialist must approve the military risk. The publisher (who may be the author, but cannot supply
-consumed approvals) finally uses the Procedure Version **publish selected** action. Import,
-review, specialist approval, and canonical publish are intentionally separate operations.
+A rerun returns the identical draft and rejects semantic conflicts. Its military risk requires an
+independent military specialist in both review modes; import is not review or publication.
 
 ## National-ID-renewal knowledge import and review
 
@@ -259,11 +215,8 @@ uv run python backend/manage.py import_national_id_renewal --author <username> \
 
 The command does not create users, approvals, or publication metadata. A rerun returns the
 identical draft and rejects planning, scenario, provenance, trust, source, and review-policy
-semantic drift. In `independent`, eligible independent staff review the normal evidence/source,
-rule/logic, scenario/behavior, and bilingual-semantic dimensions (and discrepancy as applicable).
-In `solo`, those general approvals are skipped. A permitted publisher, who may be the author,
-then uses the canonical Procedure Version **publish selected** action. The imported ordinary fee remains an
-explicit unknown value, the previous-card research lead remains needs-reverification, and exact
+semantic drift. The imported ordinary fee remains an explicit unknown value, the previous-card
+research lead remains needs-reverification, and exact
 office routing remains unresolved until stronger current evidence is authored.
 
 ## Temporary family-exemption knowledge import and review
@@ -288,15 +241,13 @@ The import deliberately preserves the research limits: it does not invent the un
 incapable-brother semantics, exact Basis-specific document lists, a fee amount, nationwide or
 nearest-region routing, a direct prerequisite, or compatibility aliases. The only imported
 jurisdiction mappings are the researched Giza, Mansoura, and Zagazig recruitment regions.
-In `independent`, independent staff review evidence/source, rule/logic, scenario/behavior, and
-bilingual-semantic dimensions (and discrepancy as applicable); solo skips these general approvals.
-Because the review policy flags both legal and military risk, fresh eligible legal and military
-specialist approvals distinct from author and publisher are required in **both modes** before the
-canonical Procedure Version **publish selected** action. Without specialists, keep both drafts
-unpublished.
+Both drafts flag legal and military risk and require eligible independent specialists for both
+in either review mode. Without specialists, keep both drafts unpublished.
 
-The backend's trusted HTTPS ingress, proxy-header, HSTS and rate-limit requirements are
-in [`operations/private-pilot.md`](operations/private-pilot.md). The Next integration does
+The backend's trusted HTTPS ingress, proxy-header, HSTS and rate-limit requirements, plus
+[backup](operations/private-pilot.md#backup-policy) and
+[restore procedures](operations/private-pilot.md#restore-procedure), are in
+[`operations/private-pilot.md`](operations/private-pilot.md). The Next integration does
 not provision or replace them: only the two public `/v1` routes are proxied, without browser
 cookies, credentials or forwarded client IP headers. Django normally sees a shared Next
 proxy IP, so hardened edge rate limits and privacy-safe logging remain required. Production
@@ -352,6 +303,25 @@ On Linux CI, browser installation uses `npx playwright install --with-deps chrom
 PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/absolute/path/to/chromium \
   npm --prefix frontend run test:e2e
 ```
+
+Servers are not reused. If port 8451 is occupied, set `BARDI_E2E_API_PORT=8471` for
+`test:e2e` and use `BARDI_API_ORIGIN=http://127.0.0.1:8471` for its build. CI uses 8451.
+
+For visual inspection after the browser-test build, start these in two terminals from
+`frontend/` (with the default API port free):
+
+```bash
+node --experimental-strip-types e2e/api-stand-in.mjs
+```
+
+```bash
+BARDI_API_ORIGIN=http://127.0.0.1:8451 BARDI_SITE_ORIGIN=http://localhost:3010 \
+  npm run start -- --port 3010
+```
+
+Open `http://localhost:3010/ar` or `/en`. Follow `frontend/e2e/fixtures.mjs` and use
+`TEST-ONLY-NOTE`, never personal information. Stop both processes before Playwright,
+which needs to own the same ports.
 
 Use only synthetic cases for browser tests and debugging; do not publish traces, screenshots
 or other artifacts containing real case data. This browser suite does not replace the
@@ -438,60 +408,9 @@ must use separate database connections; SQLite is not a supported substitute.
 
 ## Service-scoped loader measurement
 
-Issue #119 includes a self-contained disposable PostgreSQL probe. It creates its own namespaced
-requested published graph, unrelated published graphs, authoring-draft graphs with evidence,
-and unrelated semantic-preserving workflow history; no pre-existing `issue119.requested`
-service or custom Fact is required.
-
-```bash
-# Create and migrate a disposable database using the local PostgreSQL service.
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d postgres \
-  -c 'CREATE DATABASE bardi_issue119_repair_probe'
-POSTGRES_DB=bardi_issue119_repair_probe uv run python backend/manage.py migrate \
-  --settings=bardi.settings.test --noinput
-
-# Seed, compare, and clean each unchanged generated dataset.
-PYTHONPATH=backend POSTGRES_DB=bardi_issue119_repair_probe \
-  uv run python tools/measure_service_scoped_snapshot.py \
-  --facts '{"application_location":"inside_egypt"}' --locale en \
-  --evaluation-date 2026-12-31 --scales 0,100,500 \
-  --settings bardi.settings.test
-```
-
-The probe reports exact queryset-equivalent global validation row sets, SQL count, detached
-object counts, elapsed time, full/scoped workflow rows, shared Fact-registry rows, requested
-Graph rows, unrelated materialized rows, and full/scoped response equality. Each generated
-published anchor carries two discrepancy-transition rows (open/resolved) and two repeated
-re-verification rows, so event rows are distinguishable from unique workflow owners. It removes
-the namespaced generated rows after each scale and vacuums/analyzes the disposable database so
-sequential scales do not measure deleted-row bloat. If interrupted, drop the disposable database
-rather than running it against a shared catalog:
-
-```bash
-docker compose exec -T postgres psql -U "$POSTGRES_USER" -d postgres \
-  -c 'DROP DATABASE bardi_issue119_repair_probe'
-```
-
-The 2026-09-10 run produced:
-
-| unrelated published / draft graphs | workflow event rows | validation rows | full SQL / scoped SQL | full detached rows | scoped detached rows | full workflow rows / scoped workflow rows | responses match | full ms / scoped ms |
-| ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: | ---: |
-| 1 / 1 | 0 | 56 | 23 / 48 | 56 | 46 | 0 / 0 | yes | 123.241 / 214.902 |
-| 101 / 101 | 400 | 1556 | 23 / 49 | 1056 | 46 | 400 / 0 | yes | 261.890 / 229.722 |
-| 501 / 501 | 2000 | 7556 | 23 / 49 | 5056 | 46 | 2000 / 0 | yes | 554.380 / 333.168 |
-
-For the 101/101 and 501/501 rows, the validation event breakdown is respectively
-`200/200/100` and `1000/1000/500` for transition rows/re-verification rows/unique owner rows.
-
-These are single-run elapsed observations, not a capacity benchmark or a query-count-only
-performance claim. Global validation remains intentionally row-linear and is reported honestly;
-draft graph
-and evidence rows are excluded from published/withdrawn validation and scoped DTO materialization.
-The validation event counts include every matching history row, while `workflow_owner_rows` is the
-unique anchor-owner read used for owner resolution.
-The generated workload is synthetic and does not replace imported-family acceptance coverage.
-The complete raw result, including per-queryset counts and limitations, is preserved at
-[`docs/operations/issue-119-loader-measurement-2026-09-09.json`](operations/issue-119-loader-measurement-2026-09-09.json).
+The historical issue #119 probe commands, 2026-09-10 results, limitations and linked raw
+JSON are preserved in the [loader performance baseline](operations/loader-performance-baseline.md).
+This synthetic disposable-database probe is not a routine setup or acceptance check.
 
 ## Teardown
 

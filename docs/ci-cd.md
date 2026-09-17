@@ -50,16 +50,10 @@ Django Ninja API declarations, but build OpenAPI entirely in memory without a da
 connection, migrations or production settings/secrets. No backend test groups are duplicated
 in this job.
 
-The schema-drift gate runs from the repository root:
-
-```bash
-uv run python tools/export_web_api.py --check
-npm --prefix frontend run api:generate
-git diff --exit-code -- frontend/api-schema.json frontend/src/api/generated.d.ts
-```
-
-The snapshot must match the backend declarations, and regenerating types must leave the
-committed files unchanged. Runtime response schemas are also checked against the generated
+The schema-drift gate follows the
+[local API schema checks](development.md#frontend-checks-and-api-schema): the snapshot
+must match backend declarations, and regenerating types must leave both
+`frontend/api-schema.json` and `frontend/src/api/generated.d.ts` unchanged. Runtime response schemas are also checked against the generated
 types by `npm --prefix frontend run typecheck`. An intentional API change includes both
 regenerated files, not just a manually patched TypeScript declaration.
 
@@ -71,12 +65,12 @@ do not establish Django/PostgreSQL correctness or replace the backend's research
 acceptance coverage. The workflow uploads no browser traces, screenshots, videos or reports.
 Do not add artifacts or telemetry containing real case data.
 
-See [`frontend/README.md`](../frontend/README.md) for current test scope and local commands,
-including managed Chromium or `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for an existing local
-browser. Dependency upgrades can use npm 11 through `npx` without a global install: npm 10
-encountered an Arborist dependency-update bug, while npm 11 installed the current lock.
-CI uses ordinary locked `npm ci`; disabling install scripts is not assumed safe without
-verifying the complete frontend checks.
+See [development checks](development.md#frontend-checks-and-api-schema) for local commands,
+including managed Chromium or `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` for an existing browser,
+and [`frontend/README.md`](../frontend/README.md#regression-scope) for coverage limitations.
+The Frontend job also runs the database-free Admin draft-pack JavaScript regressions.
+Dependency-upgrade guidance lives in [frontend setup](development.md#frontend-setup);
+CI uses ordinary locked `npm ci`.
 
 ### Development Compose gate
 

@@ -154,8 +154,9 @@ Future-effective published versions are permitted. At most one published version
 ## Draft editing
 
 Editors work on drafts through Django Admin, deterministic research importers, or the
-[versioned draft-pack CLI](../draft-packs/README.md). Generic pack import is authoring only,
-not publication preview or verification; PR3 Admin pack-upload/preview is not implemented.
+[versioned draft-pack CLI or native Admin adapter](../draft-packs/README.md). Generic pack import
+is authoring only, not verification or publication. The Admin adapter adds rollback-only proposed
+change inspection, advisory publication readiness and bilingual stored-scenario preview.
 
 A draft may be created from scratch or cloned from an existing published version. Cloning copies the coherent version-owned records into new editable draft records; it does not reopen the published version for mutation.
 
@@ -350,7 +351,27 @@ coherent reads and revision checks against ordinary writers, returning retryable
 history, not just authored text. A small internal last-request/post-revision hash receipt
 permits only proven unchanged exact retries; no raw uploaded pack is stored. See the
 [operator guide](../draft-packs/README.md) for stale revisions, deletion consent and permissions.
-PR3 Admin upload/preview and publication-diagnostics UI are not included.
+The native Admin adapter now exposes upload → inspect → confirm and downloads on Procedure
+Version pages. Inspection applies the real importer speculatively, captures changes and canonical
+publication diagnostics, then rolls back; incomplete but structurally valid drafts remain
+importable. Confirmation reauthorizes and checks both exported revision and conservative global
+inspection precondition. Its signed 15-minute exact-file token is stateless, not one-use; only a
+receipt-proven unchanged exact retry may bypass stale precondition as a no-op.
+
+Stored draft readiness uses the current editor as prospective publisher and reports
+`missing_publish_permission` while still running all core/configured gates and mode-specific review
+decision validation. No blockers is advisory, not publication or approval. Independent specialist
+requirements for all configured risks remain intact. Gates run inside rollback boundaries;
+trusted custom gates must not perform irreversible external I/O.
+
+Readiness and selected stored-scenario runs require explicit requests, not ordinary Admin loads
+or saves. Preview shares the production date-aware snapshot/decoder/planner and renders both
+Arabic RTL and English LTR guidance. Stale seals are reported independently of expectation match;
+stale-but-valid scenarios can run without resealing. Invalid scenarios, overlapping published
+versions and execution failures yield unavailable previews, not false success. Inactive Services
+remain inactive and honestly inconclusive. Temporary draft lifecycle exposure is rolled back;
+Facts, trust, reviews, audit history and scenario seals are not changed. Actual publication still
+runs its canonical locked validation and audit path.
 
 The passport importer recognizes only its exact legacy, pre-checklist-Question, and
 pre-Fee-Question scenario seals. After all other integrity checks pass, rerunning it upgrades an

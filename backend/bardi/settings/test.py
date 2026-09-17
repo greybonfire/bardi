@@ -8,6 +8,7 @@ DEBUG = False
 ALLOWED_HOSTS = ["testserver", "localhost", "127.0.0.1"]
 CSRF_TRUSTED_ORIGINS = env_list("CSRF_TRUSTED_ORIGINS")
 DATABASES = {"default": postgres_database()}
+TEST_RUNNER = "bardi.testing.FreshDatabaseRunner"
 
 # Existing feature-isolation tests author deliberately skeletal Procedure Versions. Selection,
 # scenario, and review publication coverage opt back in explicitly so those tests do not need

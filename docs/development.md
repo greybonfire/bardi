@@ -107,8 +107,9 @@ the review gate, not by disabling production review policy.
 
 This policy/audit boundary was established by
 [ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md). PR2 also
-supports the generic draft-pack CLI below; manual Admin authoring and deterministic imports
-remain available. PR3 Admin pack-upload/preview is not implemented.
+established the generic draft-pack CLI below. Native Admin upload/inspection/confirmation,
+publication-readiness checks and stored-scenario previews are now available; manual Admin
+authoring and deterministic imports remain available.
 
 ## Frontend setup
 
@@ -171,6 +172,21 @@ workflow history. Finish manual Admin followups. `concurrent_edit` means retry a
 work finishes; conservative fingerprints may require re-export/reconciliation. The short
 knowledge-table locks used by import/export permit ordinary reads but can briefly delay writers.
 
+### Native Admin draft-pack workflow
+
+With the backend running, open `/admin/knowledge/procedureversion/`. Use **Import research draft**
+or **Download incomplete research template**. Existing draft pages provide **Draft-pack tools**
+for export/context downloads, targeted import, **Check publication readiness as current editor**
+and **Preview stored scenarios**. See [the operator guide](draft-packs/README.md#admin-upload-inspect-then-confirm)
+for exact routes, permissions, 15-minute exact-file confirmation and manual followups. No new
+migration, dashboard, public endpoint or Next.js change is required by this adapter.
+
+Inspection is rollback-only and permits incomplete research despite publication blockers. Checks
+are explicitly requested, not run on ordinary page loads/saves. Preview uses stored scenarios and
+displays Arabic/English production projections without activation, publication or resealing.
+The runtime template is `backend/knowledge/draft_pack_template.json` (the backend image does not
+copy `docs/`); its regression test requires equality with the documented synthetic example.
+
 ### Draft-pack contract checks
 
 Schema generation/parsing needs no PostgreSQL:
@@ -190,6 +206,28 @@ exported environment values and PostgreSQL, using a disposable Django test datab
   --settings=bardi.settings.test --noinput)
 ```
 
+Focused Admin/inspection/readiness/scenario regressions use Django's test runner, which creates
+its disposable test database through PostgreSQL's maintenance connection; a pre-created base
+application database is not needed. With `.env` values exported and PostgreSQL running, choose a
+unique unused test database name for parallel work (do not use `--keepdb`):
+
+```bash
+(cd backend && POSTGRES_DB=bardi_task3_docs_probe uv run python manage.py test \
+  knowledge.tests.test_draft_pack_inspection knowledge.tests.test_draft_preview \
+  knowledge.tests.test_draft_pack_admin --settings=bardi.settings.test --noinput)
+```
+
+These tests cover transactional rollback, stale state, publication policy, stored scenarios,
+authorization, CSRF, upload limits and token binding. Dependency-free JavaScript VM regressions
+require Node 22 and run from the repository root without PostgreSQL or npm installation:
+
+```bash
+node --test backend/knowledge/tests/draft_pack_admin.test.cjs
+```
+
+Neither Django tests nor these VM regressions are real-browser checks. Separately check
+retained-file inspection/confirmation, file-change
+invalidation, no-JavaScript reselection, and Arabic RTL/English LTR desktop/mobile rendering.
 These scoped checks do not replace the complete backend delivery suite below.
 
 ## Passport-renewal knowledge import and review
@@ -339,7 +377,16 @@ Run the complete checks with PostgreSQL available:
 Database-backed Django commands require the exported `.env` values and a running local
 PostgreSQL service. The `manage.py test` commands below create and destroy disposable test
 databases; the `manage.py migrate` commands below target the configured `POSTGRES_DB`. Do not
-use `--keepdb` for lifecycle-isolation checks.
+use `--keepdb`: test settings select `bardi.testing.FreshDatabaseRunner`, which rejects it
+before database setup. Choose a unique unused `POSTGRES_DB` for concurrent runs (Django adds
+`test_`). During fresh creation only, a temporary knowledge `post_migrate` receiver disables
+regular autovacuum on disposable `knowledge_` tables and their TOAST tables before parallel
+cloning; clones inherit these options. Rollback-heavy tests otherwise race autovacuum's
+`ShareUpdateExclusiveLock` against the production NOWAIT snapshot lock. Explicit competing
+maintenance/writer locks still fail normally: there are no production retries or lock changes.
+The receiver is removed even on setup failure; later migration tests, ordinary settings and
+application databases are unaffected. PostgreSQL's emergency anti-wraparound vacuum is not
+disabled. Disposable databases must be destroyed, not reused for long-running workloads.
 
 The combined backend discovery suite is supported from the `backend/` directory:
 

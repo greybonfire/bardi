@@ -1,9 +1,10 @@
 # Draft packs v1
 
 A draft pack is a versioned **staff authoring transport**, not a publication, verification,
-backup, public API response, or saved Anonymous Case. PR2 provides generic import/export services
-and Django management commands. Admin upload, preview, and publication-diagnostics UI are PR3
-work and are **not implemented here**. Manual Admin editing and the existing deterministic
+backup, public API response, or saved Anonymous Case. Generic import/export services have both
+Django management commands and a focused native Django Admin adapter: upload, inspect, then
+confirm draft import, with publication-readiness checks and stored-scenario previews. There is no
+new dashboard or free-form case simulator. Manual Admin editing and the existing deterministic
 research importers remain supported.
 
 ## Contract and supported inputs
@@ -97,6 +98,85 @@ Admin access to those child models. `--actor` names the real operator; there is 
 `--author` impersonation flag. The actor becomes accountable author for a new Review Policy;
 an existing author is retained. No users, approvals, publication actors/dates, trust metadata,
 scenario seals, or lifecycle state may be supplied in JSON.
+
+## Admin: upload, inspect, then confirm
+
+Open **Procedure versions** at `/admin/knowledge/procedureversion/`:
+
+- **Download incomplete research template** downloads the supported synthetic example, not
+  publication-ready guidance (`draft-pack/template/`).
+- **Download global vocabulary context** downloads read-only context before any version exists
+  (`draft-pack/context/`), for external-LLM drafting alongside the template.
+- **Import research draft** selects a new draft, never an existing target implicitly
+  (`draft-pack/import/`).
+
+An existing version's change page has **Draft-pack tools**. Routes below are relative to
+`/admin/knowledge/procedureversion/<object_id>/`, where `object_id` is the Admin database ID:
+
+| Tool label | Route |
+| --- | --- |
+| Export authoring pack with revision | `draft-pack/export/` |
+| Download read-only vocabulary context | `draft-pack/context/` |
+| Inspect import into [semantic ID] | `draft-pack/import/` |
+| Check publication readiness as current editor | `draft-pack/readiness/` |
+| Preview stored scenarios | `draft-pack/scenarios/` |
+
+Exports are JSON attachments with `Cache-Control: no-store`. The version-specific context selects this version's
+Service setup but retains global shared vocabulary; it is not importable. Finalized versions can
+be exported, not updated or previewed as drafts. Clone a successor through the existing action.
+Downloads and standalone checks require version view permission; imports retain the aggregate
+permissions above, freshly checked again on confirmation.
+
+Choose one JSON file (at most 8 MiB), then **Inspect proposed changes**. Inspection runs the real
+import path and publication gates on the proposed state, detaches the result, and rolls back.
+Review before/after values, deletions, shared/setup creations, trust/date resets, risk increases
+and stale scenarios. Nothing is saved; sequences may advance. Publication blockers do **not**
+prevent importing structurally valid incomplete research. Structural, authorization, history,
+identity and revision errors still prevent import. Consent explicitly to any displayed deletions,
+then use **Confirm draft import**. Success redirects to the draft; it never publishes or approves.
+
+With JavaScript, inspection retains the original File input and replaces only the rendered result;
+changing files clears the old inspection and discards obsolete responses. Without JavaScript,
+reselect the **same file** after inspection before confirming. Confirmation resends the file with a
+signed, 15-minute token bound to its exact bytes, current editor, route-selected target, deletion
+requirement and inspected live-state precondition. Even whitespace changes require reinspection.
+Tokens are stateless, **not one-use**: an unchanged receipt-proven exact retry within expiry may
+return `noop`. Confirmation rechecks permissions, draft identity, exported revision and live state.
+The conservative global precondition includes knowledge rows and readiness settings; unrelated
+edits can require reinspection (`stale_inspection`). A stale exported revision still requires a
+fresh export and human reconciliation, not merely a new inspection.
+
+The upload handler is installed before multipart/CSRF parsing; during parsing it bounds actual
+received file bytes and rejects extra files. Actual operations remain CSRF-protected. This is an application limit,
+not a guarantee against earlier proxy/server buffering; configure upstream limits separately.
+The bounded request-local buffer is not persistent staging. Raw packs are never retained in
+sessions, cookies, browser storage or a server upload archive, nor embedded in confirmation fields.
+Only the small signed token crosses requests alongside the explicitly resubmitted file.
+
+### Advisory readiness and stored-scenario previews
+
+Readiness identifies the current editor as **prospective publisher**, not a selectable actor.
+It evaluates the canonical core and configured publication gates, including dates, evidence,
+scenarios and mode-specific independent/specialist requirements. Lacking publish permission adds
+`missing_publish_permission` without suppressing other diagnostics. No blockers means advisory
+readiness for that editor at that moment, not approval; actual publication reruns all gates.
+
+Readiness and scenario evaluation run only on explicit tool requests (and proposed-state readiness
+on inspection), not ordinary draft page loads or saves. **Preview stored scenarios** lists existing
+scenarios; **Preview [name]** runs the selected scenario via `?scenario=<scenario_id>`. There is no
+free-form Fact entry. It uses the stored synthetic source Facts, date and authored locale with the
+production date-aware loader and planner, then displays Arabic RTL and English LTR projections,
+including returned guidance sections, uncertainty, sources and freshness.
+
+Scenario seal staleness is independent of expectation matching: a stale valid scenario may run
+and match, but still needs explicit human review/resave in Planning Scenario Admin. Invalid
+scenarios, overlapping published versions or execution failures are unavailable, not successful
+previews. An inactive Service stays inactive and produces honest inconclusive planning output;
+preview never publishes Facts, activates Services, verifies evidence or refreshes seals. Temporary
+lifecycle exposure is rolled back. Readiness also rolls back database gate effects and callbacks;
+trusted custom gates must not perform irreversible external I/O, which database rollback cannot undo.
+
+All [manual followups](#trust-history-and-manual-followups) still apply.
 
 ## CLI: research, dry-run, then write
 

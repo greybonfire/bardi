@@ -95,10 +95,11 @@ Mode changes never rewrite past publications. New publish audits record applied 
 only actual fresh eligible independent approvals consumed by it; legacy events and withdrawal rows
 retain null/unrecorded mode, not retrospective review claims.
 
-PR1 established this policy and honest audit history. PR2 adds the
-[generic draft-pack import/export CLI](draft-packs/README.md) alongside manual Admin authoring
-and existing deterministic importers. External-LLM research preparation is supported as untrusted
-input, not automatic ingestion or verification. PR3 Admin upload/preview is not implemented.
+PR1 established this policy and honest audit history. PR2 established the
+[generic draft-pack import/export service and CLI](draft-packs/README.md); the native Admin adapter
+now adds upload → inspect → confirm, downloads, advisory publication readiness and stored-scenario
+bilingual previews. Manual Admin authoring and deterministic importers remain available.
+External-LLM research preparation is untrusted input, not automatic ingestion or verification.
 
 ## 3. Before entering data
 
@@ -145,6 +146,53 @@ uv run python backend/manage.py runserver --settings=bardi.settings.development
 
 Open `http://localhost:8000/admin/` and sign in with a staff account that has the permissions
 needed for your role.
+
+### Draft-pack alternative: inspect before importing
+
+**Import one procedure, not the whole Service.** Each pack contains exactly one draft **Procedure
+Version**. For example, you can import a passport-renewal draft without importing the Service's
+other passport procedures. Reference existing Service/Procedure identities by their stable semantic
+IDs; their catalog definitions do not need to be repeated. Other procedures remain untouched.
+
+Two boundaries matter:
+
+- **The selected draft is a full snapshot, not a partial patch.** Include all of its intended
+  owned collections (requirements, steps, fees, evidence, scenarios, and so on). Removing an
+  existing row proposes deletion; omitting a required collection is invalid.
+- **Existing Service setup is separate.** Imports cannot add or change its Questions,
+  procedure-selection rules/candidates, or contradictions, even if the Service is inactive.
+  Adjust those in Admin when needed, such as when adding a new procedure. Initial setup can
+  accompany a brand-new Service created by the same import, but the pack still contains only
+  one Procedure Version.
+
+On **Procedure versions**, choose **Download incomplete research template** or **Import research
+draft**. For an existing draft, use its **Draft-pack tools**: export that draft's full authoring
+pack with revision, download read-only vocabulary context, or **Inspect import into [semantic ID]**.
+Preserve the exported revision and full owned snapshot.
+
+**Inspect proposed changes** shows before/after values, trust consequences and publication blockers
+without saving. Incomplete research is allowed: blockers prevent publication, not a structurally
+valid draft import. Review any deletion consent, then **Confirm draft import**. Confirmation lasts
+15 minutes and binds the exact file, editor and target to the inspected state. With JavaScript the
+File input is retained; without it reselect the same file. File/state changes require reinspection;
+stale exported revisions require fresh export and reconciliation. An unchanged exact retry can be
+a no-op; the token is not one-use. See the [full workflow](draft-packs/README.md#admin-upload-inspect-then-confirm).
+
+**Check publication readiness as current editor** checks you as prospective publisher, including
+missing publish permission and all other configured gates. It is advisory, never an approval.
+**Preview stored scenarios** runs only the selected stored scenario on explicit request and shows
+Arabic/English guidance, uncertainty and source/freshness details. Stale seals can coexist with
+matching expectations: review and resave manually. Inactive Services remain inconclusive, not
+silently activated; unavailable previews are not successful tests. Normal draft loads/saves do
+not run these tools.
+
+Imports and previews never verify, approve, publish or activate. Continue the manual steps below:
+review evidence and bilingual meaning, publish appropriate Facts, finish existing-Service setup
+and consequential Questions/candidates, author/review/resave scenarios, obtain mode-required
+reviews and independent specialists for every true risk, publish canonically and activate the
+Service explicitly. Legacy blank Evidence Link IDs need lifecycle-safe manual assignment before
+export; protected workflow history requires a successor or supported manual workflow, never
+history deletion to force an import.
 
 ### 4.2 Create or reuse stable vocabulary and provenance
 
@@ -540,8 +588,13 @@ or deleting history.
 ### 8.1 What "programmatic" means today
 
 Bardi supports the [versioned draft-pack CLI](draft-packs/README.md) for generic JSON authoring,
-export and read-only vocabulary context. There is no generic editorial upload API or Admin
-pack-upload/preview screen in PR2. Start with the supported schema/example and
+export and read-only vocabulary context alongside the native Admin upload, inspection and
+stored-scenario preview workflow. **One pack imports one draft Procedure Version, not an entire
+Service**, whether uploaded through Admin or imported through the CLI. It is a full snapshot of
+that draft, not a partial patch; other procedures in the Service are untouched. Existing-Service
+Questions and procedure-selection rules still require separate Admin edits when needed.
+
+There is no public editorial upload API. For CLI authoring, start with the supported schema/example and
 [external-LLM prompt](draft-packs/llm-prompt.md), inspect sources and Fact vocabulary, then dry-run
 with a real active staff `--actor`. For updates, export first, retain `base_revision`, explicitly
 select `--target-version`, and review every owned deletion before `--allow-deletions`.

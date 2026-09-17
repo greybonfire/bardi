@@ -1,0 +1,17 @@
+{% if error %}<p class="errornote">{{ error }}</p>{% endif %}
+{% include "admin/knowledge/pack_diagnostics.html" %}
+{% if inspection %}
+<h2>Inspection — not saved</h2>
+<p>Proposed version: <strong>{{ inspection.import_result.version }}</strong>. Review changed values and trust consequences before saving.</p>
+{% for change in changes %}
+<details class="module"><summary><strong>{{ change.kind }}</strong> — {{ change.path }}{% if change.fields %} ({{ change.fields|join:", " }}){% endif %}</summary>
+<h3>Before</h3>{% include "admin/knowledge/pack_tree.html" with node=change.before only %}
+<h3>After</h3>{% include "admin/knowledge/pack_tree.html" with node=change.after only %}
+</details>
+{% empty %}<p>No proposed changes. An exact unchanged retry may return without writing.</p>{% endfor %}
+{% include "admin/knowledge/pack_readiness.html" %}
+<input type="hidden" name="token" value="{{ token }}">
+{% if inspection.requires_deletions %}<p><label><input type="checkbox" name="allow_deletions" required> I consent to the deletions shown above.</label></p>{% endif %}
+<p>Confirmation expires after 15 minutes. If the file or live knowledge changes, inspect again. An exact unchanged retry is allowed within that time.</p>
+<div class="submit-row"><button type="submit" name="action" value="confirm" class="button default">Confirm draft import</button></div>
+{% endif %}

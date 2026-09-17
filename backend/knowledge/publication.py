@@ -546,13 +546,33 @@ def _run_policy(context: PublicationContext) -> tuple[PublicationDiagnostic, ...
     failures = list(diagnostics)
     for gate in (*_CORE_GATES, *extension_gates):
         try:
-            result = tuple(gate.validate(context))
-            if any(not isinstance(item, PublicationDiagnostic) for item in result):
-                raise TypeError("invalid gate result")
+            # A failed database gate must not poison later independent gates.
+            with transaction.atomic():
+                result = tuple(gate.validate(context))
+                if any(not isinstance(item, PublicationDiagnostic) for item in result):
+                    raise TypeError("invalid gate result")
             failures.extend(result)
         except Exception:
             failures.append(PublicationDiagnostic(gate.name, "gate_execution_failed"))
     return tuple(sorted(failures, key=lambda item: (item.gate, item.code, item.detail)))
+
+
+def _publication_diagnostics(context: PublicationContext) -> tuple[PublicationDiagnostic, ...]:
+    """Canonical policy and post-gate review-decision validation."""
+    diagnostics = _run_policy(context)
+    if diagnostics or context.review_decision is None:
+        return diagnostics
+    from .review_workflow import review_state_signature
+
+    decision = context.review_decision
+    if (
+        decision.version_id != context.version.pk
+        or decision.publisher_id != context.actor.pk
+        or decision.mode != settings.PROCEDURE_VERSION_REVIEW_MODE
+        or decision.signature != review_state_signature(context.version)
+    ):
+        return _diagnostic("core.procedure_version_reviews", "invalid_review_decision")
+    return ()
 
 
 def _enable_transition(name: str) -> None:
@@ -743,22 +763,9 @@ def publish_procedure_version(version_id: int, *, actor: models.Model) -> Proced
                 .order_by("pk")
             )
             context = PublicationContext(version, actor, _load_published_fact_definitions())
-            diagnostics = _run_policy(context)
+            diagnostics = _publication_diagnostics(context)
             if diagnostics:
                 raise PublicationRejected(diagnostics)
-            if context.review_decision is not None:
-                from .review_workflow import review_state_signature
-
-                decision = context.review_decision
-                if (
-                    decision.version_id != version.pk
-                    or decision.publisher_id != actor.pk
-                    or decision.mode != settings.PROCEDURE_VERSION_REVIEW_MODE
-                    or decision.signature != review_state_signature(version)
-                ):
-                    raise PublicationRejected(
-                        _diagnostic("core.procedure_version_reviews", "invalid_review_decision")
-                    )
             published_at = timezone.now()
             _enable_transition("publish")
             updated = ProcedureVersion.objects.filter(

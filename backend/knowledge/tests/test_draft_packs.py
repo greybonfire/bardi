@@ -959,6 +959,14 @@ class DraftPackConcurrencyTests(TransactionTestCase):
             lambda: m.ProcedureVersion.objects.select_for_update().get(), self.concurrent_import
         )
 
+    def test_maintenance_lock_still_rejects_then_succeeds_after_release(self) -> None:
+        def maintenance() -> None:
+            with connection.cursor() as cursor:
+                cursor.execute("LOCK TABLE knowledge_service IN SHARE UPDATE EXCLUSIVE MODE")
+
+        self.held(maintenance, self.concurrent_import)
+        import_draft_pack(self.data, actor=self.actor, target_version="draft")
+
     def test_procedure_row_lock_is_nowait_too(self) -> None:
         self.held(lambda: m.Procedure.objects.select_for_update().get(), self.concurrent_import)
 

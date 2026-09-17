@@ -1,0 +1,12 @@
+{% extends "admin/base_site.html" %}{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'knowledge/draft_pack_admin.css' %}">{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:knowledge_procedureversion_change' version.pk %}">{{ target }}</a> › Draft checks</div>{% endblock %}
+{% block content %}<p>Draft: <strong>{{ target }}</strong>. These checks do not save, publish, approve, activate or refresh scenario seals.</p>
+{% include "admin/knowledge/pack_diagnostics.html" %}{% include "admin/knowledge/pack_readiness.html" %}
+{% if scenarios != None %}<h2>Stored scenarios</h2><ul>{% for scenario in scenarios %}<li><a href="?scenario={{ scenario.pk }}">Preview {{ scenario.name }}</a></li>{% empty %}<li>No stored scenarios. Author and review scenarios in the existing Planning scenarios editor first.</li>{% endfor %}</ul>{% endif %}
+{% if preview %}<h2>{{ preview.scenario_name }}</h2><p>Evaluation date: {{ preview.evaluation_date }} · Authored locale: {{ preview.authored_locale }}</p>
+<p>Scenario seal: {% if preview.stale %}<strong>Stale — review and resave manually</strong>{% else %}Current{% endif %}. Expectations: {% if preview.matches_expectations == None %}Unavailable{% elif preview.matches_expectations %}Match{% else %}<strong>Do not match</strong>{% endif %}.</p>
+{% include "admin/knowledge/pack_diagnostics.html" with diagnostics=preview.diagnostics %}
+{% if not projections %}<p>Preview unavailable. Resolve the diagnostics before relying on this scenario.</p>{% endif %}
+{% for locale, sections in projections %}<section class="module pack-guidance" lang="{{ locale }}" dir="{% if locale == 'ar' %}rtl{% else %}ltr{% endif %}"><h2>{% if locale == 'ar' %}معاينة الإرشادات — مسودة غير منشورة{% else %}Guidance preview — unpublished draft{% endif %}</h2>{% for section in sections %}<h3>{{ section.label }}</h3>{% include "admin/knowledge/pack_tree.html" with node=section.tree only %}{% endfor %}</section>{% endfor %}{% endif %}
+<p><a href="{% url 'admin:knowledge_procedureversion_change' version.pk %}">Return to draft editor</a></p>{% endblock %}

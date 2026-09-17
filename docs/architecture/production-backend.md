@@ -137,10 +137,31 @@ plan dependencies or replace unknown guidance with a closest match.
 
 Navigation is loaded from the active-Service API, never a bundled fake catalog. Authored
 knowledge enters through manual Admin authoring, existing deterministic draft imports or the
-generic draft-pack CLI, followed by deployment-mode review and canonical publish as separate
-operations. PR2 adds no Admin pack-upload/preview screen; that remains PR3 work. Service
+generic draft-pack CLI/native Admin adapter, followed by deployment-mode review and canonical
+publish as separate operations. The focused Admin flow is upload → inspect → confirm, with
+no-store JSON downloads, advisory publication readiness and stored-scenario bilingual preview;
+it is not a new dashboard or public/free-form simulation API. Service
 activation remains explicit and independent of publication. Empty navigation and unavailable services remain honest states, not demo
 fallbacks.
+
+### Private Admin authoring transport
+
+The [draft-pack adapter](../draft-packs/README.md#admin-upload-inspect-then-confirm) delegates to
+shared authoring/publication/planning services; no knowledge-domain dependency on the public API
+is introduced. The Admin adapter projects detached planning results through the existing public
+projection code without changing the public response schema. Checks run only on explicit requests
+and roll back speculative database effects. Inactive Services remain honestly inconclusive;
+preview never activates or reseals. Trusted custom gates must avoid irreversible external I/O.
+
+Uploads retain only a bounded request-local buffer, never a persistent raw-pack archive, session,
+cookie or browser-storage payload. A signed 15-minute exact-file/editor/target/precondition token
+requires explicit multipart resubmission. It is not one-use: unchanged receipt-proven retries
+may be no-ops. Conservative global state/settings changes can require reinspection. JavaScript
+retains the selected File input; the no-JavaScript path requires exact-file reselection. A custom
+handler installed before multipart/CSRF parsing enforces one file and at most 8 MiB received file
+bytes; actual operations remain CSRF-protected. This application limit does not prevent upstream
+buffering or replace ingress limits. All existing import authorization, revision/history protection
+and manual publication/activation boundaries remain intact.
 
 ### Same-origin transport
 

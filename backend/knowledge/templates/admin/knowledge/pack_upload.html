@@ -1,0 +1,15 @@
+{% extends "admin/base_site.html" %}{% load static %}
+{% block extrastyle %}{{ block.super }}<link rel="stylesheet" href="{% static 'admin/css/forms.css' %}"><link rel="stylesheet" href="{% static 'knowledge/draft_pack_admin.css' %}">{% endblock %}
+{% block extrahead %}{{ block.super }}<script src="{% static 'knowledge/draft_pack_admin.js' %}" defer></script>{% endblock %}
+{% block breadcrumbs %}<div class="breadcrumbs"><a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:knowledge_procedureversion_changelist' %}">Procedure versions</a> › Import research draft</div>{% endblock %}
+{% block content %}
+<p>Target: <strong>{{ target|default:"New draft (no existing version will be overwritten)" }}</strong></p>
+<p>Incomplete research input, not authoritative guidance. Inspect first; confirmation saves only a draft. No verification, approval, publication or activation occurs.</p>
+<form method="post" enctype="multipart/form-data" id="draft-pack-form">{% csrf_token %}
+<div class="form-row"><label for="id_pack">Draft-pack JSON (maximum 8 MiB)</label> <input type="file" name="pack" id="id_pack" accept="application/json,.json" required></div>
+<p><button type="submit" name="action" value="inspect" class="button" formnovalidate>Inspect proposed changes</button></p>
+<p id="pack-progress" role="status" aria-live="polite"></p>
+<noscript><p>After inspecting, reselect the same file before confirming. Files are not stored between requests.</p></noscript>
+<div id="pack-result" aria-live="polite">{% include "admin/knowledge/pack_inspection.html" %}</div>
+</form>
+{% endblock %}

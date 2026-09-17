@@ -149,11 +149,26 @@ needed for your role.
 
 ### Draft-pack alternative: inspect before importing
 
+**Import one procedure, not the whole Service.** Each pack contains exactly one draft **Procedure
+Version**. For example, you can import a passport-renewal draft without importing the Service's
+other passport procedures. Reference existing Service/Procedure identities by their stable semantic
+IDs; their catalog definitions do not need to be repeated. Other procedures remain untouched.
+
+Two boundaries matter:
+
+- **The selected draft is a full snapshot, not a partial patch.** Include all of its intended
+  owned collections (requirements, steps, fees, evidence, scenarios, and so on). Removing an
+  existing row proposes deletion; omitting a required collection is invalid.
+- **Existing Service setup is separate.** Imports cannot add or change its Questions,
+  procedure-selection rules/candidates, or contradictions, even if the Service is inactive.
+  Adjust those in Admin when needed, such as when adding a new procedure. Initial setup can
+  accompany a brand-new Service created by the same import, but the pack still contains only
+  one Procedure Version.
+
 On **Procedure versions**, choose **Download incomplete research template** or **Import research
-draft**. For an existing draft, use its **Draft-pack tools**: export the full authoring pack with
-revision, download read-only vocabulary context, or **Inspect import into [semantic ID]**. Preserve
-the exported revision and full owned snapshot; removing rows proposes deletions. Initial setup for
-an existing Service remains protected, even inactive.
+draft**. For an existing draft, use its **Draft-pack tools**: export that draft's full authoring
+pack with revision, download read-only vocabulary context, or **Inspect import into [semantic ID]**.
+Preserve the exported revision and full owned snapshot.
 
 **Inspect proposed changes** shows before/after values, trust consequences and publication blockers
 without saving. Incomplete research is allowed: blockers prevent publication, not a structurally
@@ -574,8 +589,12 @@ or deleting history.
 
 Bardi supports the [versioned draft-pack CLI](draft-packs/README.md) for generic JSON authoring,
 export and read-only vocabulary context alongside the native Admin upload, inspection and
-stored-scenario preview workflow. There is no public editorial upload API. For CLI authoring,
-start with the supported schema/example and
+stored-scenario preview workflow. **One pack imports one draft Procedure Version, not an entire
+Service**, whether uploaded through Admin or imported through the CLI. It is a full snapshot of
+that draft, not a partial patch; other procedures in the Service are untouched. Existing-Service
+Questions and procedure-selection rules still require separate Admin edits when needed.
+
+There is no public editorial upload API. For CLI authoring, start with the supported schema/example and
 [external-LLM prompt](draft-packs/llm-prompt.md), inspect sources and Fact vocabulary, then dry-run
 with a real active staff `--actor`. For updates, export first, retain `base_revision`, explicitly
 select `--target-version`, and review every owned deletion before `--allow-deletions`.

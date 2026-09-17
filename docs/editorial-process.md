@@ -127,17 +127,18 @@ ask an operator for access rather than borrowing a publisher's account.
 
 ### Draft-pack alternative: inspect before importing
 
-**Import one procedure, not the whole Service.** Each pack contains exactly one draft **Procedure
-Version**. For example, you can import a passport-renewal draft without importing the Service's
-other passport procedures. Reference existing Service/Procedure identities by their stable semantic
-IDs; their catalog definitions do not need to be repeated. Other procedures remain untouched.
+**Import one Procedure Version's owned guidance, not the whole Service.** For example, you can
+import a passport-renewal draft without modifying other versions' owned guidance. A pack may also
+create or reuse shared catalog identities, including other Procedures. Reference existing
+Service/Procedure identities by their stable semantic IDs; their catalog definitions do not need
+to be repeated.
 
 Two boundaries matter:
 
 - **The selected draft is a full snapshot, not a partial patch.** Include all of its intended
   owned collections (requirements, steps, fees, evidence, scenarios, and so on). Removing an
   existing row proposes deletion; omitting a required collection is invalid.
-- **Existing Service setup is separate.** Imports cannot add or change its Questions,
+- **Existing Service setup is separate.** Draft-pack imports cannot add or change its Questions,
   procedure-selection rules/candidates, or contradictions, even if the Service is inactive.
   Adjust those in Admin when needed, such as when adding a new procedure. Initial setup can
   accompany a brand-new Service created by the same import, but the pack still contains only
@@ -155,7 +156,7 @@ blockers. Follow the [pack workflow](draft-packs/README.md#admin-upload-inspect-
 for confirmation, advisory readiness checks and stored-scenario previews, and the
 [recovery table](draft-packs/README.md#recovery-quick-reference) for errors or stale state.
 
-Imports and previews never verify, approve, publish or activate; readiness is not approval.
+Draft-pack imports and previews never verify, approve, publish or activate; readiness is not approval.
 Continue the manual steps below and the [editor checklist](#12-editor-checklist), including
 human scenario review/resave, Fact publication and existing-Service setup. Activate the Service
 explicitly when ready. Never delete protected history to force an import.

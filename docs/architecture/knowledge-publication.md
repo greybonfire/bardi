@@ -174,8 +174,13 @@ publication path. A custom CMS is justified only by a demonstrated Admin bottlen
 
 Supported importers author or verify drafts, never manufacture users, approvals, publisher identity
 or publication dates. Deterministic research importers return identical drafts or verify finalized
-identities and reject semantic conflicts. Generic draft packs instead use ADR 0020's explicit
-draft-target/revision contract; [operator instructions](../draft-packs/README.md) own the how-to.
+identities and reject semantic conflicts.
+
+### Generic draft-pack import/export
+
+The following contract applies only to generic draft packs, not deterministic research importers.
+Packs use ADR 0020's explicit draft-target/revision contract;
+[operator instructions](../draft-packs/README.md) own the how-to.
 
 Owned arrays are complete desired snapshots with explicit deletion consent. Shared records are
 create-or-exact-compare; initial Service setup is allowed only for a Service created in that same

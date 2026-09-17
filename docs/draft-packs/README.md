@@ -5,9 +5,12 @@ a public API response or a saved Anonymous Case. Import/export through CLI or Dj
 Admin also offers advisory readiness and stored-scenario previews, not a free-form simulator.
 Manual editing and deterministic research importers remain supported.
 
-**One pack imports one draft Procedure Version, not a whole Service.** Other procedures in that
-Service are untouched. Use this guide for pack preparation, inspection, confirmation and recovery;
-use the [editorial workflow](../editorial-process.md) for field meaning and human completion.
+**One pack imports one draft Procedure Version's owned guidance, not a whole Service.** Other
+versions' owned guidance is unchanged. A pack may also create or reuse shared catalog identities,
+including other Procedures, and initialize setup for a Service created by that same import.
+
+Use this guide for pack preparation, inspection, confirmation and recovery; use the
+[editorial workflow](../editorial-process.md) for field meaning and human completion.
 
 ## Contract and supported inputs
 

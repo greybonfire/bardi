@@ -87,8 +87,8 @@ jobs:
 
       - name: Exercise latest project migration rollback and reapply
         run: |
-          uv run python backend/manage.py migrate knowledge 0016 --noinput --settings=bardi.settings.test
           uv run python backend/manage.py migrate knowledge 0017 --noinput --settings=bardi.settings.test
+          uv run python backend/manage.py migrate knowledge 0018 --noinput --settings=bardi.settings.test
           uv run python backend/manage.py migrate --check --settings=bardi.settings.test
 
       - name: Exercise PostgreSQL backup and restore

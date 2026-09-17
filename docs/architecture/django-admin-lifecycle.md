@@ -22,6 +22,26 @@ A staff account receives only the capabilities required for its role. Review per
 imply publish permission, specialist permission does not imply general review permission, and
 research/edit permission does not imply re-verification or lifecycle-transition permission.
 
+### Generic draft-pack service permissions
+
+The [draft-pack CLI/service](../draft-packs/README.md) is a separate authoring entry point, not
+an Admin upload or preview screen (PR3 is not implemented). It requires a persisted, currently
+active staff actor reloaded from the database. New drafts require
+`knowledge.add_procedureversion` **and** `knowledge.change_procedureversion`; updates require
+`knowledge.change_procedureversion`. These authorize the version-owned aggregate import without
+individual child add/change/delete permissions. Each new shared catalog type still requires its
+`knowledge.add_<model>` permission; new-Service setup requires the applicable
+`knowledge.add_servicequestion`, `knowledge.add_serviceprocedurecandidate` and
+`knowledge.add_servicecontradiction` permissions. Both exports require
+`knowledge.view_procedureversion`. This does not broaden the individual Admin model permissions.
+
+The actor is accountable author for a new Review Policy, never a replacement for an existing
+author. Initial setup is permitted only for a Service created by that import; existing Service
+configuration is protected even inactive. Import cannot grant review, publish, withdrawal or
+re-verification capability, assign their metadata, clear existing risks, or rewrite history.
+Stale unchanged scenarios must be explicitly reviewed and resaved in Planning Scenario Admin;
+reimporting identical data does not reseal them. Manual editing and deterministic importers remain.
+
 ## Draft authoring and successor cloning
 
 Staff with ordinary Procedure Version add/change permissions may create a draft from scratch.

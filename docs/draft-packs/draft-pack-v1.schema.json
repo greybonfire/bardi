@@ -1,0 +1,2354 @@
+{
+  "$defs": {
+    "Authority": {
+      "additionalProperties": false,
+      "properties": {
+        "name_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Name Ar",
+          "type": "string"
+        },
+        "name_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Name En",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "name_ar",
+        "name_en"
+      ],
+      "title": "Authority",
+      "type": "object"
+    },
+    "Basis": {
+      "additionalProperties": false,
+      "properties": {
+        "display_order": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Display Order",
+          "type": "integer"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "qualification": {
+          "discriminator": {
+            "mapping": {
+              "all": "#/$defs/BooleanRule",
+              "any": "#/$defs/BooleanRule",
+              "eq": "#/$defs/ComparisonRule",
+              "exists": "#/$defs/ExistsRule",
+              "gt": "#/$defs/ComparisonRule",
+              "gte": "#/$defs/ComparisonRule",
+              "in": "#/$defs/InRule",
+              "lt": "#/$defs/ComparisonRule",
+              "lte": "#/$defs/ComparisonRule",
+              "not": "#/$defs/NotRule"
+            },
+            "propertyName": "op"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ComparisonRule"
+            },
+            {
+              "$ref": "#/$defs/InRule"
+            },
+            {
+              "$ref": "#/$defs/ExistsRule"
+            },
+            {
+              "$ref": "#/$defs/BooleanRule"
+            },
+            {
+              "$ref": "#/$defs/NotRule"
+            }
+          ],
+          "title": "Qualification"
+        },
+        "reachability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Reachability"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "qualification"
+      ],
+      "title": "Basis",
+      "type": "object"
+    },
+    "BooleanRule": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/$defs/BooleanRule",
+                "any": "#/$defs/BooleanRule",
+                "eq": "#/$defs/ComparisonRule",
+                "exists": "#/$defs/ExistsRule",
+                "gt": "#/$defs/ComparisonRule",
+                "gte": "#/$defs/ComparisonRule",
+                "in": "#/$defs/InRule",
+                "lt": "#/$defs/ComparisonRule",
+                "lte": "#/$defs/ComparisonRule",
+                "not": "#/$defs/NotRule"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ComparisonRule"
+              },
+              {
+                "$ref": "#/$defs/InRule"
+              },
+              {
+                "$ref": "#/$defs/ExistsRule"
+              },
+              {
+                "$ref": "#/$defs/BooleanRule"
+              },
+              {
+                "$ref": "#/$defs/NotRule"
+              }
+            ]
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "title": "Children",
+          "type": "array"
+        },
+        "op": {
+          "enum": [
+            "all",
+            "any"
+          ],
+          "title": "Op",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "children"
+      ],
+      "title": "BooleanRule",
+      "type": "object"
+    },
+    "Candidate": {
+      "additionalProperties": false,
+      "properties": {
+        "procedure": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Procedure",
+          "type": "string"
+        },
+        "selection_predicate": {
+          "discriminator": {
+            "mapping": {
+              "all": "#/$defs/BooleanRule",
+              "any": "#/$defs/BooleanRule",
+              "eq": "#/$defs/ComparisonRule",
+              "exists": "#/$defs/ExistsRule",
+              "gt": "#/$defs/ComparisonRule",
+              "gte": "#/$defs/ComparisonRule",
+              "in": "#/$defs/InRule",
+              "lt": "#/$defs/ComparisonRule",
+              "lte": "#/$defs/ComparisonRule",
+              "not": "#/$defs/NotRule"
+            },
+            "propertyName": "op"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ComparisonRule"
+            },
+            {
+              "$ref": "#/$defs/InRule"
+            },
+            {
+              "$ref": "#/$defs/ExistsRule"
+            },
+            {
+              "$ref": "#/$defs/BooleanRule"
+            },
+            {
+              "$ref": "#/$defs/NotRule"
+            }
+          ],
+          "title": "Selection Predicate"
+        }
+      },
+      "required": [
+        "procedure",
+        "selection_predicate"
+      ],
+      "title": "Candidate",
+      "type": "object"
+    },
+    "Catalog": {
+      "additionalProperties": false,
+      "properties": {
+        "authorities": {
+          "items": {
+            "$ref": "#/$defs/Authority"
+          },
+          "title": "Authorities",
+          "type": "array"
+        },
+        "document_types": {
+          "items": {
+            "$ref": "#/$defs/DocumentType"
+          },
+          "title": "Document Types",
+          "type": "array"
+        },
+        "facts": {
+          "items": {
+            "$ref": "#/$defs/Fact"
+          },
+          "title": "Facts",
+          "type": "array"
+        },
+        "procedures": {
+          "items": {
+            "$ref": "#/$defs/Procedure"
+          },
+          "title": "Procedures",
+          "type": "array"
+        },
+        "services": {
+          "items": {
+            "$ref": "#/$defs/Service"
+          },
+          "title": "Services",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "services",
+        "procedures",
+        "facts",
+        "authorities",
+        "sources",
+        "document_types"
+      ],
+      "title": "Catalog",
+      "type": "object"
+    },
+    "ChecklistItem": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "classification": {
+          "enum": [
+            "official_requirement",
+            "practical_preparation",
+            "candidate"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "copy_quantity": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Copy Quantity",
+          "type": "integer"
+        },
+        "display_order": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Display Order",
+          "type": "integer"
+        },
+        "document_type": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Document Type"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "original_quantity": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Original Quantity",
+          "type": "integer"
+        },
+        "quantity": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Quantity",
+          "type": "integer"
+        },
+        "scope": {
+          "default": "procedure",
+          "enum": [
+            "procedure",
+            "eligibility_basis"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "scope_reference": {
+          "default": "",
+          "maxLength": 128,
+          "title": "Scope Reference",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "classification"
+      ],
+      "title": "ChecklistItem",
+      "type": "object"
+    },
+    "ComparisonRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fact": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Fact",
+          "type": "string"
+        },
+        "op": {
+          "enum": [
+            "eq",
+            "lt",
+            "lte",
+            "gt",
+            "gte"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/$defs/DateLiteral"
+            }
+          ],
+          "title": "Value"
+        }
+      },
+      "required": [
+        "op",
+        "fact",
+        "value"
+      ],
+      "title": "ComparisonRule",
+      "type": "object"
+    },
+    "Contradiction": {
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "discriminator": {
+            "mapping": {
+              "all": "#/$defs/BooleanRule",
+              "any": "#/$defs/BooleanRule",
+              "eq": "#/$defs/ComparisonRule",
+              "exists": "#/$defs/ExistsRule",
+              "gt": "#/$defs/ComparisonRule",
+              "gte": "#/$defs/ComparisonRule",
+              "in": "#/$defs/InRule",
+              "lt": "#/$defs/ComparisonRule",
+              "lte": "#/$defs/ComparisonRule",
+              "not": "#/$defs/NotRule"
+            },
+            "propertyName": "op"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ComparisonRule"
+            },
+            {
+              "$ref": "#/$defs/InRule"
+            },
+            {
+              "$ref": "#/$defs/ExistsRule"
+            },
+            {
+              "$ref": "#/$defs/BooleanRule"
+            },
+            {
+              "$ref": "#/$defs/NotRule"
+            }
+          ],
+          "title": "Condition"
+        },
+        "facts": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+            "type": "string"
+          },
+          "minItems": 2,
+          "title": "Facts",
+          "type": "array"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "condition",
+        "facts"
+      ],
+      "title": "Contradiction",
+      "type": "object"
+    },
+    "DateLiteral": {
+      "additionalProperties": false,
+      "properties": {
+        "$date": {
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "$Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "$date"
+      ],
+      "title": "DateLiteral",
+      "type": "object"
+    },
+    "Dependency": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "display_order": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Display Order",
+          "type": "integer"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "relation": {
+          "const": "blocking_prerequisite",
+          "default": "blocking_prerequisite",
+          "title": "Relation",
+          "type": "string"
+        },
+        "satisfied_when": {
+          "discriminator": {
+            "mapping": {
+              "all": "#/$defs/BooleanRule",
+              "any": "#/$defs/BooleanRule",
+              "eq": "#/$defs/ComparisonRule",
+              "exists": "#/$defs/ExistsRule",
+              "gt": "#/$defs/ComparisonRule",
+              "gte": "#/$defs/ComparisonRule",
+              "in": "#/$defs/InRule",
+              "lt": "#/$defs/ComparisonRule",
+              "lte": "#/$defs/ComparisonRule",
+              "not": "#/$defs/NotRule"
+            },
+            "propertyName": "op"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ComparisonRule"
+            },
+            {
+              "$ref": "#/$defs/InRule"
+            },
+            {
+              "$ref": "#/$defs/ExistsRule"
+            },
+            {
+              "$ref": "#/$defs/BooleanRule"
+            },
+            {
+              "$ref": "#/$defs/NotRule"
+            }
+          ],
+          "title": "Satisfied When"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "target_procedure": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Target Procedure",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "target_procedure",
+        "satisfied_when"
+      ],
+      "title": "Dependency",
+      "type": "object"
+    },
+    "DocumentType": {
+      "additionalProperties": false,
+      "properties": {
+        "name_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Name Ar",
+          "type": "string"
+        },
+        "name_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Name En",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "name_ar",
+        "name_en"
+      ],
+      "title": "DocumentType",
+      "type": "object"
+    },
+    "EmptyRule": {
+      "additionalProperties": false,
+      "properties": {},
+      "title": "EmptyRule",
+      "type": "object"
+    },
+    "EvaluationContext": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_date": {
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Evaluation Date",
+          "type": "string"
+        },
+        "locale": {
+          "enum": [
+            "ar",
+            "en"
+          ],
+          "title": "Locale",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evaluation_date",
+        "locale"
+      ],
+      "title": "EvaluationContext",
+      "type": "object"
+    },
+    "EvidenceLink": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability_context": {
+          "default": "",
+          "title": "Applicability Context",
+          "type": "string"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "location": {
+          "default": "",
+          "title": "Location",
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/EvidenceOwner"
+        },
+        "passage": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Passage",
+          "type": "string"
+        },
+        "retrieved_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieved On"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "sources": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+            "type": "string"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "support_status": {
+          "default": "supports",
+          "enum": [
+            "supports",
+            "context",
+            "contradicts"
+          ],
+          "title": "Support Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "owner",
+        "passage",
+        "sources"
+      ],
+      "title": "EvidenceLink",
+      "type": "object"
+    },
+    "EvidenceOwner": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "checklist_item",
+            "step",
+            "warning",
+            "fee",
+            "eligibility_basis",
+            "procedure_dependency",
+            "procedure_service_point_association"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "kind"
+      ],
+      "title": "EvidenceOwner",
+      "type": "object"
+    },
+    "ExistsRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fact": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Fact",
+          "type": "string"
+        },
+        "op": {
+          "const": "exists",
+          "title": "Op",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "fact"
+      ],
+      "title": "ExistsRule",
+      "type": "object"
+    },
+    "Fact": {
+      "additionalProperties": false,
+      "properties": {
+        "enum_values": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Enum Values",
+          "type": "array"
+        },
+        "key": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Key",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "boolean",
+            "enum",
+            "integer",
+            "date",
+            "string"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum"
+        }
+      },
+      "required": [
+        "key",
+        "kind"
+      ],
+      "title": "Fact",
+      "type": "object"
+    },
+    "Fee": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amount"
+        },
+        "applicability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "currency": {
+          "maxLength": 16,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Currency",
+          "type": "string"
+        },
+        "display_order": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Display Order",
+          "type": "integer"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "eligibility_basis": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eligibility Basis"
+        },
+        "fee_type": {
+          "default": "service_fee",
+          "maxLength": 64,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Fee Type",
+          "type": "string"
+        },
+        "maximum_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maximum Amount"
+        },
+        "minimum_amount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Minimum Amount"
+        },
+        "scope": {
+          "default": "procedure",
+          "enum": [
+            "procedure",
+            "eligibility_basis"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        },
+        "value_state": {
+          "enum": [
+            "known",
+            "range",
+            "unknown",
+            "unverified"
+          ],
+          "title": "Value State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "value_state",
+        "currency"
+      ],
+      "title": "Fee",
+      "type": "object"
+    },
+    "InRule": {
+      "additionalProperties": false,
+      "properties": {
+        "fact": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Fact",
+          "type": "string"
+        },
+        "op": {
+          "const": "in",
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/$defs/DateLiteral"
+              }
+            ]
+          },
+          "maxItems": 128,
+          "minItems": 1,
+          "title": "Value",
+          "type": "array"
+        }
+      },
+      "required": [
+        "op",
+        "fact",
+        "value"
+      ],
+      "title": "InRule",
+      "type": "object"
+    },
+    "JsonValue": {},
+    "NotRule": {
+      "additionalProperties": false,
+      "properties": {
+        "children": {
+          "items": {
+            "discriminator": {
+              "mapping": {
+                "all": "#/$defs/BooleanRule",
+                "any": "#/$defs/BooleanRule",
+                "eq": "#/$defs/ComparisonRule",
+                "exists": "#/$defs/ExistsRule",
+                "gt": "#/$defs/ComparisonRule",
+                "gte": "#/$defs/ComparisonRule",
+                "in": "#/$defs/InRule",
+                "lt": "#/$defs/ComparisonRule",
+                "lte": "#/$defs/ComparisonRule",
+                "not": "#/$defs/NotRule"
+              },
+              "propertyName": "op"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/ComparisonRule"
+              },
+              {
+                "$ref": "#/$defs/InRule"
+              },
+              {
+                "$ref": "#/$defs/ExistsRule"
+              },
+              {
+                "$ref": "#/$defs/BooleanRule"
+              },
+              {
+                "$ref": "#/$defs/NotRule"
+              }
+            ]
+          },
+          "maxItems": 1,
+          "minItems": 1,
+          "title": "Children",
+          "type": "array"
+        },
+        "op": {
+          "const": "not",
+          "title": "Op",
+          "type": "string"
+        }
+      },
+      "required": [
+        "op",
+        "children"
+      ],
+      "title": "NotRule",
+      "type": "object"
+    },
+    "Procedure": {
+      "additionalProperties": false,
+      "properties": {
+        "primary_service": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Primary Service",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "primary_service"
+      ],
+      "title": "Procedure",
+      "type": "object"
+    },
+    "Question": {
+      "additionalProperties": false,
+      "properties": {
+        "fact": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Fact",
+          "type": "string"
+        },
+        "priority": {
+          "minimum": 0,
+          "title": "Priority",
+          "type": "integer"
+        },
+        "resolves_facts": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+            "type": "string"
+          },
+          "title": "Resolves Facts",
+          "type": "array"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "fact",
+        "priority"
+      ],
+      "title": "Question",
+      "type": "object"
+    },
+    "Risks": {
+      "additionalProperties": false,
+      "properties": {
+        "contested_identity": {
+          "title": "Contested Identity",
+          "type": "boolean"
+        },
+        "custody_guardianship": {
+          "title": "Custody Guardianship",
+          "type": "boolean"
+        },
+        "legal": {
+          "title": "Legal",
+          "type": "boolean"
+        },
+        "military": {
+          "title": "Military",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "legal",
+        "military",
+        "custody_guardianship",
+        "contested_identity"
+      ],
+      "title": "Risks",
+      "type": "object"
+    },
+    "RoutingAssociation": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "discriminator": {
+            "mapping": {
+              "all": "#/$defs/BooleanRule",
+              "any": "#/$defs/BooleanRule",
+              "eq": "#/$defs/ComparisonRule",
+              "exists": "#/$defs/ExistsRule",
+              "gt": "#/$defs/ComparisonRule",
+              "gte": "#/$defs/ComparisonRule",
+              "in": "#/$defs/InRule",
+              "lt": "#/$defs/ComparisonRule",
+              "lte": "#/$defs/ComparisonRule",
+              "not": "#/$defs/NotRule"
+            },
+            "propertyName": "op"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ComparisonRule"
+            },
+            {
+              "$ref": "#/$defs/InRule"
+            },
+            {
+              "$ref": "#/$defs/ExistsRule"
+            },
+            {
+              "$ref": "#/$defs/BooleanRule"
+            },
+            {
+              "$ref": "#/$defs/NotRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "service_point_version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Service Point Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "service_point_version",
+        "applicability"
+      ],
+      "title": "RoutingAssociation",
+      "type": "object"
+    },
+    "Scenario": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluation_context": {
+          "$ref": "#/$defs/EvaluationContext"
+        },
+        "expected_diagnostics": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expected Diagnostics",
+          "type": "array"
+        },
+        "expected_identifiers": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Expected Identifiers",
+          "type": "object"
+        },
+        "expected_result_family": {
+          "enum": [
+            "plan",
+            "next_question",
+            "inconclusive",
+            "invalid"
+          ],
+          "title": "Expected Result Family",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "positive",
+            "negative",
+            "unknown",
+            "contradictory",
+            "supported_edge"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 160,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Name",
+          "type": "string"
+        },
+        "source_facts": {
+          "patternProperties": {
+            "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "propertyNames": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]"
+          },
+          "title": "Source Facts",
+          "type": "object"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "evaluation_context",
+        "expected_result_family"
+      ],
+      "title": "Scenario",
+      "type": "object"
+    },
+    "Service": {
+      "additionalProperties": false,
+      "properties": {
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en"
+      ],
+      "title": "Service",
+      "type": "object"
+    },
+    "ServiceSetup": {
+      "additionalProperties": false,
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "title": "Candidates",
+          "type": "array"
+        },
+        "contradictions": {
+          "items": {
+            "$ref": "#/$defs/Contradiction"
+          },
+          "title": "Contradictions",
+          "type": "array"
+        },
+        "questions": {
+          "items": {
+            "$ref": "#/$defs/Question"
+          },
+          "title": "Questions",
+          "type": "array"
+        },
+        "service": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Service",
+          "type": "string"
+        }
+      },
+      "required": [
+        "service",
+        "questions",
+        "candidates",
+        "contradictions"
+      ],
+      "title": "ServiceSetup",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "authority": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Authority",
+          "type": "string"
+        },
+        "classification": {
+          "enum": [
+            "official",
+            "field_report",
+            "secondary"
+          ],
+          "title": "Classification",
+          "type": "string"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "locator": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Locator",
+          "type": "string"
+        },
+        "observation_context": {
+          "default": "",
+          "title": "Observation Context",
+          "type": "string"
+        },
+        "observation_date": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Observation Date"
+        },
+        "published_on": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Published On"
+        },
+        "retrieved_on": {
+          "format": "date",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "title": "Retrieved On",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "authority",
+        "title",
+        "locator",
+        "classification",
+        "retrieved_on"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Step": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "eligibility_basis": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Eligibility Basis"
+        },
+        "phase": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Phase",
+          "type": "string"
+        },
+        "phase_order": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Phase Order",
+          "type": "integer"
+        },
+        "scope": {
+          "default": "procedure",
+          "enum": [
+            "procedure",
+            "eligibility_basis"
+          ],
+          "title": "Scope",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "slot": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Slot",
+          "type": "integer"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "phase"
+      ],
+      "title": "Step",
+      "type": "object"
+    },
+    "Version": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "procedure": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Procedure",
+          "type": "string"
+        },
+        "rules_contract_version": {
+          "const": "v1",
+          "default": "v1",
+          "title": "Rules Contract Version",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "text_ar": {
+          "default": "",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "default": "",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "procedure"
+      ],
+      "title": "Version",
+      "type": "object"
+    },
+    "Warning": {
+      "additionalProperties": false,
+      "properties": {
+        "applicability": {
+          "anyOf": [
+            {
+              "discriminator": {
+                "mapping": {
+                  "all": "#/$defs/BooleanRule",
+                  "any": "#/$defs/BooleanRule",
+                  "eq": "#/$defs/ComparisonRule",
+                  "exists": "#/$defs/ExistsRule",
+                  "gt": "#/$defs/ComparisonRule",
+                  "gte": "#/$defs/ComparisonRule",
+                  "in": "#/$defs/InRule",
+                  "lt": "#/$defs/ComparisonRule",
+                  "lte": "#/$defs/ComparisonRule",
+                  "not": "#/$defs/NotRule"
+                },
+                "propertyName": "op"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ComparisonRule"
+                },
+                {
+                  "$ref": "#/$defs/InRule"
+                },
+                {
+                  "$ref": "#/$defs/ExistsRule"
+                },
+                {
+                  "$ref": "#/$defs/BooleanRule"
+                },
+                {
+                  "$ref": "#/$defs/NotRule"
+                }
+              ]
+            },
+            {
+              "$ref": "#/$defs/EmptyRule"
+            }
+          ],
+          "title": "Applicability"
+        },
+        "display_order": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Display Order",
+          "type": "integer"
+        },
+        "effective_from": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective From"
+        },
+        "effective_to": {
+          "anyOf": [
+            {
+              "format": "date",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Effective To"
+        },
+        "kind": {
+          "enum": [
+            "administrative",
+            "product"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "role": {
+          "default": "general",
+          "enum": [
+            "general",
+            "regeneration",
+            "limitation"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "semantic_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Semantic Id",
+          "type": "string"
+        },
+        "severity": {
+          "default": "info",
+          "enum": [
+            "info",
+            "important"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "text_ar": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text Ar",
+          "type": "string"
+        },
+        "text_en": {
+          "minLength": 1,
+          "pattern": "[^\\u0009-\\u000d\\u001c-\\u0020\\u0085\\u00a0\\u1680\\u2000-\\u200a\\u2028\\u2029\\u202f\\u205f\\u3000]",
+          "title": "Text En",
+          "type": "string"
+        }
+      },
+      "required": [
+        "semantic_id",
+        "text_ar",
+        "text_en",
+        "kind"
+      ],
+      "title": "Warning",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "base_revision": {
+      "anyOf": [
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Base Revision"
+    },
+    "bases": {
+      "items": {
+        "$ref": "#/$defs/Basis"
+      },
+      "title": "Bases",
+      "type": "array"
+    },
+    "catalog": {
+      "$ref": "#/$defs/Catalog"
+    },
+    "checklist_items": {
+      "items": {
+        "$ref": "#/$defs/ChecklistItem"
+      },
+      "title": "Checklist Items",
+      "type": "array"
+    },
+    "dependencies": {
+      "items": {
+        "$ref": "#/$defs/Dependency"
+      },
+      "title": "Dependencies",
+      "type": "array"
+    },
+    "evidence_links": {
+      "items": {
+        "$ref": "#/$defs/EvidenceLink"
+      },
+      "title": "Evidence Links",
+      "type": "array"
+    },
+    "fees": {
+      "items": {
+        "$ref": "#/$defs/Fee"
+      },
+      "title": "Fees",
+      "type": "array"
+    },
+    "format": {
+      "const": "bardi.draft-pack",
+      "title": "Format",
+      "type": "string"
+    },
+    "format_version": {
+      "const": 1,
+      "title": "Format Version",
+      "type": "integer"
+    },
+    "risks": {
+      "$ref": "#/$defs/Risks"
+    },
+    "routing_associations": {
+      "items": {
+        "$ref": "#/$defs/RoutingAssociation"
+      },
+      "title": "Routing Associations",
+      "type": "array"
+    },
+    "scenarios": {
+      "items": {
+        "$ref": "#/$defs/Scenario"
+      },
+      "title": "Scenarios",
+      "type": "array"
+    },
+    "service_setup": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ServiceSetup"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/Step"
+      },
+      "title": "Steps",
+      "type": "array"
+    },
+    "version": {
+      "$ref": "#/$defs/Version"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/Warning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "format",
+    "format_version",
+    "base_revision",
+    "catalog",
+    "version",
+    "risks",
+    "service_setup",
+    "bases",
+    "checklist_items",
+    "steps",
+    "warnings",
+    "fees",
+    "dependencies",
+    "routing_associations",
+    "evidence_links",
+    "scenarios"
+  ],
+  "title": "DraftPack",
+  "type": "object"
+}

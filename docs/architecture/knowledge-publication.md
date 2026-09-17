@@ -153,7 +153,9 @@ Future-effective published versions are permitted. At most one published version
 
 ## Draft editing
 
-Editors work on drafts through Django Admin initially.
+Editors work on drafts through Django Admin, deterministic research importers, or the
+[versioned draft-pack CLI](../draft-packs/README.md). Generic pack import is authoring only,
+not publication preview or verification; PR3 Admin pack-upload/preview is not implemented.
 
 A draft may be created from scratch or cloned from an existing published version. Cloning copies the coherent version-owned records into new editable draft records; it does not reopen the published version for mutation.
 
@@ -320,10 +322,35 @@ A custom CMS may be introduced later only if Django Admin becomes a demonstrated
 Supported importers create or verify drafts only. Staff run the importer with an existing
 accountable author, complete general dimension approvals in `independent` and applicable specialist
 approvals in both modes in Admin, and publish only with the canonical Procedure Version Admin action.
-Manual Admin authoring and the existing deterministic importers remain the supported routes; PR1
-adds no generic importer, LLM ingestion, or Admin upload tooling. Rerunning an importer
-returns an identical draft (or verifies an already finalized identity) and rejects semantic
-conflicts; it never manufactures users, approvals, publisher identity, or publication dates.
+Manual Admin authoring and the existing deterministic importers remain supported. Those
+deterministic importers return an identical draft (or verify an already finalized identity)
+and reject semantic conflicts; they never manufacture users, approvals, publisher identity,
+or publication dates.
+
+[ADR 0020](../adr/0020-use-versioned-draft-pack-authoring-contract.md) adds generic draft-pack
+import/export plus CLI, including untrusted external-LLM research preparation. Its explicit
+selected-target/fingerprint update contract differs from deterministic fixture verification:
+only drafts may be updated, owned arrays are full desired snapshots, and deletions require
+consent. Shared catalog records are create-or-exact-compare. Initial Service Questions,
+candidates and contradictions may be created only with a brand-new Service in the same
+transaction; existing setup is protected even inactive. New Services remain inactive and new
+source Facts unpublished, with manual readiness followups rather than automatic activation.
+
+Import preserves unchanged rows, existing authors and approval/audit history. Claim/evidence
+changes reset affected trust, including Basis-scoped dependents; version semantic changes
+conservatively reset owned aggregate trust. Owners with discrepancy/re-verification history
+cannot be edited or deleted: temporal overlays cannot safely be rewritten for new meaning.
+Use a fresh successor or supported manual workflow. Unchanged scenarios retain seals and may
+become stale; humans must explicitly review and resave through Admin. Imports cannot clear
+existing risks or manufacture approvals/verification. All publication gates remain separate.
+
+Import and export take short fixed knowledge-table locks with nonblocking acquisition for
+coherent reads and revision checks against ordinary writers, returning retryable
+`concurrent_edit` conflicts. A complete-live-state fingerprint includes protected trust and
+history, not just authored text. A small internal last-request/post-revision hash receipt
+permits only proven unchanged exact retries; no raw uploaded pack is stored. See the
+[operator guide](../draft-packs/README.md) for stale revisions, deletion consent and permissions.
+PR3 Admin upload/preview and publication-diagnostics UI are not included.
 
 The passport importer recognizes only its exact legacy, pre-checklist-Question, and
 pre-Fee-Question scenario seals. After all other integrity checks pass, rerunning it upgrades an

@@ -105,9 +105,10 @@ Remove `PROCEDURE_VERSION_REVIEWS_REQUIRED` from old configuration; it is no lon
 there is no production off mode. Test-only settings isolate unrelated tests by explicitly omitting
 the review gate, not by disabling production review policy.
 
-This is PR1's policy/audit scope only. Use manual Admin authoring or the deterministic imports
-below, not a generic importer, LLM ingestion, or Admin upload feature. See
-[ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md).
+This policy/audit boundary was established by
+[ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md). PR2 also
+supports the generic draft-pack CLI below; manual Admin authoring and deterministic imports
+remain available. PR3 Admin pack-upload/preview is not implemented.
 
 ## Frontend setup
 
@@ -137,6 +138,59 @@ active Services are listed; publication alone does not activate one. Use the imp
 and the mode-aware Admin review/publish workflow to author usable guidance. Imports
 do not publish or approve knowledge. Empty navigation and API unavailability are explicit
 states, not a switch to a demo catalog or sample plan.
+
+## Generic draft-pack authoring
+
+See [draft packs v1](draft-packs/README.md) for the exact schema, supported synthetic example,
+[external-LLM prompt](draft-packs/llm-prompt.md), permission matrix and safe update roundtrip.
+Use the host-run setup above and apply pending branch migrations to your chosen local database
+before database-backed commands; adding this feature does not automatically migrate an existing
+host-run database or update its `.env`. No production migration is authorized by these examples.
+
+With a real active staff `EDITOR` holding the required permissions, run from the repository root:
+
+```bash
+uv run python backend/manage.py export_draft_context --actor EDITOR \
+  --output /tmp/bardi-context.json --settings=bardi.settings.development
+uv run python backend/manage.py import_draft_pack docs/draft-packs/examples/minimal-research.json \
+  --new --actor EDITOR --dry-run --settings=bardi.settings.development
+uv run python backend/manage.py export_draft_pack --version DRAFT_ID --actor EDITOR \
+  --output /tmp/bardi-draft.json --settings=bardi.settings.development
+```
+
+The last command requires an existing version: dry-run creates none. Remove `--dry-run` only
+after inspecting the result on a disposable development database. The example creates an inactive
+Service and unpublished source Fact, not usable government guidance. Exports refuse existing
+output paths; there is no overwrite flag. For `export_draft_pack`, `--version ID` selects knowledge
+and intentionally overrides Django's usual version-banner option.
+
+For updates preserve the exported fingerprint, use `--target-version DRAFT_ID` instead of `--new`,
+and add `--allow-deletions` only for reviewed intended deletions. Existing Service setup is
+protected even inactive; imports cannot verify, approve, publish, clear risks or rewrite evidence
+workflow history. Finish manual Admin followups. `concurrent_edit` means retry after competing
+work finishes; conservative fingerprints may require re-export/reconciliation. The short
+knowledge-table locks used by import/export permit ordinary reads but can briefly delay writers.
+
+### Draft-pack contract checks
+
+Schema generation/parsing needs no PostgreSQL:
+
+```bash
+uv run python tools/export_draft_pack_schema.py --check
+(cd backend && uv run python -m unittest knowledge.tests.test_draft_pack_schema -v)
+```
+
+When intentionally changing the transport, run `uv run python tools/export_draft_pack_schema.py`,
+review `docs/draft-packs/draft-pack-v1.schema.json` and the supported example, then rerun `--check`.
+Do not hand-edit the generated schema. Focused service/CLI/history/concurrency regressions require
+exported environment values and PostgreSQL, using a disposable Django test database:
+
+```bash
+(cd backend && uv run python manage.py test knowledge.tests.test_draft_packs \
+  --settings=bardi.settings.test --noinput)
+```
+
+These scoped checks do not replace the complete backend delivery suite below.
 
 ## Passport-renewal knowledge import and review
 

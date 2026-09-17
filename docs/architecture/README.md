@@ -22,7 +22,15 @@ An ADR may intentionally supersede an older ADR. The newer ADR must say so expli
 - [`production-backend.md`](production-backend.md) — system boundaries, application layers, persistence strategy, privacy constraints, testing strategy, and initial infrastructure constraints.
 - [`domain-model.md`](domain-model.md) — stable identities, version-owned content, ownership rules, evidence/trust concepts, and persistence boundaries.
 - [`rules-contract.md`](rules-contract.md) — typed Facts, rules AST, three-valued semantics, Procedure/Basis evaluation, Missing-Fact behavior, diagnostics, and public result families.
-- [`knowledge-publication.md`](knowledge-publication.md) — draft/review/publish lifecycle, immutable Procedure Versions, evidence gates, trust/freshness, review requirements, and withdrawal/re-verification behavior.
+- [`knowledge-publication.md`](knowledge-publication.md) — draft/review/publish lifecycle, immutable Procedure Versions, evidence gates, trust/freshness, and withdrawal/re-verification behavior.
+- [`procedure-version-review-roles.md`](procedure-version-review-roles.md) — detailed subordinate publication contract for review modes, accountable authors, reviewer/specialist eligibility, signatures, and approval audit capture.
+- [`django-admin-lifecycle.md`](django-admin-lifecycle.md) — detailed subordinate contract for staff capabilities and safe Admin adapters over authoring, preview, review, publication, and re-verification services.
+
+Read the document that owns the topic, plus relevant accepted ADRs, as needed; the detailed
+contracts above do not create separate publication paths. Use [draft packs](../draft-packs/README.md)
+for operator import/export instructions and [development](../development.md) for setup and check
+commands. The glossary names concepts; architecture defines their contracts; operator guides
+explain how to use them.
 
 ## Change process
 

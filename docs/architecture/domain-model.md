@@ -126,13 +126,26 @@ Service routing uses three layers:
 2. `ServicePointVersion` — time-bounded material details such as address/availability;
 3. `ProcedureServicePointAssociation` — Procedure-Version-specific availability/jurisdiction rule connecting the Procedure Version to a Service Point Version.
 
-A rule about who may use an office belongs to the Procedure association, not to the Service Point identity. Routing may resolve zero, one, or multiple points and remains locally inconclusive when necessary.
+A rule about who may use an office belongs to the Procedure association, not to the Service Point identity. Routing evaluates all associations, may resolve zero, one, or multiple points, and remains locally inconclusive when necessary; it does not rank a nearest/best office.
+
+### Service Point routing aggregate
+
+Stable points have bilingual identities; material versions have bilingual addresses and inclusive
+effective intervals. Associations own required applicability predicates and link to one material
+version. Both material versions and associations are claim-level Evidence Link owners. Current
+material versions for one stable point cannot overlap; association intervals may overlap because
+each remains a distinct jurisdiction claim. Published/withdrawn reachability preserves stable
+identity, material, association, evidence, Source, and Authority rows.
 
 ## Evidence, discrepancy, and trust
 
 ### Evidence Link
 
 Internal claim-specific provenance connecting one evidence-bearing item to one or more preserved Sources, including the exact relied-upon passage and retrieval/applicability context.
+
+Each Evidence Link has exactly one owner: Checklist Item, Step, Warning, Fee, Eligibility Basis,
+Procedure Dependency, Service Point Version, or Procedure–Service Point Association. Shared
+Sources and Authorities remain preserved provenance; ownership is not citation presentation.
 
 ### Evidence Discrepancy
 
@@ -144,9 +157,9 @@ Publication lifecycle (`draft`, `published`, `withdrawn`) is separate from calcu
 
 ## Steps, Warnings, and claim provenance
 
-Steps and Warnings are immutable Procedure-Version-owned bilingual guidance. Steps have stable per-version IDs, phases, deterministic `(phase_order, slot, semantic_id)` ordering, applicability, temporal trust, and procedure or Eligibility-Basis scope. `EligibilityBasis` is presently only a relational scope anchor; qualification is intentionally deferred. Basis Steps fail closed unless matched Basis IDs are supplied.
+Steps and Warnings are immutable Procedure-Version-owned bilingual guidance. Steps have stable per-version IDs, phases, deterministic `(phase_order, slot, semantic_id)` ordering, applicability, temporal trust, and procedure or Eligibility-Basis scope. Eligibility Bases carry the reachability and required qualification rules described above. Basis Steps fail closed unless matched Basis IDs are supplied.
 
-Warnings use deterministic `(display_order, semantic_id)` ordering. Administrative warnings make external assertions and require claim evidence. Product safety, regeneration, and limitation wording is presentation policy and must not carry Evidence Links. Every Evidence Link has exactly one Checklist Item, Step, or Warning owner; shared Sources and Authorities remain preserved provenance.
+Warnings use deterministic `(display_order, semantic_id)` ordering. Administrative warnings make external assertions and require claim evidence. Product safety, regeneration, and limitation wording is presentation policy and must not carry Evidence Links. Evidence ownership follows the complete [Evidence Link contract](#evidence-link).
 
 ## Transient concepts that are not persistence requirements
 
@@ -171,14 +184,3 @@ A deterministic projection/result DTO assembled from a Procedure Version and cur
 Relational storage is preferred for identities, version-owned claims, evidence, relationships, temporal metadata, review state, and objects that editors need to query or validate individually.
 
 Typed predicate ASTs are stored as validated JSONB values owned by their semantic record. Rule nodes are not normalized into generic database rows, and executable Python/JavaScript expressions are forbidden as authored rules.
-
-## Service Point routing aggregate
-
-Routing follows ADR 0010's three layers: a stable bilingual `ServicePoint`, inclusive
- time-bounded bilingual-address `ServicePointVersion`, and an explicitly
-`ProcedureVersion`-owned `ProcedureServicePointAssociation`. Associations own required
-applicability predicates and link to one material version. Both material versions and
-associations are claim-level Evidence Link owners. Current material versions for one stable
-point cannot overlap; association intervals may overlap because each remains a distinct
-jurisdiction claim. Published/withdrawn reachability preserves stable identity, material,
-association, evidence, Source, and Authority rows.

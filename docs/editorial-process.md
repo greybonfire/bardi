@@ -1,18 +1,13 @@
 # Editorial process
 
 **Status:** Operational guide  
-**Audience:** Researchers, editors, reviewers, specialists, publishers, and developers supporting editorial imports
+**Audience:** Researchers, editors, reviewers, specialists, and publishers
 
 This guide explains how researched administrative guidance moves from source material to a
-published Bardi Procedure Version. It covers both normal staff editing through Django Admin and
-the supported programmatic importer pattern.
+published Bardi Procedure Version. Use manual Django Admin editing or import a reviewed draft
+pack, then complete the same human review and publication workflow.
 
-The production architecture and ADRs remain authoritative if this guide ever conflicts with them.
-Start with [the production architecture authority](architecture/README.md), especially
-[the domain model](architecture/domain-model.md),
-[knowledge publication](architecture/knowledge-publication.md),
-[review roles](architecture/procedure-version-review-roles.md), and
-[the Admin lifecycle](architecture/django-admin-lifecycle.md).
+For authoritative contracts, see the [production architecture and accepted ADRs](architecture/README.md).
 
 ## 1. The editorial mental model
 
@@ -71,10 +66,10 @@ draft. One eligible reviewer may approve several ordinary dimensions.
 
 ### Solo now; independent when the team joins
 
-[ADR 0019](adr/0019-use-explicit-solo-and-independent-publication-review-modes.md) replaces blanket
-second-person publication with deployment-wide `PROCEDURE_VERSION_REVIEW_MODE`: exactly `solo` or
-`independent`, default `independent`, invalid values fail closed. Local `.env.example` explicitly
-opts into `solo`; the old `PROCEDURE_VERSION_REVIEWS_REQUIRED` flag is unsupported.
+Confirm the deployment's review mode with your operator: **solo** or **independent**.
+The default is independent; local development explicitly opts into solo. The exact eligibility,
+dimensions and signature rules live in the [review policy](architecture/procedure-version-review-roles.md);
+permission and action contracts live in the [Admin lifecycle](architecture/django-admin-lifecycle.md).
 
 In **solo**, name the accountable author and configure risk flags truthfully, complete the editor
 self-check, then publish with existing permissions. The author may publish; skip general approval
@@ -87,18 +82,12 @@ Without a real specialist, keep high-risk content unpublished. Never omit or cle
 policy. Evidence, trust, scenarios, domain validation, bilingual completeness, effective dates and
 immutable snapshots are unchanged; there are no new publication states.
 
-When reviewers join, an operator sets `PROCEDURE_VERSION_REVIEW_MODE=independent` across the
-deployment and restarts backend processes (see [development configuration](development.md#solo-now-independent-when-the-team-joins)).
-Future publication attempts require all applicable general dimensions, current signatures and
-permissions, and reviewer independence from author and publisher. The author may still publish.
-Mode changes never rewrite past publications. New publish audits record applied `review_mode` and
-only actual fresh eligible independent approvals consumed by it; legacy events and withdrawal rows
-retain null/unrecorded mode, not retrospective review claims.
+When reviewers join, ask an operator to enable independent mode using the
+[development configuration](development.md#solo-now-independent-when-the-team-joins).
+Future publications then need the applicable fresh general approvals, independent of author and
+publisher; the author may still publish. Mode changes never rewrite past publications.
 
-PR1 established this policy and honest audit history. PR2 established the
-[generic draft-pack import/export service and CLI](draft-packs/README.md); the native Admin adapter
-now adds upload → inspect → confirm, downloads, advisory publication readiness and stored-scenario
-bilingual previews. Manual Admin authoring and deterministic importers remain available.
+Manual Admin authoring, draft-pack upload and deterministic importers remain available.
 External-LLM research preparation is untrusted input, not automatic ingestion or verification.
 
 ## 3. Before entering data
@@ -131,35 +120,25 @@ Reuse the existing Fact Definition when the meaning and type are genuinely the s
 
 ### 4.1 Start the local Admin
 
-With the development environment configured:
-
-```bash
-cp .env.example .env
-set -a
-. ./.env
-set +a
-uv sync --locked --extra dev
-docker compose up -d postgres
-uv run python backend/manage.py migrate --settings=bardi.settings.development
-uv run python backend/manage.py runserver --settings=bardi.settings.development
-```
-
-Open `http://localhost:8000/admin/` and sign in with a staff account that has the permissions
-needed for your role.
+For local practice, follow [backend setup](development.md#backend-setup-host-run-workflow),
+then open `http://localhost:8000/admin/`. For a shared environment, use the Admin address supplied
+by your operator. Sign in with your own staff account with the permissions needed for your role;
+ask an operator for access rather than borrowing a publisher's account.
 
 ### Draft-pack alternative: inspect before importing
 
-**Import one procedure, not the whole Service.** Each pack contains exactly one draft **Procedure
-Version**. For example, you can import a passport-renewal draft without importing the Service's
-other passport procedures. Reference existing Service/Procedure identities by their stable semantic
-IDs; their catalog definitions do not need to be repeated. Other procedures remain untouched.
+**Import one Procedure Version's owned guidance, not the whole Service.** For example, you can
+import a passport-renewal draft without modifying other versions' owned guidance. A pack may also
+create or reuse shared catalog identities, including other Procedures. Reference existing
+Service/Procedure identities by their stable semantic IDs; their catalog definitions do not need
+to be repeated.
 
 Two boundaries matter:
 
 - **The selected draft is a full snapshot, not a partial patch.** Include all of its intended
   owned collections (requirements, steps, fees, evidence, scenarios, and so on). Removing an
   existing row proposes deletion; omitting a required collection is invalid.
-- **Existing Service setup is separate.** Imports cannot add or change its Questions,
+- **Existing Service setup is separate.** Draft-pack imports cannot add or change its Questions,
   procedure-selection rules/candidates, or contradictions, even if the Service is inactive.
   Adjust those in Admin when needed, such as when adding a new procedure. Initial setup can
   accompany a brand-new Service created by the same import, but the pack still contains only
@@ -170,29 +149,17 @@ draft**. For an existing draft, use its **Draft-pack tools**: export that draft'
 pack with revision, download read-only vocabulary context, or **Inspect import into [semantic ID]**.
 Preserve the exported revision and full owned snapshot.
 
-**Inspect proposed changes** shows before/after values, trust consequences and publication blockers
-without saving. Incomplete research is allowed: blockers prevent publication, not a structurally
-valid draft import. Review any deletion consent, then **Confirm draft import**. Confirmation lasts
-15 minutes and binds the exact file, editor and target to the inspected state. With JavaScript the
-File input is retained; without it reselect the same file. File/state changes require reinspection;
-stale exported revisions require fresh export and reconciliation. An unchanged exact retry can be
-a no-op; the token is not one-use. See the [full workflow](draft-packs/README.md#admin-upload-inspect-then-confirm).
+Choose the JSON file and **Inspect proposed changes** without saving. Review the target,
+before/after values, trust resets and every proposed deletion, then **Confirm draft import**
+with the same file. Structurally valid incomplete research can be imported despite publication
+blockers. Follow the [pack workflow](draft-packs/README.md#admin-upload-inspect-then-confirm)
+for confirmation, advisory readiness checks and stored-scenario previews, and the
+[recovery table](draft-packs/README.md#recovery-quick-reference) for errors or stale state.
 
-**Check publication readiness as current editor** checks you as prospective publisher, including
-missing publish permission and all other configured gates. It is advisory, never an approval.
-**Preview stored scenarios** runs only the selected stored scenario on explicit request and shows
-Arabic/English guidance, uncertainty and source/freshness details. Stale seals can coexist with
-matching expectations: review and resave manually. Inactive Services remain inconclusive, not
-silently activated; unavailable previews are not successful tests. Normal draft loads/saves do
-not run these tools.
-
-Imports and previews never verify, approve, publish or activate. Continue the manual steps below:
-review evidence and bilingual meaning, publish appropriate Facts, finish existing-Service setup
-and consequential Questions/candidates, author/review/resave scenarios, obtain mode-required
-reviews and independent specialists for every true risk, publish canonically and activate the
-Service explicitly. Legacy blank Evidence Link IDs need lifecycle-safe manual assignment before
-export; protected workflow history requires a successor or supported manual workflow, never
-history deletion to force an import.
+Draft-pack imports and previews never verify, approve, publish or activate; readiness is not approval.
+Continue the manual steps below and the [editor checklist](#12-editor-checklist), including
+human scenario review/resave, Fact publication and existing-Service setup. Activate the Service
+explicitly when ready. Never delete protected history to force an import.
 
 ### 4.2 Create or reuse stable vocabulary and provenance
 
@@ -453,22 +420,8 @@ approvals.
 
 ### 4.18 Do an editor self-check before requesting review
 
-Before asking reviewers to approve the version, inspect the draft as one coherent unit.
-
-Check at least:
-
-- Arabic and English text convey the same meaning;
-- all referenced Fact keys exist and have the correct types;
-- consequential source Facts have Service Questions;
-- applicability rules are attached at the correct ownership level;
-- ordering is deterministic;
-- effective dates are correct and non-overlapping where required;
-- official claims have appropriate evidence;
-- unknowns remain explicit;
-- trust/verification state matches the evidence;
-- scenarios describe the intended behavior;
-- specialist-risk flags are correct; and
-- no editor has filled a research gap with an unsupported assumption.
+Inspect the draft as one coherent unit using the [editor checklist](#12-editor-checklist).
+Do this in solo mode too, before publishing; it is not approval paperwork.
 
 Saving individual Admin forms catches many local validation errors. Publication is the final
 whole-version validation boundary and may still find cross-record problems.
@@ -495,9 +448,9 @@ Ordinary review dimensions are:
 
 The reviewer must have `knowledge.review_procedureversion`.
 
-Approval records bind to a SHA-256 signature of the coherent reviewed draft state. If an editor
-changes consequential content afterward, the old approval remains in history but becomes stale.
-Request a fresh approval for the new state when required by the applied mode.
+Approval binds to the reviewed draft state. Consequential changes afterward make it stale,
+not deleted. Finish editing first, then request fresh approval when required. See the
+[review policy](architecture/procedure-version-review-roles.md) for exact signature and eligibility rules.
 
 ### 4.20 Record specialist approval
 
@@ -514,14 +467,8 @@ rule/logic, scenarios, or bilingual meaning.
 When all review required by the deployment mode is complete, a publisher with `knowledge.publish_procedureversion` selects the draft
 on the Procedure Versions changelist and chooses **Publish selected drafts**.
 
-Publication is not a simple state-field edit. The canonical publication service:
-
-- locks the relevant state;
-- runs the complete publication gates;
-- checks mode-required review independence, permissions and freshness;
-- validates temporal overlap;
-- changes lifecycle state atomically; and
-- records immutable audit history.
+Do not edit a state field to publish. This action validates the whole version, including evidence,
+scenarios, dates and mode-required reviews, and records immutable audit history atomically.
 
 If publication is rejected, Admin reports diagnostics in the form:
 
@@ -585,181 +532,29 @@ or deleting history.
 
 ## 8. Programmatic editorial workflow
 
-### 8.1 What "programmatic" means today
+The [draft-pack CLI workflow](draft-packs/README.md#cli-research-dry-run-then-write) supports the
+same one-version snapshot boundary as Admin upload; there is no public editorial upload API.
+Prepare reviewed JSON using the schema, example and [external-LLM prompt](draft-packs/llm-prompt.md).
+Use your real staff `--actor`, dry-run first, and inspect changes and manual followups before
+writing. Export before updates, retain the revision and explicitly select the target. Never
+consent to deletions you have not reviewed.
 
-Bardi supports the [versioned draft-pack CLI](draft-packs/README.md) for generic JSON authoring,
-export and read-only vocabulary context alongside the native Admin upload, inspection and
-stored-scenario preview workflow. **One pack imports one draft Procedure Version, not an entire
-Service**, whether uploaded through Admin or imported through the CLI. It is a full snapshot of
-that draft, not a partial patch; other procedures in the Service are untouched. Existing-Service
-Questions and procedure-selection rules still require separate Admin edits when needed.
+A separate **deterministic production importer** loads researched, code-reviewed data repeatably.
+It uses `--author`, not the generic pack CLI's `--actor`. Ask a developer to use that path when
+exact reproducibility and integrity verification justify custom code. Neither route verifies,
+approves or publishes the draft; complete the human workflow above.
 
-There is no public editorial upload API. For CLI authoring, start with the supported schema/example and
-[external-LLM prompt](draft-packs/llm-prompt.md), inspect sources and Fact vocabulary, then dry-run
-with a real active staff `--actor`. For updates, export first, retain `base_revision`, explicitly
-select `--target-version`, and review every owned deletion before `--allow-deletions`.
-
-New Services stay inactive and source Facts unpublished. Initial Questions/selection setup can
-only accompany a Service created by that same import; any existing Service, even inactive, is
-protected from setup changes. Shared catalog definitions are create-or-exact-compare. Import
-never assigns approvals or verification, replaces an existing author, clears risks, or publishes.
-Complete evidence, Fact publication, Service setup/activation, scenarios and reviews manually.
-
-Changed claims/evidence reset affected trust. Owners with evidence discrepancy/re-verification
-history cannot be edited or deleted by import because historical overlays cannot safely follow
-changed meaning; use a successor/manual workflow. Approval history is retained, but signatures
-may become stale. Unchanged scenarios keep their seals: explicitly review and resave stale ones
-in Planning Scenario Admin, rather than reimporting identical JSON to simulate review. The
-[pack guide](draft-packs/README.md) details exact retry receipts, stale revisions, concurrency,
-permissions and legacy blank Evidence Link IDs.
-
-A separate supported pattern is a **deterministic production importer**, normally paired with a
-Django management command. Sections 8.2–8.5 describe that existing code-backed pattern (including
-its `--author` flag), not the generic pack CLI's `--actor` interface. It is appropriate when:
-
-- a researched Procedure contains many related rows;
-- the source pack is maintained in code/reviewed data;
-- repeatable environments need the same draft;
-- integrity must be checked exactly; or
-- manual entry would be error-prone.
-
-For small editorial corrections or ordinary day-to-day updates, Admin is usually simpler.
-
-### 8.2 Existing examples
-
-The current production importers are:
-
-```bash
-uv run python backend/manage.py import_passport_renewal --author <username> \
-  --settings=bardi.settings.development
-
-uv run python backend/manage.py import_national_id_renewal --author <username> \
-  --settings=bardi.settings.development
-
-uv run python backend/manage.py import_temporary_family_exemption --author <username> \
-  --settings=bardi.settings.development
-```
-
-Each command requires an existing staff user. It does not create users, approvals, or publication
-metadata.
-
-A successful rerun verifies or returns the same intended state rather than silently creating a
-second copy.
-
-### 8.3 Rules for a new importer
-
-A production importer should be:
-
-- **deterministic** — the same researched input produces the same semantic state;
-- **idempotent** — a repeat run verifies/returns the intended rows rather than duplicating them;
-- **atomic** — importer writes and final integrity verification succeed or roll back together;
-- **fail-closed** — unexpected existing semantic drift is rejected rather than overwritten;
-- **actor-accountable** — the draft has a real saved staff author;
-- **draft-only** — the importer does not manufacture review approvals or publication;
-- **evidence-preserving** — Sources and claim-specific evidence are explicit;
-- **contract-aware** — it uses current production models and services, not hand-written database
-  SQL or historical prototype shapes.
-
-The public importer should own the outer atomic importer-plus-verifier boundary. The current
-pattern is conceptually:
-
-```python
-@transaction.atomic
-def _import_example(*, author: models.Model) -> ProcedureVersion:
-    # Create or verify the researched draft and related records.
-    ...
-    return version
-
-
-@transaction.atomic
-def import_example(*, author: models.Model) -> ProcedureVersion:
-    version = _import_example(author=author)
-
-    from .example_integrity import verify_example_import
-
-    verify_example_import(version)
-    return version
-```
-
-The verifier must run exactly once for every public importer invocation, including idempotent
-existing-row paths. If verification fails, the entire call must roll back.
-
-### 8.4 Add a management command
-
-Prefer a small management command as the operator-facing entry point. It should:
-
-1. require `--author`;
-2. resolve an existing staff user;
-3. reject an unknown/non-staff author;
-4. call the public importer; and
-5. print the resulting semantic ID/state.
-
-Keep command logic thin. Domain construction and verification belong in importer/integrity code,
-not in argument handling.
-
-### 8.5 Direct importer use
-
-For developer-assisted work, the same public importer may be called from a Django-aware script or
-shell after resolving a real staff user:
-
-```python
-from django.contrib.auth import get_user_model
-from knowledge.importers.passport_renewal import import_passport_renewal
-
-author = get_user_model().objects.get(username="editor", is_staff=True)
-version = import_passport_renewal(author=author)
-print(version.semantic_id, version.state)
-```
-
-Prefer the management command for routine operator use because it is easier to reproduce and
-audit operationally.
-
-Do not use one-off ORM scripts that call `.update()` on published/version-owned rows to bypass
-model validation, immutability, or publication services.
-
-### 8.6 Programmatic review, publication, withdrawal, and re-verification
-
-Canonical service functions exist for lifecycle operations, including:
-
-- `approve_review_dimension()`;
-- `approve_specialist_risk()`;
-- `publish_procedure_version()`;
-- `withdraw_procedure_version()`;
-- `record_evidence_reverification()`; and
-- `clone_published_procedure_version()`.
-
-These services preserve domain and transactional invariants, but custom tooling still needs an
-explicit authorization boundary around who is allowed to invoke it. Django Admin already provides
-that permission boundary and is the preferred staff interface.
-
-Do not build an ad-hoc script that calls lifecycle services under a generic superuser simply to
-bypass the applied review mode, specialist independence, or permissions. Solo author/publication
-uses the normal permission-controlled path, not a generic superuser workaround.
-
-If a future bulk-editor tool is added, it should call these same canonical services rather than
-reimplementing state transitions.
+Developers: see [importer development](importer-development.md) for supported examples,
+commands, implementation rules and lifecycle authorization. Use Admin for staff lifecycle actions;
+custom scripts cannot bypass permissions, eligible review or immutable history.
 
 ## 9. Choosing Admin vs an importer
 
-Use **Admin** when:
-
-- an editor is researching or correcting a small number of records;
-- human review of each field/evidence link is useful;
-- the change is exploratory but still within a draft;
-- the update is a normal successor-version edit; or
-- the operation is review, publication, withdrawal, or semantic-preserving re-verification.
-
-Use a **programmatic importer** when:
-
-- a complete researched data set should be reproducible;
-- many related rows must be constructed consistently;
-- idempotent verification matters;
-- the same data must be loaded into multiple environments; or
-- a reviewed code/data change is safer than repetitive manual entry.
-
-Use the **generic draft-pack CLI** when reviewed research JSON or an exported draft needs a
-bounded, explicit snapshot import without writing a custom importer. Always dry-run first;
-use Admin for protected existing Service configuration and all lifecycle followups.
+| Method | Purpose |
+| --- | --- |
+| Admin | Field-by-field research, small corrections, successor edits, existing-Service setup and all staff lifecycle actions. |
+| Deterministic importer | Code-reviewed, reproducible construction of related records across environments, with idempotent verification. |
+| Generic draft-pack CLI | Reviewed JSON or exported snapshots without custom code; dry-run first, then complete setup and lifecycle followups in Admin. |
 
 All paths meet at the same draft/review/publication lifecycle. Programmatic import is not a
 shortcut around the applied review policy or other publication gates.
@@ -821,8 +616,8 @@ Before editing a new real Service, practice on a disposable development database
 1. inspect one of the imported researched drafts;
 2. trace Service -> Procedure -> Procedure Version -> Checklist/Steps/Fees/Evidence;
 3. inspect its Review Policy and Planning Scenarios;
-4. create a small draft-only change on a cloned successor;
-5. observe how that change makes old approvals inapplicable;
+4. make a small change to that draft (if starting from a published version, clone a successor first);
+5. inspect review freshness; any approvals for the previous consequential state are now stale;
 6. in `independent`, have another eligible person record general review (do not switch accounts
    to simulate independence); in either mode, obtain any required real specialist approvals;
 7. intentionally attempt publication before all requirements are met and read the diagnostics;
@@ -839,16 +634,16 @@ Before handing a draft to reviewers:
 
 - [ ] Service and Procedure identities are correct.
 - [ ] Candidate selection and version applicability are at the correct levels.
-- [ ] Fact Definitions are reused where semantics are truly shared.
+- [ ] Fact Definitions are reused where semantics are truly shared; referenced keys and types are correct.
 - [ ] Consequential source Facts have bilingual Service Questions.
 - [ ] Arabic and English public text are semantically aligned.
 - [ ] Requirements, steps, fees, warnings, Bases, dependencies, and routing contain no invented
       claims.
 - [ ] Unknown/unverified values are explicit.
 - [ ] Material claims have claim-specific Evidence Links.
-- [ ] Sources are classified and preserved correctly.
+- [ ] Sources are classified and preserved correctly; trust/verification state matches the evidence.
 - [ ] Discrepancies are recorded rather than hidden.
-- [ ] Effective dates and ordering are intentional.
+- [ ] Effective dates are correct and non-overlapping where required; ordering is deterministic.
 - [ ] Planning Scenarios cover meaningful outcomes and edges.
 - [ ] Review Policy names the accountable author and correct specialist risks.
 - [ ] Editing is complete before reviewers approve the state.

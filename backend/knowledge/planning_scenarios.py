@@ -510,14 +510,14 @@ def _set_lifecycle_transition(value: str) -> None:
         cursor.execute("SELECT set_config('bardi.procedure_version_lifecycle', %s, true)", [value])
 
 
-def _execute_scenarios(
+def _run_stored_scenarios(
     context: PublicationContext,
     scenarios: tuple[PlanningScenario, ...],
-) -> tuple[PublicationDiagnostic, ...]:
-    """Expose the draft in a rollback-only savepoint and run production planning."""
+) -> tuple[dict[int, PlanningResult], tuple[PublicationDiagnostic, ...]]:
+    """Detach production results; always roll back temporary lifecycle exposure."""
 
     if context.version.pk is None or context.actor.pk is None:
-        return ()
+        return {}, (PublicationDiagnostic("core.planning_scenarios", "scenario_execution_failed"),)
     # The structural temporal gate already owns the overlap diagnostic. Avoid turning that
     # independent defect into a generic scenario execution failure as well.
     overlaps = ProcedureVersion.objects.filter(
@@ -535,31 +535,31 @@ def _execute_scenarios(
             | models.Q(effective_to__gte=context.version.effective_from)
         )
     if overlaps.exists():
-        return ()
-
-    sid = transaction.savepoint()
-    failures: list[PublicationDiagnostic] = []
-    try:
-        temporary_time = timezone.now()
-        _set_lifecycle_transition("publish")
-        updated = ProcedureVersion.objects.filter(
-            pk=context.version.pk,
-            state=ProcedureVersion.State.DRAFT,
-        ).update(
-            state=ProcedureVersion.State.PUBLISHED,
-            published_at=temporary_time,
-            published_by_id=context.actor.pk,
+        return {}, (
+            PublicationDiagnostic("core.planning_scenarios", "overlapping_published_version"),
         )
-        if updated != 1:
-            raise RuntimeError("candidate draft could not be exposed for scenario execution")
 
-        from .evidence_workflow_temporal import load_knowledge_snapshot_as_of
+    results: dict[int, PlanningResult] = {}
+    current_name = ""
+    try:
+        with transaction.atomic():
+            _set_lifecycle_transition("publish")
+            updated = ProcedureVersion.objects.filter(
+                pk=context.version.pk,
+                state=ProcedureVersion.State.DRAFT,
+            ).update(
+                state=ProcedureVersion.State.PUBLISHED,
+                published_at=timezone.now(),
+                published_by_id=context.actor.pk,
+            )
+            if updated != 1:
+                raise RuntimeError("candidate draft could not be exposed")
+            from .evidence_workflow_temporal import load_knowledge_snapshot_as_of
 
-        snapshots: dict[date, KnowledgeSnapshot] = {}
-        for scenario in scenarios:
-            try:
-                raw_date = cast(str, scenario.evaluation_context["evaluation_date"])
-                evaluation_date = date.fromisoformat(raw_date)
+            snapshots: dict[date, KnowledgeSnapshot] = {}
+            for scenario in scenarios:
+                current_name = scenario.name
+                evaluation_date = date.fromisoformat(scenario.evaluation_context["evaluation_date"])
                 snapshot = snapshots.get(evaluation_date)
                 if snapshot is None:
                     snapshot = load_knowledge_snapshot_as_of(evaluation_date)
@@ -570,30 +570,31 @@ def _execute_scenarios(
                     cast(Locale, scenario.evaluation_context["locale"]),
                     evaluation_date,
                 )
-                result = plan_stateless(snapshot, planning_input)
-            except Exception:
-                # Fail closed without serializing exception details or submitted Facts. A database
-                # error may leave the transaction unusable until the outer savepoint is rolled back,
-                # so stop executing scenarios after recording the named failure.
-                failures.append(
-                    PublicationDiagnostic(
-                        PlanningScenarioPublicationGate.name,
-                        "scenario_execution_failed",
-                        scenario.name,
-                    )
-                )
-                break
-            if not _scenario_matches(scenario, result):
-                failures.append(
-                    PublicationDiagnostic(
-                        PlanningScenarioPublicationGate.name,
-                        "scenario_failed",
-                        scenario.name,
-                    )
-                )
-    finally:
-        transaction.savepoint_rollback(sid)
-        _set_lifecycle_transition("")
+                results[scenario.pk] = plan_stateless(snapshot, planning_input)
+            # This also discards on_commit callbacks and restores the caller's SET LOCAL values.
+            transaction.set_rollback(True)
+    except Exception:
+        # Catch outside the atomic boundary, including poisoned database transactions.
+        return results, (
+            PublicationDiagnostic(
+                "core.planning_scenarios", "scenario_execution_failed", current_name
+            ),
+        )
+    return results, ()
+
+
+def _execute_scenarios(
+    context: PublicationContext,
+    scenarios: tuple[PlanningScenario, ...],
+) -> tuple[PublicationDiagnostic, ...]:
+    results, diagnostics = _run_stored_scenarios(context, scenarios)
+    # The canonical temporal gate owns overlap; preview reports unavailability explicitly.
+    failures = [d for d in diagnostics if d.code != "overlapping_published_version"]
+    failures.extend(
+        PublicationDiagnostic("core.planning_scenarios", "scenario_failed", scenario.name)
+        for scenario in scenarios
+        if scenario.pk in results and not _scenario_matches(scenario, results[scenario.pk])
+    )
     return tuple(failures)
 
 

@@ -9,6 +9,7 @@ from django.forms.models import BaseInlineFormSet
 from django.http import HttpRequest
 
 from .admin_lifecycle_admin import EvidenceLinkLifecycleAdmin, ProcedureVersionLifecycleAdmin
+from .draft_pack_admin import DraftPackAdminMixin
 from .eligibility_basis_admin import EligibilityBasisAdmin as EligibilityBasisAdmin
 from .eligibility_basis_admin import EligibilityBasisOwnerInline
 from .fee_admin import FeeOwnerInline
@@ -288,7 +289,7 @@ class ChecklistItemOwnerInline(admin.TabularInline):  # type: ignore[type-arg]
 
 
 @admin.register(ProcedureVersion)
-class ProcedureVersionAdmin(ProcedureVersionLifecycleAdmin):
+class ProcedureVersionAdmin(DraftPackAdminMixin, ProcedureVersionLifecycleAdmin):
     list_display = (
         "semantic_id",
         "procedure",

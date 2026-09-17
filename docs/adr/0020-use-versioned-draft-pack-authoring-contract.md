@@ -87,8 +87,10 @@ bound total transaction duration; there is no throughput/latency guarantee. High
 would require measured evidence and a coordinated writer protocol, not removal of these locks
 while retaining a false claim of coherent revision checks.
 
-PR2 implements generic import/export plus CLI and the
-[versioned schema, example and external-LLM guide](../draft-packs/README.md). Manual Admin editing
-and deterministic importers remain. PR3 Admin upload/preview and publication-diagnostics UI are
-not implemented by this decision's delivery. No public API/frontend, automatic publication,
-hosted infrastructure or production migration is introduced by this authoring interface.
+Delivery status: PR2 established generic import/export plus CLI and the
+[versioned schema, example and external-LLM guide](../draft-packs/README.md). A native Admin
+adapter is now available for upload/inspection/confirmation, downloads, advisory publication
+readiness and stored-scenario previews over those shared services. This is an adapter delivery,
+not a new architectural decision. Manual Admin editing and deterministic importers remain.
+No public API/frontend, automatic publication, hosted infrastructure or production migration
+is introduced by this authoring interface.

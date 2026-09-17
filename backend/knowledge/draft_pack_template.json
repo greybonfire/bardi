@@ -1,0 +1,82 @@
+{
+  "format": "bardi.draft-pack",
+  "format_version": 1,
+  "base_revision": null,
+  "catalog": {
+    "services": [
+      {
+        "semantic_id": "synthetic-service",
+        "text_ar": "خدمة تجريبية",
+        "text_en": "Synthetic research service"
+      }
+    ],
+    "procedures": [
+      {
+        "semantic_id": "synthetic-procedure",
+        "text_ar": "إجراء تجريبي",
+        "text_en": "Synthetic research procedure",
+        "primary_service": "synthetic-service"
+      }
+    ],
+    "facts": [
+      {
+        "key": "synthetic_ready",
+        "kind": "boolean",
+        "enum_values": [],
+        "minimum": null
+      }
+    ],
+    "authorities": [],
+    "sources": [],
+    "document_types": []
+  },
+  "version": {
+    "effective_from": null,
+    "effective_to": null,
+    "semantic_id": "synthetic-v1",
+    "procedure": "synthetic-procedure",
+    "rules_contract_version": "v1",
+    "text_ar": "",
+    "text_en": "Incomplete synthetic research; not government guidance.",
+    "applicability": {}
+  },
+  "risks": {
+    "legal": false,
+    "military": false,
+    "custody_guardianship": false,
+    "contested_identity": false
+  },
+  "service_setup": {
+    "service": "synthetic-service",
+    "questions": [
+      {
+        "semantic_id": "synthetic-question",
+        "text_ar": "هل أنت مستعد للتجربة؟",
+        "text_en": "Ready for the synthetic example?",
+        "fact": "synthetic_ready",
+        "priority": 0,
+        "resolves_facts": []
+      }
+    ],
+    "candidates": [
+      {
+        "procedure": "synthetic-procedure",
+        "selection_predicate": {
+          "op": "eq",
+          "fact": "synthetic_ready",
+          "value": true
+        }
+      }
+    ],
+    "contradictions": []
+  },
+  "bases": [],
+  "checklist_items": [],
+  "steps": [],
+  "warnings": [],
+  "fees": [],
+  "dependencies": [],
+  "routing_associations": [],
+  "evidence_links": [],
+  "scenarios": []
+}

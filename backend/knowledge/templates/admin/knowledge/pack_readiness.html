@@ -1,0 +1,3 @@
+{% if readiness %}<section class="module"><h2>Publication readiness (advisory)</h2>
+<p>Version: {{ readiness.version }} · Prospective publisher: {{ user.get_username }} ({{ readiness.prospective_publisher_id }}) · Review mode: {{ readiness.review_mode }}</p>
+{% if readiness.diagnostics %}<p>Publication is blocked. Draft import is still allowed. Resolve the following in the relevant evidence, review policy, scenario or guidance editor, then check again.</p><ul>{% for item in readiness.diagnostics %}<li><strong>{{ item.gate }}: {{ item.code }}</strong> {{ item.detail }}</li>{% endfor %}</ul>{% else %}<p>No blockers found for this editor at this moment. This is not approval or publication; publishing runs the gates again.</p>{% endif %}</section>{% endif %}

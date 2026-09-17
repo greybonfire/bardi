@@ -1,0 +1,1 @@
+{% if diagnostics %}<div class="errornote"><h3>Unable to complete this request</h3><ul>{% for diagnostic in diagnostics %}<li><strong>{{ diagnostic.code }}</strong> — {{ diagnostic.path|join:" / " }} {{ diagnostic.message }} {{ diagnostic.detail }}</li>{% endfor %}</ul><p>Resolve these issues and try again. No import was confirmed by this check.</p></div>{% endif %}

@@ -1,0 +1,9 @@
+.pack-values { margin: 1rem; overflow-wrap: anywhere; }
+.pack-values dt { font-weight: 600; margin-block-start: .75rem; }
+.pack-values dd { margin-inline-start: 1.25rem; margin-block-end: .75rem; }
+.pack-guidance { margin-block: 2rem; }
+#pack-result details { padding: 1rem; margin-block: 1rem; }
+#pack-result summary { cursor: pointer; overflow-wrap: anywhere; }
+#draft-pack-form input[type="file"] { max-width: 100%; }
+#draft-pack-form button { cursor: pointer; }
+#draft-pack-form[aria-busy="true"] button[value="inspect"] { opacity: .65; }

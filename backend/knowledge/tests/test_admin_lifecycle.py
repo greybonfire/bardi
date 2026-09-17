@@ -36,6 +36,7 @@ from knowledge.admin_lifecycle_admin import (
     ProcedureVersionLifecycleAdmin,
 )
 from knowledge.domain import load_knowledge_snapshot
+from knowledge.draft_pack_admin import DraftPackAdminMixin
 from knowledge.eligibility_basis_admin import EligibilityBasisOwnerInline
 from knowledge.evidence_workflow import EvidenceReverificationEvent
 from knowledge.fee_admin import FeeAdmin, FeeOwnerInline
@@ -172,7 +173,10 @@ class AdminCompositionTests(SimpleTestCase):
         )
 
     def test_migrated_admin_behavior_is_declared_without_installers(self) -> None:
-        self.assertIs(ProcedureVersionAdmin.__mro__[1], ProcedureVersionLifecycleAdmin)
+        self.assertEqual(
+            ProcedureVersionAdmin.__bases__,
+            (DraftPackAdminMixin, ProcedureVersionLifecycleAdmin),
+        )
         self.assertIs(EvidenceLinkAdmin.__mro__[1], EvidenceLinkLifecycleAdmin)
         for method in (
             "clone_selected_to_draft",

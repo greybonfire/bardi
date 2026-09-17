@@ -24,9 +24,9 @@ research/edit permission does not imply re-verification or lifecycle-transition 
 
 ### Generic draft-pack service permissions
 
-The [draft-pack CLI/service](../draft-packs/README.md) is a separate authoring entry point, not
-an Admin upload or preview screen (PR3 is not implemented). It requires a persisted, currently
-active staff actor reloaded from the database. New drafts require
+The [draft-pack service](../draft-packs/README.md) supports both CLI and focused native Admin
+upload → inspect → confirm adapters. It requires a persisted, currently active staff actor
+reloaded from the database. New drafts require
 `knowledge.add_procedureversion` **and** `knowledge.change_procedureversion`; updates require
 `knowledge.change_procedureversion`. These authorize the version-owned aggregate import without
 individual child add/change/delete permissions. Each new shared catalog type still requires its
@@ -41,6 +41,36 @@ configuration is protected even inactive. Import cannot grant review, publish, w
 re-verification capability, assign their metadata, clear existing risks, or rewrite history.
 Stale unchanged scenarios must be explicitly reviewed and resaved in Planning Scenario Admin;
 reimporting identical data does not reseal them. Manual editing and deterministic importers remain.
+
+### Native draft-pack tools
+
+The Procedure versions list offers **Import research draft** and **Download incomplete research
+template**. Existing version pages offer **Export authoring pack with revision** and **Download
+read-only vocabulary context**; drafts additionally offer **Inspect import into [semantic ID]**,
+**Check publication readiness as current editor**, and **Preview stored scenarios**. See the
+[operator guide](../draft-packs/README.md#admin-upload-inspect-then-confirm) for exact routes and
+confirmation/recovery behavior. There is no new dashboard or free-form simulator.
+
+Inspection uses the real importer with rollback, showing proposed changes and publication blockers;
+structurally valid incomplete drafts remain importable. Explicit confirmation requires the same
+file and a signed 15-minute actor/target/file/precondition-bound token, plus deletion consent where
+needed. Tokens are stateless, not one-use; proven unchanged exact retries may be no-ops. A global
+knowledge/settings change can conservatively require reinspection. The exported revision remains
+mandatory for updates. Fresh authorization and service validation are never replaced by the token.
+
+Standalone checks require active staff version-view permission and run only on explicit tool
+requests, not normal page loads/saves. The current editor is the prospective publisher; missing
+publish permission is a diagnostic, not a reason to omit other canonical gates. Stored-scenario
+preview uses the production planner and displays both Arabic RTL and English LTR output. Seal
+staleness and expectation matching are separate; inactive Services remain honestly inconclusive.
+Checks never approve, publish, activate or reseal. Database effects and callbacks are rolled back;
+trusted custom gates must not perform irreversible external I/O.
+
+Uploads are CSRF-protected, single-file and bounded to 8 MiB of received file bytes at the
+application handler, not at upstream infrastructure. Request-local buffering is not persistent
+staging. Raw packs never enter sessions, cookies or browser storage. JavaScript retains the File
+input for confirmation; without it, reselect the exact same file. Downloads are no-store JSON
+attachments; finalized export does not authorize finalized import.
 
 ## Draft authoring and successor cloning
 

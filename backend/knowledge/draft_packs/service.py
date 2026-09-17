@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from .inspection import DraftPackInspection
 
 from django.core.exceptions import ValidationError
 from django.db import DatabaseError, IntegrityError, transaction
@@ -54,6 +57,9 @@ from .state import (
     locked_snapshot,
     require_add,
     revision,
+)
+from .state import (
+    inspection_precondition as live_precondition,
 )
 
 
@@ -597,7 +603,7 @@ def _database_failure(exc: DatabaseError) -> None:
         fail("concurrent_edit", (), "Concurrent editing detected; reload and retry.")
     if isinstance(exc, IntegrityError):
         fail("invalid_model", (), "Database structural constraints rejected the snapshot.")
-    raise exc
+    fail("database_error", (), "The database could not complete the authoring operation.")
 
 
 def import_draft_pack(
@@ -607,7 +613,33 @@ def import_draft_pack(
     target_version: str | None = None,
     dry_run: bool = False,
     allow_deletions: bool = False,
+    inspection_precondition: str | None = None,
 ) -> dict[str, Any]:
+    return cast(
+        dict[str, Any],
+        _apply_draft_pack(
+            pack,
+            actor=actor,
+            target_version=target_version,
+            dry_run=dry_run,
+            allow_deletions=allow_deletions,
+            inspection_precondition=inspection_precondition,
+        ),
+    )
+
+
+def _apply_draft_pack(
+    pack: DraftPack | bytes | str | dict[str, Any],
+    *,
+    actor: Any,
+    target_version: str | None = None,
+    dry_run: bool = False,
+    allow_deletions: bool = False,
+    inspection_precondition: str | None = None,
+    inspect: bool = False,
+) -> dict[str, Any] | DraftPackInspection:
+    from .inspection import _capture, _inspection
+
     # Reparse model instances too: model_construct or subsequent mutation is not trusted.
     data = _normalized(
         parse_draft_pack(
@@ -627,6 +659,9 @@ def import_draft_pack(
                 m.ProcedureVersion.objects.select_for_update(nowait=True)
                 .filter(semantic_id=identity)
                 .first()
+            )
+            precondition = (
+                live_precondition() if inspect or inspection_precondition is not None else ""
             )
             if target_version is not None and version is None:
                 fail("not_found", ("target_version",), "Target Procedure Version does not exist.")
@@ -651,13 +686,31 @@ def import_draft_pack(
                     and receipt.post_revision == current
                 )
                 if retry:
-                    return {
+                    result = {
                         "status": "dry_run" if dry_run else "noop",
                         "version": version.semantic_id,
                         "revision": current,
                         "changes": [],
                         "manual_actions": _manual(version),
                     }
+                    if inspect:
+                        checked = _inspection(
+                            result,
+                            precondition,
+                            _capture(data, version),
+                            data,
+                            version,
+                            actor,
+                        )
+                        transaction.set_rollback(True)
+                        return checked
+                    return result
+                if inspection_precondition is not None and inspection_precondition != precondition:
+                    fail(
+                        "stale_inspection",
+                        (),
+                        "Live knowledge or publication policy changed; inspect again.",
+                    )
                 if target_version is None:
                     fail(
                         "identity_collision",
@@ -677,6 +730,13 @@ def import_draft_pack(
                     ("base_revision",),
                     "A new draft must have a null base revision.",
                 )
+            if inspection_precondition is not None and inspection_precondition != precondition:
+                fail(
+                    "stale_inspection",
+                    (),
+                    "Live knowledge or publication policy changed; inspect again.",
+                )
+            before = _capture(data, version) if inspect else {}
             changes: list[dict[str, Any]] = []
             new_services = _catalog(data["catalog"], actor, changes)
             if version is None:
@@ -713,6 +773,10 @@ def import_draft_pack(
                 "changes": changes,
                 "manual_actions": manual_actions,
             }
+            if inspect:
+                checked = _inspection(result, precondition, before, data, version, actor)
+                transaction.set_rollback(True)
+                return checked
             if dry_run:
                 transaction.set_rollback(True)
             return result

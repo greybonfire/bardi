@@ -165,6 +165,31 @@ def digest(value: Any) -> str:
     ).hexdigest()
 
 
+def inspection_precondition() -> str:
+    """Conservative complete pre-write state, including readiness policy configuration."""
+    from django.conf import settings
+
+    payload = {
+        model._meta.label_lower: list(model.objects.order_by("pk").values())
+        for model in LOCK_MODELS
+        if model is not m.DraftPackImportReceipt
+    }
+    return digest(
+        {
+            "tables": payload,
+            "settings": {
+                name: getattr(settings, name, default)
+                for name, default in (
+                    ("PROCEDURE_VERSION_REVIEW_MODE", "independent"),
+                    ("PROCEDURE_VERSION_PUBLICATION_GATES", ()),
+                    ("SELECTION_QUESTIONS_REQUIRED", True),
+                    ("PLANNING_SCENARIOS_REQUIRED", True),
+                )
+            },
+        }
+    )
+
+
 def evidence_for(version: Any) -> QuerySet[m.EvidenceLink]:
     query = Q(pk__in=[])
     for spec in OWNED.values():

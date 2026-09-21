@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { SandboxNotice } from "@/components/sandbox-notice";
 import { isLocale, siteCopy, siteOrigin } from "@/lib/site";
 import "@fontsource/noto-sans-arabic/arabic-400.css";
 import "@fontsource/noto-sans-arabic/arabic-600.css";
@@ -26,6 +27,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
     <body>
       <a className="skip-link" href="#main-content">{t.skip}</a>
       <SiteHeader locale={locale} />
+      <SandboxNotice locale={locale} />
       <main id="main-content" className="site-main" tabIndex={-1}>{children}</main>
       <footer className="site-footer"><div className="site-footer-inner">
         <p>{t.independent}</p><Link href={`/${locale}/privacy`} prefetch={false}>{t.privacy}</Link>

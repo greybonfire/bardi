@@ -44,6 +44,10 @@ volume is not a backup: use the [local backup and guarded recovery commands](ope
 before substantial edits or migrations. This Compose setup is for local development; it is not a
 production deployment definition.
 
+For a reusable questionnaire copy beside authoring, use the separate
+[local questionnaire sandbox](operations/questionnaire-sandbox.md). It restores a trusted backup
+into its own stack without changing these authoring commands or applying migrations.
+
 ## Backend setup (host-run workflow)
 
 From the repository root, copy the development environment contract and export it for

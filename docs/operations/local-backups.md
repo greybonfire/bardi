@@ -94,8 +94,9 @@ separately. The restore is not intended to reproduce production role grants.
 
 After verification, keep the clearly named copy for inspection or deliberately remove only
 that disposable database using PostgreSQL administration. Do not use `down -v` to clean up a
-restore drill: the source shares that volume. A separate questionnaire sandbox launcher is not
-part of this tool.
+restore drill: the source shares that volume. For a reusable application copy in its own stack,
+use the separate [questionnaire sandbox launcher](questionnaire-sandbox.md); the same trusted-archive
+and confidentiality rules apply.
 
 ## Regression checks
 

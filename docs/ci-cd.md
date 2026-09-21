@@ -5,7 +5,7 @@ The repository uses GitHub Actions for production continuous integration.
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs on every pull request, every push to `main`, and manual
-`workflow_dispatch` runs. It has three deliberately separate required tracks:
+`workflow_dispatch` runs. It has four deliberately separate required tracks:
 
 - The Python 3.14 **Production backend** job runs against PostgreSQL 17. It installs
   only from the committed `uv.lock`, then runs Ruff lint and format checks, Mypy, Python
@@ -27,15 +27,22 @@ The repository uses GitHub Actions for production continuous integration.
   verifying the guarded CLI, synthetic record preservation and restore invariants.
   This catches recovery-tooling, Dockerfile, Compose wiring, container-DNS and startup
   regressions that the backend and frontend jobs intentionally do not exercise.
+- A parallel **Questionnaire sandbox** job installs Python 3.14 and locked development
+  dependencies, runs tools-wide Ruff lint/format and compilation, type-checks the four new
+  sandbox tool files, and runs the sandbox probe unit regressions. Its full disposable Docker/HTTP
+  probe has a 30-minute step limit within a 35-minute job deadline. It covers copied-data fidelity, all publication
+  gates, login/cookies/notices, the Next proxy journey, persistence and guarded refresh in
+  owned synthetic projects; see [sandbox regression scope](operations/questionnaire-sandbox.md#regression-scope).
+  It needs no copied authoring `.env` and does not establish real authored-content readiness.
 
 Production CI intentionally uses the same Python runtime family as local backend development.
 The retired research prototype is no longer compiled or tested on `main`; production acceptance
 tests are authoritative for supported behavior.
 
-The final `CI required` job depends on all three tracks and succeeds only when
-`PRODUCTION_RESULT`, `FRONTEND_RESULT`, and `COMPOSE_RESULT` are each exactly `success`.
+The final `CI required` job depends on all four tracks and succeeds only when
+`PRODUCTION_RESULT`, `FRONTEND_RESULT`, `COMPOSE_RESULT`, and `SANDBOX_RESULT` are each exactly `success`.
 A failure, cancellation or skipped dependency cannot pass the aggregate. This stable name
-remains the branch-protection check; the frontend and Compose gates do not weaken or replace
+remains the branch-protection check; the frontend, Compose and sandbox gates do not weaken or replace
 the production-backend track.
 
 The workflow uses read-only repository permissions. CI supplies explicit test-only
@@ -43,7 +50,8 @@ PostgreSQL credentials, a strong Django secret, allowed hosts, and a valid HTTPS
 origin for the backend job. The Frontend job uses only loopback test origins and disables
 Next telemetry; it needs no production secrets or PostgreSQL service. The Compose job uses
 only the repository's safe development example values and destroys its database volume when
-it finishes.
+it finishes. The sandbox probe generates private test-only configuration and cleans up only its
+verified owned disposable resources; no real archive or private artifact is uploaded.
 
 ### Frontend contract and browser gates
 

@@ -163,8 +163,8 @@ boundary with synthetic responses, not Django/PostgreSQL or researched-family pa
 Desktop Chromium and mobile Chromium emulation are not a full cross-browser or
 accessibility audit.
 
-See [`docs/ci-cd.md`](../docs/ci-cd.md) for the independent Frontend CI job and the required
-three-track aggregate (Production backend, Frontend and Development Compose). The architectural boundaries remain governed by
+See [`docs/ci-cd.md`](../docs/ci-cd.md) for the independent Frontend CI job and required
+verification aggregate. The architectural boundaries remain governed by
 [ADR 0004](../docs/adr/0004-do-not-persist-case-facts.md),
 [ADR 0005](../docs/adr/0005-use-nextjs-with-django-ninja.md),
 [ADR 0006](../docs/adr/0006-expose-one-stateless-planning-operation.md),

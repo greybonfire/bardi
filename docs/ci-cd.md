@@ -22,8 +22,11 @@ The repository uses GitHub Actions for production continuous integration.
   `compose.yaml`, builds the backend and frontend development images, starts PostgreSQL,
   Django and Next.js together, and waits for real HTTP 200 responses from both
   `GET /v1/services` and `/ar`. It tears down the disposable volumes after every run.
-  This catches Dockerfile, Compose wiring, container-DNS and startup regressions that the
-  backend and frontend jobs intentionally do not exercise.
+  It also runs the [local recovery regression](operations/local-backups.md#regression-checks)
+  with Python 3.14 and locked dependencies in a separate random disposable PostgreSQL project,
+  verifying the guarded CLI, synthetic record preservation and restore invariants.
+  This catches recovery-tooling, Dockerfile, Compose wiring, container-DNS and startup
+  regressions that the backend and frontend jobs intentionally do not exercise.
 
 Production CI intentionally uses the same Python runtime family as local backend development.
 The retired research prototype is no longer compiled or tested on `main`; production acceptance

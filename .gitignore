@@ -55,6 +55,11 @@ cover/
 *.mo
 *.pot
 
+# Private local database archives (defense in depth; store outside worktrees)
+*.dump
+*.dump.partial
+*.backup
+
 # Django stuff:
 *.log
 local_settings.py

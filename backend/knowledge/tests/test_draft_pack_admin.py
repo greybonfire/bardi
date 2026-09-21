@@ -168,11 +168,16 @@ class DraftPackAdminTests(TestCase):
             self.assertEqual(self.client.get(url).status_code, 302)
 
     def test_configuration_changes_invalidate_inspection(self) -> None:
-        token = self.post().context["token"]
-        with self.settings(PROCEDURE_VERSION_REVIEW_MODE="solo"):
-            response = self.post(action="confirm", token=token)
-        self.assertContains(response, "stale_inspection", status_code=400)
-        self.assertFalse(ProcedureVersion.objects.exists())
+        for initial, changed in (("independent", "solo"), ("solo", "independent")):
+            with (
+                self.subTest(initial=initial),
+                self.settings(PROCEDURE_VERSION_REVIEW_MODE=initial),
+            ):
+                token = self.post().context["token"]
+                with self.settings(PROCEDURE_VERSION_REVIEW_MODE=changed):
+                    response = self.post(action="confirm", token=token)
+                self.assertContains(response, "stale_inspection", status_code=400)
+                self.assertFalse(ProcedureVersion.objects.exists())
 
     def test_aggregate_permissions_and_readonly_staff(self) -> None:
         self.actor.is_superuser = False

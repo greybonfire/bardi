@@ -39,8 +39,10 @@ Stop the services while preserving the database volume with:
 docker compose down
 ```
 
-Use `docker compose down -v` only when intentionally deleting the local database. This
-Compose setup is for local development; it is not a production deployment definition.
+Use `docker compose down -v` only when intentionally deleting the local database. The persistent
+volume is not a backup: use the [local backup and guarded recovery commands](operations/local-backups.md)
+before substantial edits or migrations. This Compose setup is for local development; it is not a
+production deployment definition.
 
 ## Backend setup (host-run workflow)
 

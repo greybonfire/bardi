@@ -250,8 +250,26 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
+      - name: Set up Python 3.14 for local recovery regression
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install uv for local recovery regression
+        uses: astral-sh/setup-uv@v10.0.1
+
+      - name: Install locked recovery dependencies
+        run: uv sync --locked
+
       - name: Prepare development environment
         run: cp .env.example .env
+
+      - name: Check recovery probe readiness and safe diagnostics
+        run: uv run python -m unittest tools.test_probe_local_database -v
+
+      - name: Exercise local backup CLI in its own disposable Compose project
+        timeout-minutes: 6
+        run: uv run python tools/probe_local_database.py --disposable
 
       - name: Validate Compose configuration
         run: docker compose config --quiet

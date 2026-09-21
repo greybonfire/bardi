@@ -1,0 +1,77 @@
+# Independent local stack. Only tools/local_sandbox.py supplies its private environment.
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: sandbox
+      POSTGRES_PASSWORD: ${SANDBOX_PASSWORD:?}
+    ports:
+      - "127.0.0.1:${SANDBOX_POSTGRES_PORT:?}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    logging:
+      driver: none
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, sandbox, -d, postgres]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  backend:
+    image: ${SANDBOX_PROJECT:?}-backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DJANGO_SETTINGS_MODULE: bardi.settings.sandbox
+      DJANGO_SECRET_KEY: ${SANDBOX_SECRET:?}
+      BARDI_SANDBOX: "1"
+      BARDI_SANDBOX_ID: ${SANDBOX_ID:?}
+      POSTGRES_DB: ${SANDBOX_DATABASE:?}
+      POSTGRES_USER: sandbox
+      POSTGRES_PASSWORD: ${SANDBOX_PASSWORD:?}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      PROCEDURE_VERSION_REVIEW_MODE: ${SANDBOX_REVIEW_MODE:?}
+    ports:
+      - "127.0.0.1:${SANDBOX_BACKEND_PORT:?}:8000"
+    logging:
+      driver: none
+    command:
+      - sh
+      - -c
+      - >-
+        PGOPTIONS='-c default_transaction_read_only=on' python backend/manage.py sandbox_check &&
+        python backend/manage.py runserver 0.0.0.0:8000 --noreload --insecure
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready')"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+  frontend:
+    image: ${SANDBOX_PROJECT:?}-frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    environment:
+      BARDI_SANDBOX: "1"
+      BARDI_API_ORIGIN: http://backend:8000
+      BARDI_SITE_ORIGIN: http://127.0.0.1:${SANDBOX_FRONTEND_PORT:?}
+      NEXT_TELEMETRY_DISABLED: "1"
+    ports:
+      - "127.0.0.1:${SANDBOX_FRONTEND_PORT:?}:3000"
+    logging:
+      driver: none
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/ar').then(r => {if (!r.ok) process.exit(1)}).catch(() => process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 60
+volumes:
+  postgres_data:
+    labels:
+      bardi.sandbox.id: ${SANDBOX_ID:?}
+networks:
+  default:
+    labels:
+      bardi.sandbox.id: ${SANDBOX_ID:?}

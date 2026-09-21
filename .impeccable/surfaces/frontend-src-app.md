@@ -27,6 +27,13 @@ FORM: Conversational helper, grounded candidate 6 (familiar phone conversation f
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 
+## Narrow extension — local questionnaire sandbox
+
+- User-approved sandbox-only identification: a small, persistent, non-dismissible notice below the existing masthead, using the established green/white palette and body-small typography. No new identity, controls, assets, or planning behavior.
+- Server-only `BARDI_SANDBOX=1` enables Egyptian Arabic/English copy identifying copied local test data and explaining that the explicit sandbox refresh command replaces active-copy changes, unlike browser reload. Other flag values produce no notice markup or request-time rendering requirement; only sandbox mode invokes request-time evaluation.
+- The notice remains outside print-hidden navigation and has an explicit print rule, so printed test guidance retains its label.
+- Visual status: bounded finish review returned **ship** after inspecting seven private Chromium captures: desktop 1440px/mobile 390px in Arabic/English, both print-media views, and the native Admin login. One detector pass returned no findings. Browser checks passed locale switching, direction, overflow, print-label persistence, distinct CSRF names and unmarked normal interfaces, with no page errors. This covers only the extension in light mode, not full journeys, print pagination, other browsers, dark mode or accessibility certification; historical results below are unchanged.
+
 ## Finish handoff — 2026-09-12
 
 - **Review scope:** the public client in `frontend/src/app`, `frontend/src/components` and `frontend/src/planning`. The parent reports a fresh isolated finish review with `disposition: ship`, all five sections (`persistence`, `fidelity`, `ceiling`, `material_fixes`, `keep`) and no material fixes. The final technical review is reported **PASS**, with all three findings closed. The optional top-of-plan answer-review jump was advisory, not required and not implemented.

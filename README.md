@@ -19,7 +19,7 @@ administrative services.
   content requires independent specialists in both modes.
 - **Configure the web app safely:** [frontend guide](frontend/README.md) for API origins,
   case privacy, shared-device handling and deployment-security caveats.
-- **Understand delivery gates:** [CI/CD](docs/ci-cd.md) for the three required tracks.
+- **Understand delivery gates:** [CI/CD](docs/ci-cd.md) for the required verification tracks.
   There is no production deployment automation for Django or Next.js.
 - **Operate or recover a private pilot:** [operations guide](docs/operations/private-pilot.md)
   for ingress hardening, backups and restore procedures.

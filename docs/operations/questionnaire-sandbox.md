@@ -74,6 +74,7 @@ risk flags truthful and such content unpublished without those specialists. See 
 Startup and refresh do not publish, approve, activate Services, import draft packs or migrate.
 Existing copied publication/activation state remains as archived. Empty questionnaires may be
 correct: launching a copy does not prove that real authored content is ready for a full journey.
+See the [National ID renewal readiness handoff](national-id-renewal-readiness.md) for its scoped audit and scenario-addition workflow.
 
 ## Compatibility and failure recovery
 

@@ -1,0 +1,592 @@
+[
+  {
+    "name": "nid.readiness.empty",
+    "kind": "unknown",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {},
+    "expected_result_family": "next_question",
+    "expected_identifiers": {
+      "question_id": "q.nid.application_location"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.change_profession",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "profession",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.change_marital_status",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "marital_status",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.change_other",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "other",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.change_multiple",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "multiple",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.lost_with_change",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "lost",
+      "national_id_data_change_kind": "profession",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.damaged_with_change",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "damaged",
+      "national_id_data_change_kind": "profession",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.expiry_equal",
+    "kind": "negative",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-08-26",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "inconclusive",
+    "expected_identifiers": {
+      "reason": "no_matching_researched_procedure"
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.expiry_previous_day",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-08-25",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [
+        "nid.requirement.renew_after_expiry"
+      ],
+      "step_ids": [
+        "nid.step.apply_for_renewal",
+        "nid.step.resolve_service_location"
+      ],
+      "warning_ids": [
+        "nid.warning.deadline",
+        "nid.warning.changed_data",
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": []
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.deadline_next_day",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-27",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-05-26",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [
+        "nid.requirement.renew_after_expiry"
+      ],
+      "step_ids": [
+        "nid.step.apply_for_renewal",
+        "nid.step.resolve_service_location"
+      ],
+      "warning_ids": [
+        "nid.warning.deadline",
+        "nid.warning.changed_data",
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": []
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.clamped_deadline_equal",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-11-30",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-08-31",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [],
+      "step_ids": [],
+      "warning_ids": [
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": [
+        "checklist_items",
+        "steps"
+      ]
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.clamped_deadline_passed",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-12-01",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-08-31",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [],
+      "step_ids": [],
+      "warning_ids": [
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": [
+        "checklist_items",
+        "steps"
+      ]
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.without_district",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [
+        "nid.requirement.renew_after_expiry"
+      ],
+      "step_ids": [
+        "nid.step.apply_for_renewal",
+        "nid.step.resolve_service_location"
+      ],
+      "warning_ids": [
+        "nid.warning.deadline",
+        "nid.warning.changed_data",
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": []
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.without_residence",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-05-01"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [
+        "nid.requirement.renew_after_expiry"
+      ],
+      "step_ids": [
+        "nid.step.apply_for_renewal",
+        "nid.step.resolve_service_location"
+      ],
+      "warning_ids": [
+        "nid.warning.deadline",
+        "nid.warning.changed_data",
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": []
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.invalid_enum",
+    "kind": "contradictory",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "unsupported",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "invalid",
+    "expected_identifiers": {},
+    "expected_diagnostics": [
+      "invalid_fact_value"
+    ]
+  },
+  {
+    "name": "nid.readiness.null_date",
+    "kind": "contradictory",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": null,
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "invalid",
+    "expected_identifiers": {},
+    "expected_diagnostics": [
+      "invalid_fact_value"
+    ]
+  },
+  {
+    "name": "nid.readiness.impossible_date",
+    "kind": "contradictory",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-02-30",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "invalid",
+    "expected_identifiers": {},
+    "expected_diagnostics": [
+      "invalid_fact_value"
+    ]
+  },
+  {
+    "name": "nid.readiness.noncanonical_date",
+    "kind": "contradictory",
+    "evaluation_context": {
+      "evaluation_date": "2026-08-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "20260501",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "invalid",
+    "expected_identifiers": {},
+    "expected_diagnostics": [
+      "invalid_fact_value"
+    ]
+  },
+  {
+    "name": "nid.readiness.freshness_sep_24",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-09-24",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [
+        "nid.requirement.renew_after_expiry"
+      ],
+      "step_ids": [
+        "nid.step.apply_for_renewal",
+        "nid.step.resolve_service_location"
+      ],
+      "warning_ids": [
+        "nid.warning.deadline",
+        "nid.warning.changed_data",
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": []
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.freshness_sep_25",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-09-25",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [
+        "nid.requirement.renew_after_expiry"
+      ],
+      "step_ids": [
+        "nid.step.apply_for_renewal",
+        "nid.step.resolve_service_location"
+      ],
+      "warning_ids": [
+        "nid.warning.deadline",
+        "nid.warning.changed_data",
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": []
+    },
+    "expected_diagnostics": []
+  },
+  {
+    "name": "nid.readiness.freshness_sep_26",
+    "kind": "supported_edge",
+    "evaluation_context": {
+      "evaluation_date": "2026-09-26",
+      "locale": "en"
+    },
+    "source_facts": {
+      "application_location": "inside_egypt",
+      "national_id_possession_state": "held",
+      "national_id_data_change_kind": "none",
+      "national_id_expiry_date": "2026-05-01",
+      "residence_governorate": "giza",
+      "residence_district": "dokki"
+    },
+    "expected_result_family": "plan",
+    "expected_identifiers": {
+      "procedure_version_id": "ordinary_domestic_national_id_renewal.research-2026-08-26",
+      "checklist_item_ids": [],
+      "step_ids": [],
+      "warning_ids": [
+        "nid.warning.recheck"
+      ],
+      "fee_ids": [
+        "nid.fee.ordinary"
+      ],
+      "routing_status": "unresolved",
+      "routing_association_ids": [],
+      "dependency_ids": [],
+      "inconclusive_sections": [
+        "checklist_items",
+        "steps"
+      ]
+    },
+    "expected_diagnostics": []
+  }
+]

@@ -91,6 +91,8 @@ class LocalDatabaseTests(unittest.TestCase):
     def test_directory_guards(self) -> None:
         unsafe = self.directory / "unsafe"
         unsafe.mkdir(mode=0o755)
+        # mkdir's mode is masked by the caller; this fixture must actually be unsafe.
+        unsafe.chmod(0o755)
         link = self.directory / "link"
         link.symlink_to(self.directory, target_is_directory=True)
         git = self.directory / "worktree"

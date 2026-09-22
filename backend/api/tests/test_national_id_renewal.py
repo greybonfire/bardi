@@ -97,13 +97,48 @@ class NationalIdRenewalProductionPlanningTests(TestCase):
         self.assertFalse(exact.prepared_facts.values["renewal_deadline_passed"])
         self.assertTrue(exact.prepared_facts.values["card_expired_before_evaluation_date"])
 
-        clamped = prepare_case(
+        same_day = prepare_case(
             definitions,
             service,
             {"national_id_expiry_date": date(2026, 5, 31)},
             date(2026, 8, 31),
         )
-        self.assertIsInstance(clamped, CasePreparationSuccess)
-        assert isinstance(clamped, CasePreparationSuccess)
-        self.assertEqual(clamped.prepared_facts.values["renewal_deadline_date"], date(2026, 8, 31))
-        self.assertFalse(clamped.prepared_facts.values["renewal_deadline_passed"])
+        self.assertIsInstance(same_day, CasePreparationSuccess)
+        assert isinstance(same_day, CasePreparationSuccess)
+        self.assertEqual(same_day.prepared_facts.values["renewal_deadline_date"], date(2026, 8, 31))
+        self.assertFalse(same_day.prepared_facts.values["renewal_deadline_passed"])
+
+        # May 31 -> August 31 preserves the day; August -> November actually clamps.
+        for evaluation_date, passed in ((date(2026, 11, 30), False), (date(2026, 12, 1), True)):
+            clamped = prepare_case(
+                definitions,
+                service,
+                {"national_id_expiry_date": date(2026, 8, 31)},
+                evaluation_date,
+            )
+            self.assertIsInstance(clamped, CasePreparationSuccess)
+            assert isinstance(clamped, CasePreparationSuccess)
+            self.assertEqual(
+                clamped.prepared_facts.values["renewal_deadline_date"], date(2026, 11, 30)
+            )
+            self.assertIs(clamped.prepared_facts.values["renewal_deadline_passed"], passed)
+
+        for expiry, expired in ((date(2026, 8, 26), False), (date(2026, 8, 25), True)):
+            prepared = prepare_case(
+                definitions,
+                service,
+                {"national_id_expiry_date": expiry},
+                date(2026, 8, 26),
+            )
+            assert isinstance(prepared, CasePreparationSuccess)
+            self.assertIs(
+                prepared.prepared_facts.values["card_expired_before_evaluation_date"], expired
+            )
+        next_day = prepare_case(
+            definitions,
+            service,
+            {"national_id_expiry_date": date(2026, 5, 26)},
+            date(2026, 8, 27),
+        )
+        assert isinstance(next_day, CasePreparationSuccess)
+        self.assertTrue(next_day.prepared_facts.values["renewal_deadline_passed"])

@@ -28,11 +28,15 @@ The repository uses GitHub Actions for production continuous integration.
   This catches recovery-tooling, Dockerfile, Compose wiring, container-DNS and startup
   regressions that the backend and frontend jobs intentionally do not exercise.
 - A parallel **Questionnaire sandbox** job installs Python 3.14 and locked development
-  dependencies, runs tools-wide Ruff lint/format and compilation, type-checks the four new
-  sandbox tool files, and runs the sandbox probe unit regressions. Its full disposable Docker/HTTP
-  probe has a 30-minute step limit within a 35-minute job deadline. It covers copied-data fidelity, all publication
-  gates, login/cookies/notices, the Next proxy journey, persistence and guarded refresh in
-  owned synthetic projects; see [sandbox regression scope](operations/questionnaire-sandbox.md#regression-scope).
+  dependencies, runs tools-wide Ruff lint/format and compilation, type-checks the four
+  sandbox tool files, and runs the sandbox probe unit regressions. It also installs Node 22,
+  locked npm dependencies and managed Chromium with Linux dependencies, then runs the 16 focused
+  real-browser configuration/reporter Vitest tests. Its `--disposable --with-browser` Docker/HTTP
+  probe retains a 30-minute step limit within a 40-minute job deadline, allowing installation
+  overhead. It covers copied-data fidelity, all publication gates, login/cookies/notices,
+  persistence and guarded refresh, plus three real-backend questionnaire browser journeys on
+  the same Next development server in owned disposable projects; see
+  [sandbox regression scope and commands](operations/questionnaire-sandbox.md#regression-scope).
   It needs no copied authoring `.env` and does not establish real authored-content readiness.
 
 Production CI intentionally uses the same Python runtime family as local backend development.

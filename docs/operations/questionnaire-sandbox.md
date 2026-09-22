@@ -135,9 +135,55 @@ uv run python -m unittest tools.test_probe_local_sandbox -v
 ```
 
 The separate [Questionnaire sandbox CI track](../ci-cd.md#continuous-integration) runs
-`uv run python tools/probe_local_sandbox.py --disposable`. It creates only owned synthetic
+`uv run python tools/probe_local_sandbox.py --disposable --with-browser`. It creates only owned synthetic
 projects and checks restored rows/sequences/constraints/triggers before writes, all publication
 gates, real Admin login/cookies, localized notices, the Next proxy question/publish/plan/withdraw
 path, resume persistence, generation retention and rejected refreshes. It verifies its synthetic
 source remains unchanged and removes only its owned disposable resources. This is tooling
 coverage, not proof of real archive recoverability, researched-content readiness or visual quality.
+
+The optional browser phase requires `--disposable`; it never targets authoring or a persistent
+sandbox. It imports and canonically publishes the ordinary National ID renewal fixture only in
+the restored disposable database, with normal publication/scenario gates and solo review enabled.
+Three real Django/PostgreSQL browser tests cover Arabic/English directory-to-plan journeys and
+English possession correction (held → lost → held), including downstream-answer clearing,
+inconclusive recovery, unknown fees, unresolved routing and the blocked previous-card exclusion.
+Database snapshots check that the browser phase makes no database changes.
+
+This reuses the probe's Next **development** server, not a production build. With `BARDI_SANDBOX=1`,
+Next explicitly allows the `127.0.0.1` development origin so its browser runtime can initialize
+through the published loopback port. This does not widen API origins or CSP, and ordinary
+(non-sandbox) configuration remains unchanged. Browser time and evaluation date are fixed at
+**2026-08-26**; passing tests do not establish present-day evidence
+freshness. These three representative tests complement, rather than repeat, the 78 synthetic
+production-build browser tests. New Procedures need their own editorial checks and scenarios,
+not another full browser suite unless they introduce a new interaction pattern. Normal CI gates
+remain in force. The probe uses the existing researched fixture, not an authoring backup.
+
+### Real-backend browser command
+
+Prerequisites: Python 3.14+, uv, Docker with Compose and a running daemon, Node 22/npm, and
+Chromium with its Linux system dependencies. From the repository root:
+
+```bash
+uv sync --locked --extra dev
+npm --prefix frontend ci
+(cd frontend && node node_modules/@playwright/test/cli.js install --with-deps chromium)
+(cd frontend && node node_modules/vitest/vitest.mjs run --config e2e-real/vitest.config.ts)
+uv run python tools/probe_local_sandbox.py --disposable --with-browser
+```
+
+The focused Vitest command runs 16 database-free configuration/reporter regressions. On Linux,
+an existing compatible Chromium can replace the managed browser installation (system libraries
+must already be installed):
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/absolute/path/to/chromium \
+  uv run python tools/probe_local_sandbox.py --disposable --with-browser
+```
+
+No authoring `.env`, archive or manually supplied target URL is needed. The probe supplies the
+loopback origin and disposable marker, invokes local pinned Playwright, limits browser environment
+and network access, and emits data-free results without retained browser artifacts. Browser
+failure fails the probe and triggers owned-resource cleanup. Omit `--with-browser` for the
+original tooling-only probe.

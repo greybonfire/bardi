@@ -338,6 +338,11 @@ and `experimental.serverComponentsHmrCache: false`: the development HMR cache ot
 caches even `no-store` POSTs. Never attach Facts, Fact keys, bodies, planning responses,
 exceptions or traces to Next/APM/ingress logs or analytics.
 
+For the separate three-test real Django/PostgreSQL questionnaire journey probe, see
+[real-backend browser prerequisites and commands](operations/questionnaire-sandbox.md#real-backend-browser-command).
+It runs only in owned disposable projects against Next development mode, complements the 78
+synthetic production-build browser tests, and does not change authoring or persistent sandboxes.
+
 ## Backend checks
 
 Run the production backend checks with a running PostgreSQL service:

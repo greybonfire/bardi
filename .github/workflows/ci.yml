@@ -305,7 +305,7 @@ jobs:
   sandbox:
     name: Questionnaire sandbox
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
 
     steps:
       - name: Check out repository
@@ -323,6 +323,24 @@ jobs:
 
       - name: Install locked development dependencies
         run: uv sync --locked --extra dev
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install locked frontend dependencies
+        run: npm --prefix frontend ci
+
+      - name: Install managed Chromium and system dependencies
+        working-directory: frontend
+        run: node node_modules/@playwright/test/cli.js install --with-deps chromium
+
+      - name: Check real-browser configuration and safe reporter
+        working-directory: frontend
+        run: node node_modules/vitest/vitest.mjs run --config e2e-real/vitest.config.ts
 
       - name: Lint tools
         run: uv run ruff check --config 'include = ["tools/**/*.py"]' tools
@@ -344,7 +362,7 @@ jobs:
 
       - name: Exercise reusable sandbox in owned disposable projects
         timeout-minutes: 30
-        run: uv run python tools/probe_local_sandbox.py --disposable
+        run: uv run python tools/probe_local_sandbox.py --disposable --with-browser
 
   required:
     name: CI required

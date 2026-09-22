@@ -15,7 +15,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from tools import probe_local_sandbox as probe
-from tools.sandbox_probe_fixture import pack
+from tools.sandbox_probe_fixture import assert_renewal_target, pack
 
 
 class ProbeTests(unittest.TestCase):
@@ -38,6 +38,120 @@ class ProbeTests(unittest.TestCase):
             self.assertNotIn("PGOPTIONS", env)
             Path(env["HOME"], "writable").touch()
             self.assertEqual(probe.DOCKER, ["docker", "--host", "unix:///var/run/docker.sock"])
+
+    def test_browser_environment_is_minimized_and_uses_private_home(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "POSTGRES_PASSWORD": "secret",
+                "NODE_OPTIONS": "--require=hostile",
+                "PLAYWRIGHT_JSON_OUTPUT_FILE": "/tmp/leak",
+                "HOME": "/ambient",
+                "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH": "/usr/bin/chromium",
+                "PLAYWRIGHT_BROWSERS_PATH": "/cache/browsers",
+            },
+            clear=True,
+        ):
+            env = probe.browser_environment("http://127.0.0.1:1234", Path("/private"))
+        self.assertEqual(env["HOME"], "/private")
+        self.assertEqual(env["PLAYWRIGHT_BROWSERS_PATH"], "/cache/browsers")
+        self.assertEqual(env["PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"], "/usr/bin/chromium")
+        self.assertEqual(env["BARDI_REAL_E2E_DISPOSABLE"], "1")
+        for key in ("POSTGRES_PASSWORD", "NODE_OPTIONS", "PLAYWRIGHT_JSON_OUTPUT_FILE"):
+            self.assertNotIn(key, env)
+        for origin in (
+            "https://example.com",
+            "http://127.0.0.1",
+            "http://u@localhost:12",
+            "http://localhost:12/path",
+            "http://localhost:12?secret",
+        ):
+            with self.subTest(origin=origin), self.assertRaises(ValueError):
+                probe.browser_environment(origin, Path("/private"))
+
+    @staticmethod
+    def browser_report() -> dict[str, object]:
+        return {
+            "suite": "real-national-id",
+            "passed": 3,
+            "failed": 0,
+            "errors": 0,
+            "failingIds": [],
+            "status": "passed",
+        }
+
+    def test_browser_requires_three_actual_passes(self) -> None:
+        report = self.browser_report()
+        probe.assert_browser_success(json.dumps(report).encode())
+        for field, value in (
+            ("passed", 0),
+            ("passed", 2),
+            ("failed", 1),
+            ("errors", 1),
+        ):
+            broken = self.browser_report()
+            broken[field] = value
+            with self.subTest(field=field, value=value), self.assertRaises(RuntimeError):
+                probe.assert_browser_success(json.dumps(broken).encode())
+        for payload in (
+            b"private invalid output",
+            b"{}",
+            json.dumps({**report, "errors": ["private"]}).encode(),
+            json.dumps({**report, "suites": []}).encode(),
+            json.dumps(report).replace('"passed"', '"skipped"').encode(),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "^browser acceptance incomplete$"):
+                probe.assert_browser_success(payload)
+
+    def test_browser_uses_local_cli_and_captures_report(self) -> None:
+        result = subprocess.CompletedProcess([], 0, json.dumps(self.browser_report()).encode())
+        with patch.object(probe, "command", return_value=result) as command:
+            with contextlib.redirect_stdout(io.StringIO()) as output:
+                probe.run_browser("http://127.0.0.1:1234", Path("/private"))
+        argv = command.call_args.args[0]
+        self.assertEqual(
+            argv[:2], ["node", str(probe.ROOT / "frontend/node_modules/@playwright/test/cli.js")]
+        )
+        self.assertFalse(any(arg.startswith("--reporter") for arg in argv))
+        self.assertIn("--retries=0", argv)
+        self.assertEqual(argv[-1], "/private/browser-output")
+        self.assertEqual(json.loads(output.getvalue())["passed"], 3)
+
+    def test_browser_failure_still_checks_database_and_propagates(self) -> None:
+        with (
+            patch.object(probe, "command") as command,
+            patch.object(probe, "snapshot", return_value="same") as snapshot,
+            patch.object(probe, "run_browser", side_effect=RuntimeError("browser failed")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "browser failed"):
+                probe.browser_phase(["fixture"], {}, "database", "origin", Path("/private"))
+        command.assert_called_once_with(["fixture", "prepare-renewal", "database"], env={})
+        self.assertEqual(snapshot.call_count, 2)
+
+    def test_browser_database_mutation_fails(self) -> None:
+        with (
+            patch.object(probe, "command"),
+            patch.object(probe, "snapshot", side_effect=["before", "after"]),
+            patch.object(probe, "run_browser"),
+        ):
+            with self.assertRaisesRegex(AssertionError, "browser database mutation"):
+                probe.browser_phase(["fixture"], {}, "database", "origin", Path("/private"))
+
+    def test_renewal_fixture_rejects_source_and_mismatched_targets(self) -> None:
+        expected = "bardi_restore_" + "a" * 32
+        database = {"NAME": expected, "USER": "sandbox", "HOST": "127.0.0.1"}
+        assert_renewal_target(database, expected)
+        for field, value in (
+            ("NAME", "bardi_probe"),
+            ("NAME", "bardi_restore_" + "b" * 32),
+            ("USER", "authoring"),
+            ("HOST", "remote"),
+        ):
+            with self.subTest(field=field), self.assertRaises(AssertionError):
+                assert_renewal_target({**database, field: value}, expected)
+        for name in (None, "bardi_probe", "bardi_restore_bad"):
+            with self.assertRaises(AssertionError):
+                assert_renewal_target(database, name)
 
     def test_ports_distinct_and_bindable_on_loopback(self) -> None:
         ports = probe.free_ports(4)
@@ -208,7 +322,7 @@ class ProbeTests(unittest.TestCase):
             # No inherited PYTHONPATH: direct execution must bootstrap itself.
             env.pop("PYTHONPATH")
             cli = [sys.executable, str(probe.ROOT / "tools/probe_local_sandbox.py")]
-            for arguments, code in (([], 2), (["--help"], 0)):
+            for arguments, code in (([], 2), (["--with-browser"], 2), (["--help"], 0)):
                 with self.subTest(arguments=arguments):
                     result = subprocess.run(
                         cli + arguments, capture_output=True, env=env, cwd=temporary

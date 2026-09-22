@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const config: NextConfig = {
+  // Next matches hostnames (not ports) for this development-only allowance.
+  ...(process.env.BARDI_SANDBOX === "1" ? { allowedDevOrigins: ["127.0.0.1"] } : {}),
   poweredByHeader: false,
   reactStrictMode: true,
   // Next's development logger and HMR fetch cache must not capture planning traffic.

@@ -8,6 +8,7 @@ import argparse
 import contextlib
 import hashlib
 import json
+import os
 import re
 import socket
 import subprocess
@@ -75,6 +76,84 @@ def clean_environment(home: Path) -> dict[str, str]:
         "PROCEDURE_VERSION_REVIEW_MODE": "solo",
         "DJANGO_SECRET_KEY": uuid.uuid4().hex,
     }
+
+
+def browser_environment(origin: str, private: Path) -> dict[str, str]:
+    """Allow browser runtime locations, never ambient application settings or secrets."""
+    parsed = urllib.parse.urlsplit(origin)
+    if (
+        parsed.scheme != "http"
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or not parsed.port
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.path not in {"", "/"}
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError("invalid disposable browser origin")
+    env = {
+        "PATH": "/usr/local/bin:/usr/bin:/bin",
+        "HOME": str(private),
+        "LANG": "C.UTF-8",
+        "CI": "1",
+        "BARDI_REAL_E2E_ORIGIN": origin,
+        "BARDI_REAL_E2E_DISPOSABLE": "1",
+        "PLAYWRIGHT_BROWSERS_PATH": str(
+            Path(os.environ.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))) / "ms-playwright"
+        ),
+    }
+    for key in ("PLAYWRIGHT_BROWSERS_PATH", "PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH"):
+        if os.environ.get(key):
+            env[key] = os.environ[key]
+    return env
+
+
+def assert_browser_success(payload: bytes) -> None:
+    """Require the private reporter's complete summary, not merely exit status zero."""
+    try:
+        report = json.loads(payload)
+        assert report == {
+            "suite": "real-national-id",
+            "passed": 3,
+            "failed": 0,
+            "errors": 0,
+            "failingIds": [],
+            "status": "passed",
+        }
+    except ValueError, KeyError, TypeError, AssertionError:
+        raise RuntimeError("browser acceptance incomplete") from None
+
+
+def run_browser(origin: str, private: Path) -> None:
+    env = browser_environment(origin, private)
+    result = command(
+        [
+            "node",
+            str(ROOT / "frontend/node_modules/@playwright/test/cli.js"),
+            "test",
+            "--config",
+            str(ROOT / "frontend/playwright.real.config.ts"),
+            "--workers=1",
+            "--retries=0",
+            "--output",
+            str(private / "browser-output"),
+        ],
+        env=env,
+    )
+    assert_browser_success(result.stdout)
+    print(json.dumps({"stage": "browser_tests_passed", "passed": 3}), flush=True)
+
+
+def browser_phase(
+    fixture: list[str], target: dict[str, str], database: str, origin: str, private: Path
+) -> None:
+    command(fixture + ["prepare-renewal", database], env=target)
+    before = snapshot(target, database)
+    try:
+        run_browser(origin, private)
+    finally:
+        assert snapshot(target, database) == before, "browser database mutation"
 
 
 def free_ports(count: int) -> list[int]:
@@ -277,7 +356,8 @@ def planning(frontend: str, facts: dict[str, bool], service: str = "research") -
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--disposable", action="store_true", required=True)
-    parser.parse_args()
+    parser.add_argument("--with-browser", action="store_true")
+    options = parser.parse_args()
     started = time.monotonic()
     stages = []
 
@@ -415,6 +495,9 @@ def main() -> None:
             assert plan["type"] == "plan" and plan["procedure_version_id"] == "draft"
             command(fixture + ["withdraw"], env=target)
             assert planning(frontend, {"synthetic_ready": True})["type"] != "plan"
+            if options.with_browser:
+                stage("real_browser_journeys")
+                browser_phase(fixture, target, first, frontend, private)
             edited = snapshot(target, first)
             edited_rows = row_fingerprint(target, first)
             assert edited != before

@@ -4,6 +4,7 @@ Translated from DraftPreviewTests' generic pack and three scenario setup, withou
 TestCase lifecycle, test settings, or publication-gate overrides.
 """
 
+import re
 import sys
 from typing import Any
 
@@ -75,7 +76,15 @@ def pack(prefix: str = "") -> dict[str, Any]:
     }
 
 
-def main(action: str) -> None:
+def assert_renewal_target(database: dict[str, Any], expected: str | None) -> None:
+    """Reject source/authoring connections before any fixture writes."""
+    assert expected is not None and re.fullmatch(r"bardi_restore_[a-f0-9]{32}", expected)
+    assert database["NAME"] == expected
+    assert database["USER"] == "sandbox"
+    assert database["HOST"] in {"127.0.0.1", "localhost", "::1"}
+
+
+def main(action: str, expected_database: str | None = None) -> None:
     import django
 
     django.setup()
@@ -135,6 +144,22 @@ def main(action: str) -> None:
         m.FactDefinition.objects.filter(key="synthetic_ready").update(is_published=True)
         assert not m.ProcedureVersion.objects.exclude(state="draft").exists()
         return
+    if action == "prepare-renewal":
+        assert_renewal_target(connection.settings_dict, expected_database)
+        from knowledge.importers.national_id_renewal import import_national_id_renewal
+
+        actor = User.objects.get(username="sandbox-probe")
+        version = import_national_id_renewal(author=actor)
+        scenarios = list(
+            PlanningScenario.objects.filter(procedure_version=version).order_by("pk").values()
+        )
+        assert len(scenarios) == 14
+        publish_procedure_version(version.pk, actor=actor)
+        assert (
+            list(PlanningScenario.objects.filter(procedure_version=version).order_by("pk").values())
+            == scenarios
+        )
+        return
     actor = User.objects.get(username="sandbox-probe")
     version = m.ProcedureVersion.objects.get(semantic_id="draft")
     if action == "publish":
@@ -158,4 +183,4 @@ def main(action: str) -> None:
 
 
 if __name__ == "__main__":
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)

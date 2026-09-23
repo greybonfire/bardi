@@ -1,0 +1,70 @@
+{
+  "format": "bardi.native-setup-specification.NOT-IMPORTABLE",
+  "purpose": "Manual native Admin/model specification, not a draft pack or supported transport. Compare existing records exactly; stop on conflicts. No publication in persistent data.",
+  "service": "get_egyptian_national_id",
+  "prerequisites": [
+    "Existing renewal importer baseline (14 scenarios) plus Task3 additions (21): preserve all 35 cases and every existing Question/candidate.",
+    "Pinned code must support card_expires_after_evaluation_date before native Fact clean/save.",
+    "Create the single citizenship Question before importing the full snapshot. Do not modify expiry Question: pinned derivation resolves its source dependency."
+  ],
+  "fact": {
+    "key": "card_expires_after_evaluation_date",
+    "kind": "boolean",
+    "enum_values": [],
+    "minimum": null,
+    "derived": true,
+    "is_published": false
+  },
+  "procedure": {
+    "semantic_id": "ordinary_domestic_national_id_damaged_replacement",
+    "primary_service": "get_egyptian_national_id",
+    "text_ar": "بدل بطاقة رقم قومي تالفة داخل مصر دون تغيير البيانات",
+    "text_en": "Replace a damaged Egyptian National ID inside Egypt without changing recorded data"
+  },
+  "question": {
+    "semantic_id": "q.nid.citizenship",
+    "fact": "citizenship",
+    "priority": 70,
+    "text_ar": "هل أنت مواطن مصري؟",
+    "text_en": "Are you an Egyptian citizen?",
+    "resolves_facts": [
+      "citizenship"
+    ]
+  },
+  "candidate": {
+    "procedure": "ordinary_domestic_national_id_damaged_replacement",
+    "selection_predicate": {
+      "op": "all",
+      "children": [
+        {
+          "op": "eq",
+          "fact": "application_location",
+          "value": "inside_egypt"
+        },
+        {
+          "op": "eq",
+          "fact": "national_id_possession_state",
+          "value": "damaged"
+        },
+        {
+          "op": "eq",
+          "fact": "national_id_data_change_kind",
+          "value": "none"
+        }
+      ]
+    }
+  },
+  "review": [
+    "Native Fact full_clean/save; Procedure full_clean/save; Question full_clean/save and set_question_resolved_facts; save_candidate. No predicate-code bypass.",
+    "New Fact stays unpublished; draft Warning and Evidence Link stay unknown/unverified. Raw readiness reports unsupported_rule_fact:card_expires_after_evaluation_date and scenario_execution_failed; positive preview has no result and reports scenario_execution_failed. These are blockers, not verification.",
+    "Adding the citizenship Question invalidates renewal scenario signatures. Individually inspect each case outcome before ordinary model save; never write signatures or rerun deterministic importer to bypass its seal.",
+    "Only nid.negative.damaged_card changes expected reason: no_published_version while damaged draft; not_yet_effective after disposable damaged publication because its original evaluation date precedes 2026-09-22. Preserve all names, source Facts, dates and other expectations.",
+    "Regression fixtures simulate editor review and named evidence verification in disposable data only; they are not human review or source verification."
+  ],
+  "boundary": "Strict future expiry and Egyptian citizenship are version applicability, not stable selection or legal ineligibility. Coverage from 2026-09-22 is authored, not a government effective date.",
+  "gaps": [
+    "D03: marriage-document applicability unresolved, including unchanged marriage.",
+    "G02: complete checklist, channel entitlement, fees, steps, office and turnaround unknown.",
+    "G07: combined expiry/damage/changes and transaction sequencing unresolved."
+  ]
+}

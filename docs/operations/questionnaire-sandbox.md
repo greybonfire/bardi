@@ -75,6 +75,7 @@ Startup and refresh do not publish, approve, activate Services, import draft pac
 Existing copied publication/activation state remains as archived. Empty questionnaires may be
 correct: launching a copy does not prove that real authored content is ready for a full journey.
 See the [National ID renewal readiness handoff](national-id-renewal-readiness.md) for its scoped audit and scenario-addition workflow.
+For the unpublished Task 5 addition, see the [damaged National ID replacement handoff](national-id-damaged-replacement.md).
 
 ## Compatibility and failure recovery
 

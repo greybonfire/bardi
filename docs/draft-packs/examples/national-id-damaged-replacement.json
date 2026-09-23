@@ -1,0 +1,366 @@
+{
+  "format": "bardi.draft-pack",
+  "format_version": 1,
+  "base_revision": null,
+  "catalog": {
+    "services": [],
+    "procedures": [
+      {
+        "semantic_id": "ordinary_domestic_national_id_damaged_replacement",
+        "primary_service": "get_egyptian_national_id",
+        "text_ar": "بدل بطاقة رقم قومي تالفة داخل مصر دون تغيير البيانات",
+        "text_en": "Replace a damaged Egyptian National ID inside Egypt without changing recorded data"
+      }
+    ],
+    "facts": [],
+    "authorities": [
+      {
+        "semantic_id": "authority.khadamat_misr",
+        "name_ar": "خدمات مصر",
+        "name_en": "Khadamat Misr"
+      }
+    ],
+    "sources": [
+      {
+        "semantic_id": "nid.damaged.source.s10",
+        "authority": "authority.khadamat_misr",
+        "title": "Khadamat Misr — damaged National ID replacement (S10, preserved PR147)",
+        "locator": "https://www.khadamatmisr.gov.eg/node/64",
+        "classification": "official",
+        "retrieved_on": "2026-09-12"
+      }
+    ],
+    "document_types": []
+  },
+  "version": {
+    "semantic_id": "ordinary_domestic_national_id_damaged_replacement.research-2026-09-22",
+    "procedure": "ordinary_domestic_national_id_damaged_replacement",
+    "rules_contract_version": "v1",
+    "effective_from": "2026-09-22",
+    "effective_to": null,
+    "text_ar": "بدل بطاقة رقم قومي تالفة داخل مصر دون تغيير البيانات",
+    "text_en": "Replace a damaged Egyptian National ID inside Egypt without changing recorded data",
+    "applicability": {
+      "op": "all",
+      "children": [
+        {
+          "op": "eq",
+          "fact": "citizenship",
+          "value": "egyptian"
+        },
+        {
+          "op": "eq",
+          "fact": "card_expires_after_evaluation_date",
+          "value": true
+        }
+      ]
+    }
+  },
+  "risks": {
+    "legal": false,
+    "military": false,
+    "custody_guardianship": false,
+    "contested_identity": false
+  },
+  "service_setup": null,
+  "bases": [],
+  "checklist_items": [],
+  "steps": [],
+  "warnings": [
+    {
+      "semantic_id": "nid.damaged.warning.card",
+      "text_ar": "تذكر إرشادات خدمات مصر لاستخراج بدل تالف لبطاقة الرقم القومي «بطاقة الرقم القومي التالفة».",
+      "text_en": "Khadamat Misr's damaged National ID replacement guidance lists the damaged National ID card.",
+      "kind": "administrative",
+      "severity": "info",
+      "role": "general",
+      "display_order": 0
+    },
+    {
+      "semantic_id": "nid.damaged.warning.recheck",
+      "text_ar": "هذه إرشادات بحثية غير مكتملة. خلو قائمة المستندات لا يعني عدم وجود متطلبات. لم يُحسم انطباق مستند الزواج أو استحقاق استخدام القناة التي شملها البحث؛ الرسوم والخطوات والمكتب والمدة غير معروفة. أعد التحقق قبل التصرف. لا تغطي هذه المسودة اجتماع التلف مع انتهاء الصلاحية أو تغيير البيانات.",
+      "text_en": "Incomplete research guidance. An empty checklist does not mean there are no requirements. Marriage-document applicability and entitlement to the researched channel remain unresolved; fees, steps, office and turnaround are unknown. Recheck before acting. This draft does not cover damage combined with expiry or data changes.",
+      "kind": "product",
+      "severity": "important",
+      "role": "regeneration",
+      "display_order": 1
+    }
+  ],
+  "fees": [],
+  "dependencies": [],
+  "routing_associations": [],
+  "evidence_links": [
+    {
+      "semantic_id": "EL-NID-DAMAGED-S10",
+      "owner": {
+        "kind": "warning",
+        "semantic_id": "nid.damaged.warning.card"
+      },
+      "passage": "بطاقة الرقم القومي التالفة",
+      "location": "S10 required-documents anchor; PR147 C-N-08, not a full response transcription.",
+      "applicability_context": "Khadamat Misr channel only. Preserved PR147 head dd0d8cda84a7bda55871836e477341594755f300; attributed retrieval 2026-09-12, no fresh verification. D03 marriage applicability, G02 complete checklist/channel and G07 combined transactions unresolved. No quantities, copies, originals or surrender inferred.",
+      "retrieved_on": "2026-09-12",
+      "support_status": "supports",
+      "sources": [
+        "nid.damaged.source.s10"
+      ]
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "nid.damaged.positive",
+      "kind": "positive",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "plan",
+      "expected_identifiers": {
+        "procedure_version_id": "ordinary_domestic_national_id_damaged_replacement.research-2026-09-22",
+        "checklist_item_ids": [],
+        "step_ids": [],
+        "warning_ids": [
+          "nid.damaged.warning.recheck"
+        ],
+        "fee_ids": [],
+        "routing_status": "unresolved",
+        "routing_association_ids": []
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.missing_citizenship",
+      "kind": "unknown",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "next_question",
+      "expected_identifiers": {
+        "question_id": "q.nid.citizenship"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.missing_national_id_expiry_date",
+      "kind": "unknown",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian"
+      },
+      "expected_result_family": "next_question",
+      "expected_identifiers": {
+        "question_id": "q.nid.expiry_date"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.equal",
+      "kind": "negative",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2026-09-22"
+      },
+      "expected_result_family": "inconclusive",
+      "expected_identifiers": {
+        "reason": "procedure_version_not_applicable"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.expired",
+      "kind": "negative",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2026-09-21"
+      },
+      "expected_result_family": "inconclusive",
+      "expected_identifiers": {
+        "reason": "procedure_version_not_applicable"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.noncitizen",
+      "kind": "negative",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "other",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "inconclusive",
+      "expected_identifiers": {
+        "reason": "procedure_version_not_applicable"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.lost",
+      "kind": "negative",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "lost",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "inconclusive",
+      "expected_identifiers": {
+        "reason": "no_matching_researched_procedure"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.residence",
+      "kind": "negative",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "residence",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "inconclusive",
+      "expected_identifiers": {
+        "reason": "no_matching_researched_procedure"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.outside_egypt",
+      "kind": "negative",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "outside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "inconclusive",
+      "expected_identifiers": {
+        "reason": "no_matching_researched_procedure"
+      },
+      "expected_diagnostics": []
+    },
+    {
+      "name": "nid.damaged.contradictory",
+      "kind": "contradictory",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "none",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2027-01-01"
+      },
+      "expected_result_family": "invalid",
+      "expected_identifiers": {},
+      "expected_diagnostics": [
+        "contradictory_facts",
+        "contradictory_facts"
+      ]
+    },
+    {
+      "name": "nid.damaged.invalid_date",
+      "kind": "contradictory",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": null
+      },
+      "expected_result_family": "invalid",
+      "expected_identifiers": {},
+      "expected_diagnostics": [
+        "invalid_fact_value"
+      ]
+    },
+    {
+      "name": "nid.damaged.tomorrow",
+      "kind": "supported_edge",
+      "evaluation_context": {
+        "evaluation_date": "2026-09-22",
+        "locale": "en"
+      },
+      "source_facts": {
+        "application_location": "inside_egypt",
+        "national_id_possession_state": "damaged",
+        "national_id_data_change_kind": "none",
+        "citizenship": "egyptian",
+        "national_id_expiry_date": "2026-09-23"
+      },
+      "expected_result_family": "plan",
+      "expected_identifiers": {
+        "procedure_version_id": "ordinary_domestic_national_id_damaged_replacement.research-2026-09-22",
+        "checklist_item_ids": [],
+        "step_ids": [],
+        "warning_ids": [
+          "nid.damaged.warning.recheck"
+        ],
+        "fee_ids": [],
+        "routing_status": "unresolved",
+        "routing_association_ids": []
+      },
+      "expected_diagnostics": []
+    }
+  ]
+}

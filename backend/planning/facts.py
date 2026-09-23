@@ -122,6 +122,9 @@ _FACT_DEFINITIONS = {
     "card_expired_before_evaluation_date": FactDefinition(
         "card_expired_before_evaluation_date", "boolean", derived=True
     ),
+    "card_expires_after_evaluation_date": FactDefinition(
+        "card_expires_after_evaluation_date", "boolean", derived=True
+    ),
     "renewal_deadline_date": FactDefinition("renewal_deadline_date", "date", derived=True),
     "renewal_deadline_passed": FactDefinition("renewal_deadline_passed", "boolean", derived=True),
     "only_son_candidate": FactDefinition("only_son_candidate", "boolean", derived=True),

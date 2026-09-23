@@ -14,12 +14,13 @@ from planning import (
 
 class FactRegistryTests(unittest.TestCase):
     def test_registry_is_complete_and_roles_are_exact(self) -> None:
-        self.assertEqual(len(FACT_DEFINITIONS), 39)
+        self.assertEqual(len(FACT_DEFINITIONS), 40)
         self.assertEqual(
             {key for key, item in FACT_DEFINITIONS.items() if item.derived},
             {
                 "age_years_on_evaluation_date",
                 "card_expired_before_evaluation_date",
+                "card_expires_after_evaluation_date",
                 "only_son_candidate",
                 "renewal_deadline_date",
                 "renewal_deadline_passed",
@@ -34,6 +35,13 @@ class FactRegistryTests(unittest.TestCase):
         self.assertIs(type(definition.enum_values), tuple)
         with self.assertRaises(FrozenInstanceError):
             definition.key = "changed"  # type: ignore[misc]
+        future_expiry = FACT_DEFINITIONS["card_expires_after_evaluation_date"]
+        self.assertEqual(
+            future_expiry,
+            FactDefinition("card_expires_after_evaluation_date", "boolean", derived=True),
+        )
+        with self.assertRaises(FrozenInstanceError):
+            future_expiry.derived = False  # type: ignore[misc]
         diagnostic = ValidationDiagnostic("x", ("facts", "x"))
         with self.assertRaises(FrozenInstanceError):
             diagnostic.code = "y"  # type: ignore[misc]

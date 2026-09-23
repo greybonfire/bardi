@@ -27,11 +27,20 @@ The exact `v1` derivations are:
 
 - `age_years_on_evaluation_date` from `birth_date`: completed Gregorian calendar years. The year increments when the evaluation month/day reaches the birth month/day; consequently a February 29 birth reaches its next year on March 1 in a non-leap year. A birth date after the evaluation date is invalid at `facts.birth_date`.
 - `card_expired_before_evaluation_date` from `national_id_expiry_date`: `evaluation_date > national_id_expiry_date`.
+- `card_expires_after_evaluation_date` from `national_id_expiry_date`: `national_id_expiry_date > evaluation_date`. This additive boolean is false at equality, not the negation of `card_expired_before_evaluation_date`; omission remains UNKNOWN.
 - `renewal_deadline_date` from `national_id_expiry_date`: add three calendar months, clamping the day to the destination month's last day (for example January 31 becomes April 30).
 - `renewal_deadline_passed` from `national_id_expiry_date`: `evaluation_date > renewal_deadline_date`.
 - `only_son_candidate` from `father_alive` and `other_living_sons_of_father_count`: true exactly when the father is alive and the other-living-sons count is zero.
 
-All operands are already validated Python calendar `date`, exact booleans, or exact integers. Derivation does no parsing, timestamp/timezone conversion, or implicit coercion. Equality at expiry and deadline boundaries is false because both comparisons are strict. Calendar overflow is safely reported against `facts.national_id_expiry_date`, without leaking an exception. If a derivation is unavailable, its prepared dependency set contains only omitted source keys; derived keys never enter the original `submitted_keys` set and Questions may resolve only those source dependencies.
+The additive `card_expires_after_evaluation_date` key preserves all existing `v1` meanings under
+ADR 0001. Its pinned definition is boolean, derived, with no enum values or minimum; its sole
+source dependency is `national_id_expiry_date`. Code registration does not install or publish a
+catalog Fact: the original 39 seeded definitions remain unchanged. A compatible definition may
+be explicitly installed through native model/Admin operations, initially unpublished. Catalogs
+that omit it retain their existing prepared Facts. Questions continue to resolve the existing
+expiry source Fact, never the derived key. No migration or automatic publication is implied.
+
+All operands are already validated Python calendar `date`, exact booleans, or exact integers. Derivation does no parsing, timestamp/timezone conversion, or implicit coercion. Equality at expiry and deadline boundaries is false because the comparisons are strict. Calendar overflow is safely reported against `facts.national_id_expiry_date`, without leaking an exception. If a derivation is unavailable, its prepared dependency set contains only omitted source keys; derived keys never enter the original `submitted_keys` set and Questions may resolve only those source dependencies.
 
 ## Typed predicate AST
 

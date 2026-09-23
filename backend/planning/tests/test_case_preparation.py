@@ -13,6 +13,8 @@ from planning import (
     LocalizedText,
     Predicate,
     ServiceSnapshot,
+    TruthValue,
+    evaluate,
     prepare_case,
 )
 
@@ -28,6 +30,7 @@ def definitions(*keys: str) -> dict[str, FactDefinition]:
     dependencies = {
         "age_years_on_evaluation_date": {"birth_date"},
         "card_expired_before_evaluation_date": {"national_id_expiry_date"},
+        "card_expires_after_evaluation_date": {"national_id_expiry_date"},
         "renewal_deadline_date": {"national_id_expiry_date"},
         "renewal_deadline_passed": {"national_id_expiry_date"},
         "only_son_candidate": {"father_alive", "other_living_sons_of_father_count"},
@@ -77,6 +80,65 @@ class CasePreparationTests(unittest.TestCase):
         self.assertTrue(february.values["renewal_deadline_passed"])
         equal_expiry = self.successful(defs, {"national_id_expiry_date": date(2026, 9, 1)})
         self.assertFalse(equal_expiry.values["card_expired_before_evaluation_date"])
+
+    def test_future_expiry_is_additive_strict_and_optional(self) -> None:
+        key = "card_expires_after_evaluation_date"
+        old_key = "card_expired_before_evaluation_date"
+        old_defs = definitions(old_key, "renewal_deadline_date", "renewal_deadline_passed")
+        new_defs = {**old_defs, key: FACT_DEFINITIONS[key]}
+        for expiry, expected, expired in (
+            (date(2026, 8, 31), False, True),
+            (date(2026, 9, 1), False, False),
+            (date(2026, 9, 2), True, False),
+        ):
+            with self.subTest(expiry=expiry):
+                facts = {"national_id_expiry_date": expiry}
+                old = self.successful(old_defs, facts)
+                new = self.successful(new_defs, facts)
+                self.assertNotIn(key, old.values)
+                self.assertEqual(old.values, {k: v for k, v in new.values.items() if k != key})
+                self.assertIs(new.values[key], expected)
+                self.assertIs(new.values[old_key], expired)
+                self.assertEqual(new.submitted_keys, frozenset(facts))
+        missing = self.successful(new_defs, {})
+        self.assertNotIn(key, missing.values)
+        self.assertEqual(
+            missing.missing_source_dependencies[key], frozenset({"national_id_expiry_date"})
+        )
+        self.assertIs(
+            evaluate(Predicate("eq", key, True), missing.values, submitted_keys=frozenset()).value,
+            TruthValue.UNKNOWN,
+        )
+        # A comparison alone does not inherit the legacy deadline's calendar overflow.
+        maximum = self.successful(definitions(key), {"national_id_expiry_date": date.max}, date.max)
+        self.assertIs(maximum.values[key], False)
+
+    def test_future_expiry_rejects_invalid_input_and_incompatible_definition(self) -> None:
+        key = "card_expires_after_evaluation_date"
+        defs = definitions(key)
+        for facts, code in (
+            ({key: True}, f"derived_fact_cannot_be_submitted:{key}"),
+            ({key: False}, f"derived_fact_cannot_be_submitted:{key}"),
+            ({"national_id_expiry_date": None}, "invalid_fact_value:national_id_expiry_date"),
+            (
+                {"national_id_expiry_date": "2026-09-02"},
+                "invalid_fact_value:national_id_expiry_date",
+            ),
+            (
+                {"national_id_expiry_date": datetime(2026, 9, 2)},
+                "invalid_fact_value:national_id_expiry_date",
+            ),
+        ):
+            with self.subTest(facts=facts):
+                outcome = prepare_case(defs, service(), facts, date(2026, 9, 1))
+                self.assertIsInstance(outcome, CasePreparationInvalid)
+                assert isinstance(outcome, CasePreparationInvalid)
+                self.assertEqual(tuple(item.code for item in outcome.diagnostics), (code,))
+        incompatible = {**defs, key: FactDefinition(key, "date", derived=True)}
+        self.assertEqual(
+            prepare_case(incompatible, service(), {}, date(2026, 9, 1)),
+            CasePreparationConfigurationDefect((f"unsupported_derived_fact:{key}",)),
+        )
 
     def test_only_son_and_missing_dependencies(self) -> None:
         defs = definitions("only_son_candidate")

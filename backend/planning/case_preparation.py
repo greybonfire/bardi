@@ -25,6 +25,7 @@ DERIVED_FACT_DEPENDENCIES: Mapping[str, frozenset[str]] = MappingProxyType(
     {
         "age_years_on_evaluation_date": frozenset({"birth_date"}),
         "card_expired_before_evaluation_date": frozenset({"national_id_expiry_date"}),
+        "card_expires_after_evaluation_date": frozenset({"national_id_expiry_date"}),
         "renewal_deadline_date": frozenset({"national_id_expiry_date"}),
         "renewal_deadline_passed": frozenset({"national_id_expiry_date"}),
         "only_son_candidate": frozenset({"father_alive", "other_living_sons_of_father_count"}),
@@ -126,7 +127,7 @@ def prepare_case(
 ) -> CasePreparationOutcome:
     """Validate and prepare one case before any Procedure predicate is evaluated.
 
-    Only the five implementations registered in this module can produce derived values.
+    Only the implementations registered in this module can produce derived values.
     Catalog definitions merely opt a compatible derived key into the prepared snapshot.
     """
 
@@ -182,6 +183,7 @@ def prepare_case(
             values[key] = _completed_years(birth, evaluation_date)
         elif key in {
             "card_expired_before_evaluation_date",
+            "card_expires_after_evaluation_date",
             "renewal_deadline_date",
             "renewal_deadline_passed",
         }:
@@ -197,6 +199,8 @@ def prepare_case(
                 )
             if key == "card_expired_before_evaluation_date":
                 values[key] = evaluation_date > expiry
+            elif key == "card_expires_after_evaluation_date":
+                values[key] = expiry > evaluation_date
             else:
                 try:
                     deadline = _add_calendar_months(expiry, 3)

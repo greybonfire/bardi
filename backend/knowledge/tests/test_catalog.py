@@ -35,10 +35,30 @@ class CatalogModelTests(TestCase):
             semantic_id="service_two", text_ar="خدمة أخرى", text_en="Other"
         )
 
-    def test_seed_exactly_matches_pure_registry(self) -> None:
+    def test_seed_is_exact_legacy_39_compatible_registry_subset(self) -> None:
         self.assertEqual(FactDefinition.objects.count(), 39)
-        self.assertEqual(load_fact_definitions(), FACT_DEFINITIONS)
+        self.assertEqual(
+            load_fact_definitions(),
+            {
+                key: definition
+                for key, definition in FACT_DEFINITIONS.items()
+                if key != "card_expires_after_evaluation_date"
+            },
+        )
         self.assertEqual(compatibility_errors(FactDefinition.objects.all()), ())
+
+    def test_future_expiry_definition_is_optional_native_and_unpublished(self) -> None:
+        key = "card_expires_after_evaluation_date"
+        self.assertNotIn(key, load_fact_definitions())
+        with self.assertRaises(ValidationError):
+            FactDefinition.objects.create(key=key, kind="date", derived=True)
+        fact = FactDefinition.objects.create(
+            key=key, kind="boolean", enum_values=[], minimum=None, derived=True
+        )
+        self.assertFalse(fact.is_published)
+        self.assertEqual(FactDefinition.objects.count(), 40)
+        self.assertEqual(load_fact_definitions(), FACT_DEFINITIONS)
+        self.assertEqual(compatibility_errors([fact]), ())
 
     def test_only_exact_pinned_derived_definitions_can_be_authored(self) -> None:
         source = FactDefinition.objects.create(
@@ -245,6 +265,23 @@ class PublishedFactTriggerTests(TransactionTestCase):
         with self.assertRaises(DatabaseError), transaction.atomic():
             FactDefinition.objects.filter(pk=fact.pk).delete()
         self.assertFalse(FactDefinition.objects.get(pk=fact.pk).derived)
+
+    def test_published_future_expiry_definition_is_immutable(self) -> None:
+        fact = FactDefinition.objects.create(
+            key="card_expires_after_evaluation_date", kind="boolean", derived=True
+        )
+        self.assertFalse(fact.is_published)
+        # Publication is explicit and confined to this disposable regression fixture.
+        fact.is_published = True
+        fact.save()
+        fact.derived = False
+        with self.assertRaises(ValidationError):
+            fact.save()
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            FactDefinition.objects.filter(pk=fact.pk).update(derived=False)
+        with self.assertRaises(DatabaseError), transaction.atomic():
+            FactDefinition.objects.filter(pk=fact.pk).delete()
+        self.assertTrue(FactDefinition.objects.get(pk=fact.pk).derived)
 
     def test_nonsemantic_noop_update_is_allowed(self) -> None:
         fact = FactDefinition.objects.get(key="is_student")
